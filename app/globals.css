@@ -613,6 +613,7 @@ button:disabled {
 .chip.discount {
   background: #245a3a;
   color: #a5edb4;
+  gap: 3px;
 }
 .chip.good {
   background: rgba(107, 214, 138, 0.16);
