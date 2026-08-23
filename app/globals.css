@@ -410,6 +410,13 @@ button:disabled {
   background: rgba(27, 109, 155, 0.85);
   color: white;
 }
+.cardBadge.manual {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(151, 107, 214, 0.85);
+  color: white;
+}
 .cardCover img {
   width: 100%;
   height: 100%;
@@ -639,6 +646,82 @@ button:disabled {
   background: transparent;
   border: 1px dashed var(--line);
   color: var(--muted);
+}
+.chip.manual {
+  background: rgba(151, 107, 214, 0.18);
+  color: #c6a9f5;
+  gap: 4px;
+}
+.manualRemoveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.manualRemoveBtn:hover {
+  color: #ef7a86;
+}
+.manualAddPanel {
+  padding: 16px;
+}
+.manualAddPanel .field label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.manualAddRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.manualAddRow select {
+  background: #0c1420;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.manualResults {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.manualResultBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 6px 10px;
+  text-align: left;
+}
+.manualResultBtn:hover {
+  border-color: var(--accent);
+}
+.manualResultBtn img {
+  width: 60px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: none;
 }
 .empty {
   text-align: center;
