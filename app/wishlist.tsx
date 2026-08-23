@@ -737,6 +737,12 @@ export default function Wishlist() {
   function switchView(next: View) {
     setView(next);
     setSortKey(null);
+    // Convenience default, not a hard link between the two - same person uses both tabs far more
+    // often than not, so prefill from whatever's already on the wishlist tab, but only if the
+    // library tab hasn't been given its own value yet (never overwrites something already typed).
+    if (next === "library" && !libSteamId && wlSteamId) {
+      setLibSteamId(wlSteamId);
+    }
   }
   const [nameQuery, setNameQuery] = useState("");
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
