@@ -246,7 +246,7 @@ button:disabled {
 .headRight {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   margin-left: auto;
   flex: none;
 }
@@ -511,6 +511,10 @@ button:disabled {
   box-sizing: border-box;
   overflow: hidden;
 }
+.coverWrap {
+  position: relative;
+  flex: none;
+}
 .cover {
   display: block;
   width: 180px;
@@ -519,6 +523,22 @@ button:disabled {
   background: #263e57;
   flex: none;
   overflow: hidden;
+}
+.coverBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 18px;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 4px;
+}
+.coverBadge.manual {
+  background: rgba(151, 107, 214, 0.9);
+  color: white;
 }
 .cover img {
   width: 100%;
@@ -835,6 +855,9 @@ button:disabled {
     align-items: stretch;
     padding: 0;
     gap: 0;
+  }
+  .coverWrap {
+    width: 100%;
   }
   .cover {
     width: 100%;

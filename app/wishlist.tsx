@@ -409,34 +409,53 @@ function GameRow({
   const linkable = item.appid > 0;
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
-      {linkable ? (
-        <a
-          className="cover"
-          href={`https://store.steampowered.com/app/${item.appid}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={
-            view === "library"
-              ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
-              : "스팀 상점 페이지 열기"
-          }
-          onClick={(e) => {
-            if (view !== "library" || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-            e.preventDefault();
-            openLibraryOrStore(item.appid);
-          }}
-        >
-          {g?.headerImage ? (
-            <img src={g.headerImage} alt="" loading="lazy" decoding="async" />
-          ) : (
-            <div className="loadingCover">LOADING</div>
-          )}
-        </a>
-      ) : (
-        <div className="cover">
-          <div className="loadingCover">이미지 없음</div>
-        </div>
-      )}
+      <div className="coverWrap">
+        {linkable ? (
+          <a
+            className="cover"
+            href={`https://store.steampowered.com/app/${item.appid}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={
+              view === "library"
+                ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
+                : "스팀 상점 페이지 열기"
+            }
+            onClick={(e) => {
+              if (view !== "library" || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              e.preventDefault();
+              openLibraryOrStore(item.appid);
+            }}
+          >
+            {g?.headerImage ? (
+              <img src={g.headerImage} alt="" loading="lazy" decoding="async" />
+            ) : (
+              <div className="loadingCover">LOADING</div>
+            )}
+          </a>
+        ) : (
+          <div className="cover">
+            <div className="loadingCover">이미지 없음</div>
+          </div>
+        )}
+        {manual && (
+          <span className="coverBadge manual">
+            {MANUAL_PLATFORM_LABELS[manual]}
+            <button
+              type="button"
+              className="manualRemoveBtn"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onRemoveManual(item.appid);
+              }}
+              title="목록에서 제거"
+            >
+              ×
+            </button>
+          </span>
+        )}
+      </div>
       <div className="info">
         <h3>
           {linkable ? (
@@ -543,19 +562,6 @@ function GameRow({
           ) : null}
           {g?.comingSoon ? (
             <span className="chip">{g.releaseUnannounced ? "출시 미정" : "출시 예정"}</span>
-          ) : null}
-          {manual ? (
-            <span className="chip manual">
-              {MANUAL_PLATFORM_LABELS[manual]}
-              <button
-                type="button"
-                className="manualRemoveBtn"
-                onClick={() => onRemoveManual(item.appid)}
-                title="목록에서 제거"
-              >
-                ×
-              </button>
-            </span>
           ) : null}
         </div>
         {view === "wishlist" && (g?.releaseDate || g?.discountEndDate) ? (
