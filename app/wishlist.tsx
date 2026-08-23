@@ -1677,7 +1677,18 @@ export default function Wishlist() {
               onClick={() => setMobileFiltersOpen(false)}
               aria-label="필터 닫기"
             >
-              ✕
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <line x1="4" y1="4" x2="20" y2="20" />
+                <line x1="20" y1="4" x2="4" y2="20" />
+              </svg>
             </button>
           </div>
           {view === "wishlist" && (
@@ -1973,7 +1984,18 @@ export default function Wishlist() {
                 onClick={closeManualForm}
                 aria-label="닫기"
               >
-                ✕
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <line x1="4" y1="4" x2="20" y2="20" />
+                  <line x1="20" y1="4" x2="4" y2="20" />
+                </svg>
               </button>
             </div>
             <div className="row">
