@@ -382,6 +382,7 @@ function GameRow({
   rowHeight,
   manualPlatform,
   onRemoveManual,
+  steamId,
 }: RowComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -395,6 +396,7 @@ function GameRow({
   onCheckAchievement: (appid: number) => void;
   rowHeight: number;
   manualPlatform: Record<number, ManualPlatform>;
+  steamId: string;
   onRemoveManual: (appid: number) => void;
 }>) {
   const item = items[index];
@@ -538,9 +540,15 @@ function GameRow({
             <span className="chip">플레이타임 {(item.playtimeMinutes / 60).toFixed(1)}시간</span>
           ) : null}
           {achievement != null ? (
-            <span className={"chip " + scoreClass(achievement.percent)} title="업적 달성률">
+            <a
+              className={"chip " + scoreClass(achievement.percent)}
+              href={`https://steamcommunity.com/profiles/${steamId}/stats/${item.appid}/achievements`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Steam에서 업적 목록 보기"
+            >
               업적 {achievement.percent}% ({achievement.achieved}/{achievement.total})
-            </span>
+            </a>
           ) : view === "library" && achievement === undefined && !manual ? (
             <button
               type="button"
@@ -2079,6 +2087,7 @@ export default function Wishlist() {
                 rowHeight: isMobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT,
                 manualPlatform,
                 onRemoveManual: removeManualGame,
+                steamId,
               }}
               style={{ height: listSize.height, width: "100%" }}
             />
