@@ -884,19 +884,32 @@ export default function Wishlist() {
       .then((r) => r.json())
       .then((d) => {
         if (!d.configured) return;
-        if (d.statusMap) {
+        // An empty map from the server is indistinguishable from "nothing pushed yet" vs. "you
+        // really cleared everything" - so when local already has real entries, prefer local over
+        // a server value that would wipe it. A stale/empty push (e.g. from a fresh session that
+        // hadn't loaded its own data yet) can otherwise silently erase everything on next load.
+        if (
+          d.statusMap &&
+          (Object.keys(d.statusMap).length > 0 || Object.keys(statusMap).length === 0)
+        ) {
           setStatusMap(d.statusMap);
           try {
             localStorage.setItem(STATUS_STORAGE_KEY, JSON.stringify(d.statusMap));
           } catch {}
         }
-        if (d.ratingMap) {
+        if (
+          d.ratingMap &&
+          (Object.keys(d.ratingMap).length > 0 || Object.keys(ratingMap).length === 0)
+        ) {
           setRatingMap(d.ratingMap);
           try {
             localStorage.setItem(RATING_STORAGE_KEY, JSON.stringify(d.ratingMap));
           } catch {}
         }
-        if (d.achievementMap) {
+        if (
+          d.achievementMap &&
+          (Object.keys(d.achievementMap).length > 0 || Object.keys(achievementMap).length === 0)
+        ) {
           setAchievementMap(d.achievementMap);
           try {
             localStorage.setItem(ACHIEVEMENT_STORAGE_KEY, JSON.stringify(d.achievementMap));
@@ -1067,6 +1080,9 @@ export default function Wishlist() {
         syncFromServer(savedLibId);
       }
     } catch {}
+    // Intentionally mount-only (see comment above the effect) - syncFromServer is recreated every
+    // render, but only the version captured here, at mount, is ever meant to run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
   function persistTo(
