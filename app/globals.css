@@ -74,7 +74,7 @@ body {
   text-decoration: none;
   min-width: 0;
 }
-.logoutBtn {
+.smallBtn {
   flex: none;
   padding: 6px 10px;
   font-size: 11px;
@@ -82,7 +82,7 @@ body {
   border: 1px solid var(--line);
   color: var(--muted);
 }
-.logoutBtn:hover {
+.smallBtn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -301,6 +301,134 @@ button:disabled {
 .gameList::-webkit-scrollbar-thumb {
   background: var(--line);
   border-radius: 99px;
+}
+.gameGrid {
+  scrollbar-width: thin;
+}
+.gameGrid::-webkit-scrollbar {
+  width: 8px;
+}
+.gameGrid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.gameGrid::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
+}
+.layoutToggle {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+.layoutToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.layoutToggleBtn.active {
+  background: #1b6d9b;
+  border-color: var(--accent);
+  color: white;
+}
+.refreshBtn {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.refreshBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cardCellOuter {
+  box-sizing: border-box;
+  padding: 7px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #111c2a;
+  border: 1px solid #29384b;
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+.cardCover {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  flex: none;
+  background: #263e57;
+}
+.cardBadges {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
+}
+.cardBadge {
+  line-height: 20px;
+  font-size: 12px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgba(15, 23, 32, 0.75);
+  backdrop-filter: blur(2px);
+}
+.cardBadge.good {
+  color: #6bd68a;
+}
+.cardBadge.mid {
+  color: #f5d06e;
+}
+.cardBadge.bad {
+  color: #ef7a86;
+}
+.cardBadge.status {
+  background: rgba(27, 109, 155, 0.85);
+  color: white;
+}
+.cardCover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cardInfo {
+  padding: 8px 10px;
+  min-width: 0;
+}
+.cardInfo h4 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cardMeta {
+  margin: 0;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .filterGroup + .filterGroup {
   margin-top: 16px;

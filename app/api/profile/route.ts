@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const steamId = request.nextUrl.searchParams.get("steamid");
-  const key = request.nextUrl.searchParams.get("key");
+  // GetPlayerSummaries just needs *a* valid key for Valve's own rate limiting - it doesn't have to
+  // belong to the profile being looked up - so the wishlist tab (which never collects a key from
+  // the user) can still show a profile card by falling back to a server-side key from env.
+  const key = request.nextUrl.searchParams.get("key") || process.env.STEAM_API_KEY;
   if (!steamId || !key)
     return NextResponse.json({ error: "steamid, key가 필요합니다." }, { status: 400 });
   if (!/^\d{17}$/.test(steamId))

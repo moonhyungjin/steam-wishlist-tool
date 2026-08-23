@@ -29,7 +29,11 @@ export async function GET(request: NextRequest) {
         try {
           const url = new URL("https://store.steampowered.com/api/appdetails");
           url.searchParams.set("appids", String(appid));
-          url.searchParams.set("cc", "kr");
+          // No cc here on purpose - the score itself isn't region-specific, but this endpoint
+          // has been observed to silently return `null` (no wrapper object at all, not even
+          // success:false) for some titles when filters=metacritic is combined with cc=kr
+          // specifically (e.g. Satisfactory/526870), while cc=us or omitting cc entirely both
+          // return the score fine for the same app.
           url.searchParams.set("filters", "metacritic");
           const response = await fetch(url, {
             cache: "no-store",

@@ -83,6 +83,9 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .slice(0, 15);
     const finalPrice = opt ? Number(opt.final_price_in_cents) : null;
+    const discountEndTimestamp = opt?.active_discounts?.[0]?.discount_end_date
+      ? opt.active_discounts[0].discount_end_date * 1000
+      : null;
     // elanguage 4 is Korean in Valve's language enum (verified empirically: Cyberpunk 2077,
     // which has an official Korean dub, reports elanguage 4 with full_audio true).
     // supported_languages only lists languages Steam actually supports (unsupported ones are
@@ -124,6 +127,15 @@ export async function GET(request: NextRequest) {
       initialPrice: opt?.formatted_original_price ?? null,
       priceValue: finalPrice,
       discountPercent: opt?.discount_pct ?? 0,
+      discountEndDate: discountEndTimestamp
+        ? new Date(discountEndTimestamp).toLocaleDateString("ko-KR", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            timeZone: "Asia/Seoul",
+          })
+        : null,
+      discountEndTimestamp,
       reviewPositive: item.reviews?.summary_filtered?.percent_positive ?? null,
       metacritic: null,
       koreanSupported,
