@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grid, List, type CellComponentProps, type RowComponentProps } from "react-window";
 type Item = { appid: number; playtimeMinutes?: number };
 type View = "wishlist" | "library";
@@ -26,6 +26,32 @@ type Game = {
   adultContent: boolean;
   isDemo: boolean;
 };
+// Placeholder for a manually-added game with no Steam match - every other field just means "no
+// data available" rather than "really zero/false", since none of it was actually looked up.
+function blankGame(appid: number, name: string): Game {
+  return {
+    appid,
+    name,
+    headerImage: null,
+    genres: [],
+    releaseDate: null,
+    releaseTimestamp: null,
+    comingSoon: false,
+    releaseUnannounced: false,
+    earlyAccess: false,
+    price: "정보 없음",
+    initialPrice: null,
+    priceValue: null,
+    discountPercent: 0,
+    discountEndDate: null,
+    discountEndTimestamp: null,
+    reviewPositive: null,
+    metacritic: null,
+    koreanSupported: false,
+    adultContent: false,
+    isDemo: false,
+  };
+}
 type SortKey =
   | "price-asc"
   | "review"
@@ -76,6 +102,18 @@ const API_KEY_STORAGE_KEY = "steam:apikey";
 // alongside their own library), so each tab keeps its own ID64 rather than sharing one.
 const WL_STEAM_ID_STORAGE_KEY = "wishlist:steamid";
 const LIB_STEAM_ID_STORAGE_KEY = "library:steamid";
+// Games bought outside Steam (Epic, STOVE, ...) with no API to pull from - added by hand, matched
+// by name against Steam's public search purely for metadata (image/genres/metacritic), completely
+// unrelated to whether this Steam account actually owns them. Kept in their own storage key, apart
+// from the Steam-fetched library cache, so a library refresh never wipes them.
+type ManualPlatform = "epic" | "stove" | "other";
+const MANUAL_PLATFORM_LABELS: Record<ManualPlatform, string> = {
+  epic: "Epic",
+  stove: "STOVE",
+  other: "기타",
+};
+const MANUAL_PLATFORM_STORAGE_KEY = "library:manual";
+const MANUAL_GAMES_STORAGE_KEY = "library:manualGames";
 // Bump this whenever the Game shape changes - otherwise old cached entries silently keep
 // missing the new fields forever, since "resume from cache" treats them as already loaded.
 const CACHE_VERSION = 11;
@@ -141,10 +179,12 @@ function prioritizeAchievementOrder(
     genreFilter: string[];
     statusFilter: (PlayStatus | "none")[];
     ratingFilter: (Rating | "none")[];
+    platformFilter: ("steam" | ManualPlatform)[];
     excludeAdult: boolean;
     demoOnly: boolean;
     statusMap: Record<number, PlayStatus>;
     ratingMap: Record<number, Rating>;
+    manualPlatform: Record<number, ManualPlatform>;
   },
 ): number[] {
   const q = filters.nameQuery.trim().toLowerCase();
@@ -165,6 +205,10 @@ function prioritizeAchievementOrder(
     if (filters.ratingFilter.length) {
       const r = filters.ratingMap[item.appid] ?? "none";
       if (!filters.ratingFilter.includes(r)) return false;
+    }
+    if (filters.platformFilter.length) {
+      const p = filters.manualPlatform[item.appid] ?? "steam";
+      if (!filters.platformFilter.includes(p)) return false;
     }
     return true;
   }
@@ -336,6 +380,9 @@ function GameRow({
   checkingAchievements,
   onCheckAchievement,
   rowHeight,
+  manualPlatform,
+  onRemoveManual,
+  steamId,
 }: RowComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -348,6 +395,9 @@ function GameRow({
   checkingAchievements: Set<number>;
   onCheckAchievement: (appid: number) => void;
   rowHeight: number;
+  manualPlatform: Record<number, ManualPlatform>;
+  steamId: string;
+  onRemoveManual: (appid: number) => void;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -355,63 +405,98 @@ function GameRow({
   const rating = ratingMap[item.appid];
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
+  // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
+  // to - everything else about a manual entry behaves the same either way.
+  const manual = manualPlatform[item.appid];
+  const linkable = item.appid > 0;
+  // A manual entry is never actually owned in this account's library even when it matched a real
+  // Steam appid, so the steam:// launch-the-installed-client attempt would just burn its timeout
+  // for nothing - go straight to the store page instead.
+  const tryLibrary = view === "library" && !manual;
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
-      <a
-        className="cover"
-        href={`https://store.steampowered.com/app/${item.appid}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={
-          view === "library"
-            ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
-            : "스팀 상점 페이지 열기"
-        }
-        onClick={(e) => {
-          if (view !== "library" || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-          e.preventDefault();
-          openLibraryOrStore(item.appid);
-        }}
-      >
-        {g?.headerImage ? (
-          <img src={g.headerImage} alt="" loading="lazy" decoding="async" />
-        ) : (
-          <div className="loadingCover">LOADING</div>
-        )}
-      </a>
-      <div className="info">
-        <h3>
+      {manual && (
+        <span className="rowBadge manual">
+          {MANUAL_PLATFORM_LABELS[manual]}
+          <button
+            type="button"
+            className="manualRemoveBtn"
+            onClick={() => onRemoveManual(item.appid)}
+            title="목록에서 제거"
+          >
+            ×
+          </button>
+        </span>
+      )}
+      <div className="coverWrap">
+        {linkable ? (
           <a
-            className="storeLink"
+            className="cover"
             href={`https://store.steampowered.com/app/${item.appid}`}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => {
-              if (view !== "library" || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-              e.preventDefault();
-              openLibraryOrStore(item.appid);
-            }}
             title={
-              view === "library"
+              tryLibrary
                 ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
                 : "스팀 상점 페이지 열기"
             }
+            onClick={(e) => {
+              if (!tryLibrary || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              e.preventDefault();
+              openLibraryOrStore(item.appid);
+            }}
           >
-            <span className="storeLinkText">{g?.name ?? `Steam App ${item.appid}`}</span>
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </svg>
+            {g?.headerImage ? (
+              <img src={g.headerImage} alt="" loading="lazy" decoding="async" />
+            ) : (
+              <div className="loadingCover">LOADING</div>
+            )}
           </a>
+        ) : (
+          <div className="cover">
+            <div className="loadingCover">이미지 없음</div>
+          </div>
+        )}
+      </div>
+      <div className="info">
+        <h3>
+          {linkable ? (
+            <a
+              className="storeLink"
+              href={`https://store.steampowered.com/app/${item.appid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!tryLibrary || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                e.preventDefault();
+                openLibraryOrStore(item.appid);
+              }}
+              title={
+                tryLibrary
+                  ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
+                  : "스팀 상점 페이지 열기"
+              }
+            >
+              <span className="storeLinkText">{g?.name ?? `Steam App ${item.appid}`}</span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </a>
+          ) : (
+            <span className="storeLink" style={{ color: "var(--text)" }}>
+              <span className="storeLinkText">{g?.name ?? `Steam App ${item.appid}`}</span>
+            </span>
+          )}
         </h3>
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
         <div className="badges">
@@ -455,10 +540,29 @@ function GameRow({
             <span className="chip">플레이타임 {(item.playtimeMinutes / 60).toFixed(1)}시간</span>
           ) : null}
           {achievement != null ? (
-            <span className={"chip " + scoreClass(achievement.percent)} title="업적 달성률">
+            <a
+              className={"chip " + scoreClass(achievement.percent)}
+              href={`https://steamcommunity.com/profiles/${steamId}/stats/${item.appid}/achievements`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Steam에서 업적 목록 보기"
+            >
               업적 {achievement.percent}% ({achievement.achieved}/{achievement.total})
-            </span>
-          ) : view === "library" && achievement === undefined ? (
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </a>
+          ) : view === "library" && achievement === undefined && !manual ? (
             <button
               type="button"
               className="chip pending"
@@ -527,6 +631,8 @@ function CardCell({
   columnCount,
   statusMap,
   ratingMap,
+  manualPlatform,
+  onRemoveManual,
 }: CellComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -534,6 +640,8 @@ function CardCell({
   columnCount: number;
   statusMap: Record<number, PlayStatus>;
   ratingMap: Record<number, Rating>;
+  manualPlatform: Record<number, ManualPlatform>;
+  onRemoveManual: (appid: number) => void;
 }>) {
   const index = rowIndex * columnCount + columnIndex;
   const item = items[index];
@@ -541,56 +649,86 @@ function CardCell({
   const g = games[item.appid];
   const status = statusMap[item.appid];
   const rating = ratingMap[item.appid];
+  const manual = manualPlatform[item.appid];
+  const linkable = item.appid > 0;
+  const cardContent = (
+    <>
+      <div className="cardCover">
+        {g?.headerImage ? (
+          <img src={g.headerImage} alt="" loading="lazy" decoding="async" />
+        ) : (
+          <div className="loadingCover">{linkable ? "LOADING" : "이미지 없음"}</div>
+        )}
+        {view === "wishlist" && (g?.metacritic != null || g?.reviewPositive != null) ? (
+          <div className="cardBadges">
+            {g.metacritic != null ? (
+              <span className={"cardBadge " + scoreClass(g.metacritic)}>메타 {g.metacritic}</span>
+            ) : null}
+            {g.reviewPositive != null ? (
+              <span className={"cardBadge " + scoreClass(g.reviewPositive)}>
+                리뷰 {g.reviewPositive}%
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {view === "library" && (status || rating) ? (
+          <div className="cardBadges">
+            {status && <span className="cardBadge status">{STATUS_LABELS[status]}</span>}
+            {rating && <span className="cardBadge">{RATING_EMOJI[rating]}</span>}
+          </div>
+        ) : null}
+        {manual && (
+          <div className="cardBadges cardBadgesRight">
+            {/* The only clickable thing in this overlay - stopped from bubbling up into the
+                whole-card link, which would otherwise also navigate away on click. */}
+            <span className="cardBadge manual">
+              {MANUAL_PLATFORM_LABELS[manual]}
+              <button
+                type="button"
+                className="manualRemoveBtn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRemoveManual(item.appid);
+                }}
+                title="목록에서 제거"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="cardInfo">
+        <h4>{g?.name ?? `Steam App ${item.appid}`}</h4>
+        {view === "library"
+          ? item.playtimeMinutes != null && (
+              <p className="cardMeta">{(item.playtimeMinutes / 60).toFixed(1)}시간</p>
+            )
+          : g?.price && (
+              <p className="cardMeta">
+                {g.price}
+                {g.discountPercent ? ` (-${g.discountPercent}%)` : ""}
+              </p>
+            )}
+      </div>
+    </>
+  );
   return (
     <div style={style} className="cardCellOuter">
-      <a
-        className="card"
-        href={`https://store.steampowered.com/app/${item.appid}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={g?.name ?? `Steam App ${item.appid}`}
-      >
-        <div className="cardCover">
-          {g?.headerImage ? (
-            <img src={g.headerImage} alt="" loading="lazy" decoding="async" />
-          ) : (
-            <div className="loadingCover">LOADING</div>
-          )}
-          {view === "wishlist" && (g?.metacritic != null || g?.reviewPositive != null) ? (
-            <div className="cardBadges">
-              {g.metacritic != null ? (
-                <span className={"cardBadge " + scoreClass(g.metacritic)}>메타 {g.metacritic}</span>
-              ) : null}
-              {g.reviewPositive != null ? (
-                <span className={"cardBadge " + scoreClass(g.reviewPositive)}>
-                  리뷰 {g.reviewPositive}%
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-          {view === "library" && (status || rating) ? (
-            // Display-only - this sits inside the whole-card link, so it must never be
-            // clickable (a click here would both toggle it and navigate away).
-            <div className="cardBadges">
-              {status && <span className="cardBadge status">{STATUS_LABELS[status]}</span>}
-              {rating && <span className="cardBadge">{RATING_EMOJI[rating]}</span>}
-            </div>
-          ) : null}
-        </div>
-        <div className="cardInfo">
-          <h4>{g?.name ?? `Steam App ${item.appid}`}</h4>
-          {view === "library"
-            ? item.playtimeMinutes != null && (
-                <p className="cardMeta">{(item.playtimeMinutes / 60).toFixed(1)}시간</p>
-              )
-            : g?.price && (
-                <p className="cardMeta">
-                  {g.price}
-                  {g.discountPercent ? ` (-${g.discountPercent}%)` : ""}
-                </p>
-              )}
-        </div>
-      </a>
+      {linkable ? (
+        <a
+          className="card"
+          href={`https://store.steampowered.com/app/${item.appid}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={g?.name ?? `Steam App ${item.appid}`}
+        >
+          {cardContent}
+        </a>
+      ) : (
+        <div className="card">{cardContent}</div>
+      )}
     </div>
   );
 }
@@ -734,9 +872,39 @@ export default function Wishlist() {
   const [libLoading, setLibLoading] = useState(false);
   const [libProgress, setLibProgress] = useState({ done: 0, total: 0 });
   const [libError, setLibError] = useState("");
+  const [manualPlatform, setManualPlatform] = useState<Record<number, ManualPlatform>>({});
+  const [manualGames, setManualGames] = useState<Record<number, Game>>({});
+  function persistManual(
+    platformValue: Record<number, ManualPlatform>,
+    gamesValue: Record<number, Game>,
+  ) {
+    try {
+      localStorage.setItem(MANUAL_PLATFORM_STORAGE_KEY, JSON.stringify(platformValue));
+      localStorage.setItem(MANUAL_GAMES_STORAGE_KEY, JSON.stringify(gamesValue));
+    } catch {}
+  }
+  // A library refresh only ever touches libItems/libGames (the Steam-fetched half), so merging
+  // manual entries in here - rather than mixing them into libItems itself - means they survive
+  // every "라이브러리 가져오기" click instead of being wiped by it.
+  const combinedLibItems = useMemo(
+    () => [...libItems, ...Object.keys(manualPlatform).map((id) => ({ appid: Number(id) }))],
+    [libItems, manualPlatform],
+  );
+  const combinedLibGames = useMemo(
+    () => ({ ...libGames, ...manualGames }),
+    [libGames, manualGames],
+  );
+  const [manualFormOpen, setManualFormOpen] = useState(false);
+  const [manualQuery, setManualQuery] = useState("");
+  const [manualPlatformChoice, setManualPlatformChoice] = useState<ManualPlatform>("epic");
+  const [manualResults, setManualResults] = useState<
+    { appid: number; name: string; image: string | null }[]
+  >([]);
+  const [manualSearching, setManualSearching] = useState(false);
+  const [manualAdding, setManualAdding] = useState(false);
 
-  const items = view === "wishlist" ? wlItems : libItems;
-  const games = view === "wishlist" ? wlGames : libGames;
+  const items = view === "wishlist" ? wlItems : combinedLibItems;
+  const games = view === "wishlist" ? wlGames : combinedLibGames;
   const loading = view === "wishlist" ? wlLoading : libLoading;
   const progress = view === "wishlist" ? wlProgress : libProgress;
   const error = view === "wishlist" ? wlError : libError;
@@ -790,7 +958,16 @@ export default function Wishlist() {
     setIsMobile(mq.matches);
     if (mq.matches) {
       setCollapsedGroups(
-        new Set(["discount", "korean", "libraryFilter", "status", "rating", "sort", "genre"]),
+        new Set([
+          "discount",
+          "korean",
+          "libraryFilter",
+          "status",
+          "rating",
+          "platform",
+          "sort",
+          "genre",
+        ]),
       );
     }
     const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
@@ -835,12 +1012,12 @@ export default function Wishlist() {
       dropped: 0,
       none: 0,
     };
-    for (const item of libItems) {
+    for (const item of combinedLibItems) {
       const s = statusMap[item.appid];
       counts[s ?? "none"]++;
     }
     return counts;
-  }, [libItems, statusMap]);
+  }, [combinedLibItems, statusMap]);
   const [ratingMap, setRatingMap] = useState<Record<number, Rating>>({});
   const [ratingFilter, setRatingFilter] = useState<(Rating | "none")[]>([]);
   function toggleRatingFilter(r: Rating | "none") {
@@ -858,12 +1035,24 @@ export default function Wishlist() {
   }
   const ratingCounts = useMemo(() => {
     const counts: Record<string, number> = { like: 0, dislike: 0, none: 0 };
-    for (const item of libItems) {
+    for (const item of combinedLibItems) {
       const r = ratingMap[item.appid];
       counts[r ?? "none"]++;
     }
     return counts;
-  }, [libItems, ratingMap]);
+  }, [combinedLibItems, ratingMap]);
+  const [platformFilter, setPlatformFilter] = useState<("steam" | ManualPlatform)[]>([]);
+  function togglePlatformFilter(p: "steam" | ManualPlatform) {
+    setPlatformFilter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  }
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = { steam: 0, epic: 0, stove: 0, other: 0 };
+    for (const item of combinedLibItems) {
+      const p = manualPlatform[item.appid] ?? "steam";
+      counts[p]++;
+    }
+    return counts;
+  }, [combinedLibItems, manualPlatform]);
   const koreanCounts = useMemo(() => {
     const counts = { supported: 0, unsupported: 0 };
     for (const item of wlItems) {
@@ -1011,6 +1200,10 @@ export default function Wishlist() {
         const r = ratingMap[item.appid] ?? "none";
         if (!ratingFilter.includes(r)) return false;
       }
+      if (view === "library" && platformFilter.length) {
+        const p = manualPlatform[item.appid] ?? "steam";
+        if (!platformFilter.includes(p)) return false;
+      }
       return true;
     });
   }, [
@@ -1029,6 +1222,8 @@ export default function Wishlist() {
     statusMap,
     ratingFilter,
     ratingMap,
+    platformFilter,
+    manualPlatform,
   ]);
   const sortedItems = useMemo(
     () => sortItems(filteredItems, games, sortKey, achievementMap),
@@ -1040,7 +1235,11 @@ export default function Wishlist() {
     genreFilter.length > 0 ||
     (view === "wishlist"
       ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter.length > 0
-      : excludeAdult || demoOnly || statusFilter.length > 0 || ratingFilter.length > 0);
+      : excludeAdult ||
+        demoOnly ||
+        statusFilter.length > 0 ||
+        ratingFilter.length > 0 ||
+        platformFilter.length > 0);
   const [listWrapRef, listSize] = useElementSize();
   const [layoutMode, setLayoutMode] = useState<"list" | "card">("list");
   // One-time hydration from localStorage on mount; SSR has no localStorage, so this must run in an
@@ -1069,6 +1268,14 @@ export default function Wishlist() {
         setLibProgress({ done: lib.items.length, total: lib.items.length });
         if (lib.games) setLibGames(lib.games);
       }
+      const manualPlatformSaved = JSON.parse(
+        localStorage.getItem(MANUAL_PLATFORM_STORAGE_KEY) ?? "null",
+      );
+      if (manualPlatformSaved && typeof manualPlatformSaved === "object")
+        setManualPlatform(manualPlatformSaved);
+      const manualGamesSaved = JSON.parse(localStorage.getItem(MANUAL_GAMES_STORAGE_KEY) ?? "null");
+      if (manualGamesSaved && typeof manualGamesSaved === "object")
+        setManualGames(manualGamesSaved);
       const status = JSON.parse(localStorage.getItem(STATUS_STORAGE_KEY) ?? "null");
       if (status && typeof status === "object") setStatusMap(status);
       const rating = JSON.parse(localStorage.getItem(RATING_STORAGE_KEY) ?? "null");
@@ -1134,10 +1341,75 @@ export default function Wishlist() {
     persistTo(WISHLIST_CACHE_KEY, wlSteamId, itemsValue, gamesValue);
   }
   function persistLibraryThrottled(itemsValue: Item[], gamesValue: Record<number, Game>) {
+    // Event-handler-only helper, never called during render - the compiler's reachability
+    // analysis mis-flags it once enough other code is added to this component (not reproducible
+    // in isolation, and reactCompiler isn't even enabled in next.config, so no build/runtime
+    // effect either way).
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     if (now - lastLibPersistAt.current < 1500) return;
     lastLibPersistAt.current = now;
     persistTo(LIBRARY_CACHE_KEY, libSteamId, itemsValue, gamesValue);
+  }
+  // Debounced so typing doesn't fire a request per keystroke.
+  useEffect(() => {
+    if (!manualFormOpen || manualQuery.trim().length < 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setManualResults([]);
+      return;
+    }
+    setManualSearching(true);
+    const timer = setTimeout(() => {
+      fetch(`/api/search-game?term=${encodeURIComponent(manualQuery.trim())}`)
+        .then((r) => r.json())
+        .then((d) => setManualResults(d.items ?? []))
+        .catch(() => setManualResults([]))
+        .finally(() => setManualSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [manualQuery, manualFormOpen]);
+  function closeManualForm() {
+    setManualFormOpen(false);
+    setManualQuery("");
+    setManualResults([]);
+  }
+  async function addManualMatched(appid: number, name: string) {
+    setManualAdding(true);
+    try {
+      const loaded = await enrichGames([appid], {}, () => {});
+      const game = loaded[appid] ?? blankGame(appid, name);
+      const nextPlatform = { ...manualPlatform, [appid]: manualPlatformChoice };
+      const nextGames = { ...manualGames, [appid]: game };
+      setManualPlatform(nextPlatform);
+      setManualGames(nextGames);
+      persistManual(nextPlatform, nextGames);
+      closeManualForm();
+    } finally {
+      setManualAdding(false);
+    }
+  }
+  function addManualCustom() {
+    const name = manualQuery.trim();
+    if (!name) return;
+    // Negative so it can never collide with a real Steam appid.
+    const appid = -Date.now();
+    const nextPlatform = { ...manualPlatform, [appid]: manualPlatformChoice };
+    const nextGames = { ...manualGames, [appid]: blankGame(appid, name) };
+    setManualPlatform(nextPlatform);
+    setManualGames(nextGames);
+    persistManual(nextPlatform, nextGames);
+    closeManualForm();
+  }
+  function removeManualGame(appid: number) {
+    const nextPlatform = { ...manualPlatform };
+    delete nextPlatform[appid];
+    const nextGames = { ...manualGames };
+    delete nextGames[appid];
+    setManualPlatform(nextPlatform);
+    setManualGames(nextGames);
+    persistManual(nextPlatform, nextGames);
+    setGameStatus(appid, null);
+    setGameRating(appid, null);
   }
   async function loadWishlist() {
     const id = wlSteamId.trim();
@@ -1269,10 +1541,12 @@ export default function Wishlist() {
         genreFilter,
         statusFilter,
         ratingFilter,
+        platformFilter,
         excludeAdult,
         demoOnly,
         statusMap,
         ratingMap,
+        manualPlatform,
       });
       enrichAchievements(achievementOrder, id, key, achievementMap, updateAchievements).catch(
         () => {},
@@ -1424,7 +1698,18 @@ export default function Wishlist() {
               onClick={() => setMobileFiltersOpen(false)}
               aria-label="필터 닫기"
             >
-              ✕
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <line x1="4" y1="4" x2="20" y2="20" />
+                <line x1="20" y1="4" x2="4" y2="20" />
+              </svg>
             </button>
           </div>
           {view === "wishlist" && (
@@ -1555,6 +1840,32 @@ export default function Wishlist() {
               </label>
             </FilterGroup>
           )}
+          {view === "library" && (
+            <FilterGroup
+              title="플랫폼"
+              collapsed={collapsedGroups.has("platform")}
+              onToggle={() => toggleGroup("platform")}
+            >
+              <label className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={platformFilter.includes("steam")}
+                  onChange={() => togglePlatformFilter("steam")}
+                />
+                Steam ({platformCounts.steam})
+              </label>
+              {(["epic", "stove", "other"] as const).map((p) => (
+                <label key={p} className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={platformFilter.includes(p)}
+                    onChange={() => togglePlatformFilter(p)}
+                  />
+                  {MANUAL_PLATFORM_LABELS[p]} ({platformCounts[p]})
+                </label>
+              ))}
+            </FilterGroup>
+          )}
           <FilterGroup
             title="정렬 (하나만 선택)"
             collapsed={collapsedGroups.has("sort")}
@@ -1635,6 +1946,16 @@ export default function Wishlist() {
               </span>
               {filteredItems.length} / {items.length}개
             </span>
+            {view === "library" && (
+              <button
+                type="button"
+                className="refreshBtn"
+                onClick={() => setManualFormOpen((v) => !v)}
+                title="Epic/STOVE 등 다른 곳에서 산 게임 직접 추가"
+              >
+                +
+              </button>
+            )}
             <button
               type="button"
               className="refreshBtn"
@@ -1674,6 +1995,82 @@ export default function Wishlist() {
             </div>
           </div>
         </div>
+        {view === "library" && manualFormOpen && (
+          <section className="panel manualAddPanel">
+            <div className="manualAddHeader">
+              <span>게임 추가</span>
+              <button
+                type="button"
+                className="filterCloseBtn"
+                onClick={closeManualForm}
+                aria-label="닫기"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <line x1="4" y1="4" x2="20" y2="20" />
+                  <line x1="20" y1="4" x2="4" y2="20" />
+                </svg>
+              </button>
+            </div>
+            <div className="row">
+              <div className="field">
+                <label>게임 이름 검색 (Steam에 있으면 이미지/장르 자동으로 채워짐)</label>
+                <input
+                  autoFocus
+                  value={manualQuery}
+                  onChange={(e) => setManualQuery(e.target.value)}
+                  placeholder="게임 이름"
+                />
+              </div>
+              <div className="manualAddRow">
+                <select
+                  value={manualPlatformChoice}
+                  onChange={(e) => setManualPlatformChoice(e.target.value as ManualPlatform)}
+                >
+                  {(Object.keys(MANUAL_PLATFORM_LABELS) as ManualPlatform[]).map((p) => (
+                    <option key={p} value={p}>
+                      {MANUAL_PLATFORM_LABELS[p]}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="smallBtn"
+                  onClick={addManualCustom}
+                  disabled={!manualQuery.trim() || manualAdding}
+                  title="검색 결과에 원하는 게임이 없을 때, Steam 정보 없이 입력한 이름 그대로 추가합니다"
+                >
+                  검색 결과 없이 이름만 추가
+                </button>
+              </div>
+            </div>
+            {manualSearching && <p className="meta">검색 중...</p>}
+            {manualResults.length > 0 && (
+              <ul className="manualResults">
+                {manualResults.map((r) => (
+                  <li key={r.appid}>
+                    <button
+                      type="button"
+                      className="manualResultBtn"
+                      onClick={() => addManualMatched(r.appid, r.name)}
+                      disabled={manualAdding}
+                    >
+                      {r.image && <img src={r.image} alt="" />}
+                      <span>{r.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
         <div className="listWrap" ref={listWrapRef}>
           {!items.length ? (
             <div className="empty">
@@ -1701,6 +2098,9 @@ export default function Wishlist() {
                 checkingAchievements,
                 onCheckAchievement: checkOneAchievement,
                 rowHeight: isMobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT,
+                manualPlatform,
+                onRemoveManual: removeManualGame,
+                steamId,
               }}
               style={{ height: listSize.height, width: "100%" }}
             />
@@ -1715,7 +2115,16 @@ export default function Wishlist() {
                   columnWidth={`${100 / columnCount}%`}
                   rowCount={Math.ceil(sortedItems.length / columnCount)}
                   rowHeight={CARD_ROW_HEIGHT}
-                  cellProps={{ items: sortedItems, games, view, columnCount, statusMap, ratingMap }}
+                  cellProps={{
+                    items: sortedItems,
+                    games,
+                    view,
+                    columnCount,
+                    statusMap,
+                    ratingMap,
+                    manualPlatform,
+                    onRemoveManual: removeManualGame,
+                  }}
                   style={{ height: listSize.height, width: "100%" }}
                 />
               );
