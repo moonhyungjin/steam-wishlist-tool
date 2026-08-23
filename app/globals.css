@@ -274,6 +274,13 @@ button:disabled {
   font-weight: bold;
   color: var(--text);
 }
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
 .searchInput {
   flex: 1;
   max-width: 260px;
@@ -508,15 +515,18 @@ button:disabled {
   flex: 1;
 }
 .storeLink {
+  display: inline-flex;
+  align-items: center;
   color: var(--muted);
   margin-left: 6px;
-  font-size: 13px;
   text-decoration: none;
 }
 .storeLink:hover {
   color: var(--accent);
 }
 .info h3 {
+  display: inline-flex;
+  align-items: center;
   margin: 0 0 5px;
   font-size: 16px;
   white-space: nowrap;
@@ -527,6 +537,7 @@ button:disabled {
   margin: 4px 0;
   color: var(--muted);
   font-size: 12px;
+  line-height: 16px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -647,6 +658,12 @@ button:disabled {
 .retryBtn:hover {
   background: rgba(255, 183, 192, 0.12);
 }
+/* Hidden on desktop, where the filter panel is always visible inline in the sidebar - only
+   relevant once the 900px breakpoint below turns it into a drawer. */
+.mobileFilterBtn,
+.filterPanelHeader {
+  display: none;
+}
 @media (max-width: 900px) {
   html,
   body {
@@ -657,6 +674,7 @@ button:disabled {
     width: calc(100% - 20px);
     height: auto;
     flex-direction: column;
+    padding-bottom: 0;
   }
   .sidebar {
     width: 100%;
@@ -666,9 +684,11 @@ button:disabled {
   .mainArea {
     /* flex: 1 (flex-basis: 0) from the base rule wins over height in a column flex container
        whose parent has no definite height, collapsing this to near-nothing - flex: none lets the
-       explicit height apply instead. */
+       explicit height apply instead. 100vh instead of a fixed px value so the list fills the rest
+       of the screen once scrolled past the sidebar, rather than an arbitrary fixed box - listWrap
+       (flex: 1) then automatically gets 100vh minus whatever sectionHead actually renders at. */
     flex: none;
-    height: 640px;
+    height: 100vh;
   }
   .row {
     flex-direction: column;
@@ -676,21 +696,121 @@ button:disabled {
   button {
     height: 44px;
   }
-  /* h2 + search input + itemCount/refresh/layout-toggle all on one row overflows a phone width -
-     let the search input wrap to its own full-width line below the rest. */
+  /* h2 + search row + itemCount/refresh/layout-toggle all on one row overflows a phone width -
+     let the search row (filter button + input) wrap to its own full-width line below the rest. */
   .sectionHead {
     flex-wrap: wrap;
+    padding-top: 8px;
   }
-  .searchInput {
+  .sectionHead h2 {
+    margin: 0;
+  }
+  .searchRow {
     order: 3;
     flex-basis: 100%;
+  }
+  .searchInput {
     max-width: none;
   }
+  /* Side-by-side (small thumbnail + info) reads too cramped at phone width - stack the image
+     full-width on top and the info below instead. */
   .game {
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    gap: 0;
   }
   .cover {
-    width: 120px;
-    height: 58px;
+    width: 100%;
+    height: 120px;
+    border-radius: 0;
+  }
+  .info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px;
+    width: 100%;
+  }
+  .info h3 {
+    margin-bottom: 2px;
+    line-height: 20px;
+  }
+  .meta {
+    margin: 0;
+  }
+  .badges {
+    margin: 0;
+  }
+  .statusRow {
+    flex-wrap: wrap;
+    margin-top: 0;
+    gap: 4px;
+  }
+  /* The blanket button{height:44px} above (for tap targets on primary buttons) also caught these
+     small pill chips, since they only set height via padding - pin it back down explicitly. */
+  .statusChip,
+  .ratingChip {
+    height: 26px;
+  }
+  /* The 5 status chips + rating chips were ~2px too wide to share a line at phone width, wrapping
+     the rating chips onto their own second line - trimming chip padding buys back just enough. */
+  .statusChip {
+    padding: 4px 8px;
+  }
+  .ratingChips {
+    gap: 4px;
+  }
+  .mobileFilterBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .mobileFilterBtn.active {
+    background: #1b6d9b;
+    border-color: var(--accent);
+    color: white;
+  }
+  /* The full "찜목록"/"보유 게임" label eats too much of a phone-width row - just the count. */
+  .itemCountLabel {
+    display: none;
+  }
+  .filterPanelHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    font-size: 15px;
+    font-weight: bold;
+  }
+  .filterCloseBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .filterPanel {
+    display: none;
+  }
+  .filterPanel.mobileOpen {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    margin: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    background: var(--bg);
   }
 }

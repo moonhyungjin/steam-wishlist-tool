@@ -83,6 +83,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Fixed row slot for the virtualized list: the row content renders at ROW_HEIGHT - ROW_GAP,
 // leaving ROW_GAP of empty space below it as the visual gap between rows.
 const ROW_HEIGHT = 146;
+// Mobile's list row stacks the image above the info instead of side-by-side (readable at phone
+// width), which needs a lot more vertical room than the desktop row.
+const MOBILE_ROW_HEIGHT = 250;
 const ROW_GAP = 10;
 // Card view keeps only image + title + one line of context (playtime for library, price/release
 // for wishlist) - a grid can't fit as much per item as the list row can, so it's deliberately thin.
@@ -332,6 +335,7 @@ function GameRow({
   achievementMap,
   checkingAchievements,
   onCheckAchievement,
+  rowHeight,
 }: RowComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -343,6 +347,7 @@ function GameRow({
   achievementMap: Record<number, AchievementInfo | null>;
   checkingAchievements: Set<number>;
   onCheckAchievement: (appid: number) => void;
+  rowHeight: number;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -351,7 +356,7 @@ function GameRow({
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
   return (
-    <article className="game" style={{ ...style, height: ROW_HEIGHT - ROW_GAP }}>
+    <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
       <a
         className="cover"
         href={`https://store.steampowered.com/app/${item.appid}`}
@@ -393,7 +398,19 @@ function GameRow({
                 : "스팀 상점 페이지 열기"
             }
           >
-            ↗
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
           </a>
         </h3>
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
@@ -671,8 +688,8 @@ async function enrichAchievements(
 }
 export default function Wishlist() {
   const [view, setView] = useState<View>("wishlist");
-  const [wlSteamId, setWlSteamId] = useState("76561198305317064");
-  const [libSteamId, setLibSteamId] = useState("76561198305317064");
+  const [wlSteamId, setWlSteamId] = useState("");
+  const [libSteamId, setLibSteamId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [wlProfile, setWlProfile] = useState<Profile | null>(null);
   const [wlProfileError, setWlProfileError] = useState("");
@@ -732,16 +749,25 @@ export default function Wishlist() {
   const [excludeAdult, setExcludeAdult] = useState(false);
   const [demoOnly, setDemoOnly] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  // Mirrors the 900px CSS breakpoint so JS-driven layout decisions (row height, the filter
+  // drawer) stay in sync with it, including live orientation/resize changes.
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   // On mobile the sidebar stacks above the game list instead of sitting beside it, so every
   // filter group expanded by default (especially the ~40-entry genre list) buries the list under
   // a wall of checkboxes. Collapse everything on first mount there; desktop keeps them all open.
   useLayoutEffect(() => {
-    if (window.innerWidth <= 900) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    const mq = window.matchMedia("(max-width: 900px)");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMobile(mq.matches);
+    if (mq.matches) {
       setCollapsedGroups(
         new Set(["discount", "korean", "libraryFilter", "status", "rating", "sort", "genre"]),
       );
     }
+    const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
   }, []);
   function toggleGroup(key: string) {
     setCollapsedGroups((prev) => {
@@ -967,6 +993,13 @@ export default function Wishlist() {
     () => sortItems(filteredItems, games, sortKey, achievementMap),
     [filteredItems, games, sortKey, achievementMap],
   );
+  // Drives the mobile filter button's active state - the drawer hides the checkboxes themselves,
+  // so this is the only visible sign a filter is narrowing the list down.
+  const hasActiveFilter =
+    genreFilter.length > 0 ||
+    (view === "wishlist"
+      ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter.length > 0
+      : excludeAdult || demoOnly || statusFilter.length > 0 || ratingFilter.length > 0);
   const [listWrapRef, listSize] = useElementSize();
   const [layoutMode, setLayoutMode] = useState<"list" | "card">("list");
   // One-time hydration from localStorage on mount; SSR has no localStorage, so this must run in an
@@ -1319,7 +1352,18 @@ export default function Wishlist() {
             </button>
           </section>
         )}
-        <section className="panel filterPanel">
+        <section className={"panel filterPanel" + (mobileFiltersOpen ? " mobileOpen" : "")}>
+          <div className="filterPanelHeader">
+            <span>필터</span>
+            <button
+              type="button"
+              className="filterCloseBtn"
+              onClick={() => setMobileFiltersOpen(false)}
+              aria-label="필터 닫기"
+            >
+              ✕
+            </button>
+          </div>
           {view === "wishlist" && (
             <FilterGroup
               title="필터"
@@ -1487,13 +1531,27 @@ export default function Wishlist() {
       <main className="mainArea">
         <div className="sectionHead">
           <h2>{view === "wishlist" ? "Wishlist" : "Library"}</h2>
-          <input
-            className="searchInput"
-            type="text"
-            value={nameQuery}
-            onChange={(e) => setNameQuery(e.target.value)}
-            placeholder="게임 이름 검색"
-          />
+          <div className="searchRow">
+            <button
+              type="button"
+              className={"mobileFilterBtn " + (hasActiveFilter ? "active" : "")}
+              onClick={() => setMobileFiltersOpen(true)}
+              title="필터"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <line x1="4" y1="6" x2="20" y2="6" strokeWidth="2" strokeLinecap="round" />
+                <line x1="7" y1="12" x2="17" y2="12" strokeWidth="2" strokeLinecap="round" />
+                <line x1="10" y1="18" x2="14" y2="18" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+            <input
+              className="searchInput"
+              type="text"
+              value={nameQuery}
+              onChange={(e) => setNameQuery(e.target.value)}
+              placeholder="게임 이름 검색"
+            />
+          </div>
           <div className="headRight">
             {loading && progress.total > 0 && (
               <div
@@ -1509,8 +1567,10 @@ export default function Wishlist() {
               </div>
             )}
             <span className="itemCount">
-              {view === "wishlist" ? "찜목록" : "보유 게임"} {filteredItems.length} / {items.length}
-              개
+              <span className="itemCountLabel">
+                {view === "wishlist" ? "찜목록" : "보유 게임"}{" "}
+              </span>
+              {filteredItems.length} / {items.length}개
             </span>
             <button
               type="button"
@@ -1565,7 +1625,7 @@ export default function Wishlist() {
               className="gameList"
               rowComponent={GameRow}
               rowCount={sortedItems.length}
-              rowHeight={ROW_HEIGHT}
+              rowHeight={isMobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT}
               rowProps={{
                 items: sortedItems,
                 games,
@@ -1577,6 +1637,7 @@ export default function Wishlist() {
                 achievementMap,
                 checkingAchievements,
                 onCheckAchievement: checkOneAchievement,
+                rowHeight: isMobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT,
               }}
               style={{ height: listSize.height, width: "100%" }}
             />
