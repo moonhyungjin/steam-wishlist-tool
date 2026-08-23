@@ -86,6 +86,22 @@ body {
   border-color: var(--accent);
   color: var(--accent);
 }
+.filterCloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.filterCloseBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .profileAvatar {
   width: 40px;
   height: 40px;
@@ -682,15 +698,22 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
 }
 .manualAddRow select {
   background: #0c1420;
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 8px 10px;
+  padding: 8px 24px 8px 10px;
   font-size: 13px;
+}
+.manualAddHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  font-size: 15px;
+  font-weight: bold;
 }
 .manualResults {
   list-style: none;
@@ -881,17 +904,6 @@ button:disabled {
     margin-bottom: 14px;
     font-size: 15px;
     font-weight: bold;
-  }
-  .filterCloseBtn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background: transparent;
-    border: 1px solid var(--line);
-    color: var(--muted);
   }
   .filterPanel {
     display: none;

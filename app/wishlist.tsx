@@ -179,10 +179,12 @@ function prioritizeAchievementOrder(
     genreFilter: string[];
     statusFilter: (PlayStatus | "none")[];
     ratingFilter: (Rating | "none")[];
+    platformFilter: ("steam" | ManualPlatform)[];
     excludeAdult: boolean;
     demoOnly: boolean;
     statusMap: Record<number, PlayStatus>;
     ratingMap: Record<number, Rating>;
+    manualPlatform: Record<number, ManualPlatform>;
   },
 ): number[] {
   const q = filters.nameQuery.trim().toLowerCase();
@@ -203,6 +205,10 @@ function prioritizeAchievementOrder(
     if (filters.ratingFilter.length) {
       const r = filters.ratingMap[item.appid] ?? "none";
       if (!filters.ratingFilter.includes(r)) return false;
+    }
+    if (filters.platformFilter.length) {
+      const p = filters.manualPlatform[item.appid] ?? "steam";
+      if (!filters.platformFilter.includes(p)) return false;
     }
     return true;
   }
@@ -923,7 +929,16 @@ export default function Wishlist() {
     setIsMobile(mq.matches);
     if (mq.matches) {
       setCollapsedGroups(
-        new Set(["discount", "korean", "libraryFilter", "status", "rating", "sort", "genre"]),
+        new Set([
+          "discount",
+          "korean",
+          "libraryFilter",
+          "status",
+          "rating",
+          "platform",
+          "sort",
+          "genre",
+        ]),
       );
     }
     const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
@@ -997,6 +1012,18 @@ export default function Wishlist() {
     }
     return counts;
   }, [combinedLibItems, ratingMap]);
+  const [platformFilter, setPlatformFilter] = useState<("steam" | ManualPlatform)[]>([]);
+  function togglePlatformFilter(p: "steam" | ManualPlatform) {
+    setPlatformFilter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  }
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = { steam: 0, epic: 0, stove: 0, other: 0 };
+    for (const item of combinedLibItems) {
+      const p = manualPlatform[item.appid] ?? "steam";
+      counts[p]++;
+    }
+    return counts;
+  }, [combinedLibItems, manualPlatform]);
   const koreanCounts = useMemo(() => {
     const counts = { supported: 0, unsupported: 0 };
     for (const item of wlItems) {
@@ -1144,6 +1171,10 @@ export default function Wishlist() {
         const r = ratingMap[item.appid] ?? "none";
         if (!ratingFilter.includes(r)) return false;
       }
+      if (view === "library" && platformFilter.length) {
+        const p = manualPlatform[item.appid] ?? "steam";
+        if (!platformFilter.includes(p)) return false;
+      }
       return true;
     });
   }, [
@@ -1162,6 +1193,8 @@ export default function Wishlist() {
     statusMap,
     ratingFilter,
     ratingMap,
+    platformFilter,
+    manualPlatform,
   ]);
   const sortedItems = useMemo(
     () => sortItems(filteredItems, games, sortKey, achievementMap),
@@ -1173,7 +1206,11 @@ export default function Wishlist() {
     genreFilter.length > 0 ||
     (view === "wishlist"
       ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter.length > 0
-      : excludeAdult || demoOnly || statusFilter.length > 0 || ratingFilter.length > 0);
+      : excludeAdult ||
+        demoOnly ||
+        statusFilter.length > 0 ||
+        ratingFilter.length > 0 ||
+        platformFilter.length > 0);
   const [listWrapRef, listSize] = useElementSize();
   const [layoutMode, setLayoutMode] = useState<"list" | "card">("list");
   // One-time hydration from localStorage on mount; SSR has no localStorage, so this must run in an
@@ -1475,10 +1512,12 @@ export default function Wishlist() {
         genreFilter,
         statusFilter,
         ratingFilter,
+        platformFilter,
         excludeAdult,
         demoOnly,
         statusMap,
         ratingMap,
+        manualPlatform,
       });
       enrichAchievements(achievementOrder, id, key, achievementMap, updateAchievements).catch(
         () => {},
@@ -1761,6 +1800,32 @@ export default function Wishlist() {
               </label>
             </FilterGroup>
           )}
+          {view === "library" && (
+            <FilterGroup
+              title="플랫폼"
+              collapsed={collapsedGroups.has("platform")}
+              onToggle={() => toggleGroup("platform")}
+            >
+              <label className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={platformFilter.includes("steam")}
+                  onChange={() => togglePlatformFilter("steam")}
+                />
+                Steam ({platformCounts.steam})
+              </label>
+              {(["epic", "stove", "other"] as const).map((p) => (
+                <label key={p} className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={platformFilter.includes(p)}
+                    onChange={() => togglePlatformFilter(p)}
+                  />
+                  {MANUAL_PLATFORM_LABELS[p]} ({platformCounts[p]})
+                </label>
+              ))}
+            </FilterGroup>
+          )}
           <FilterGroup
             title="정렬 (하나만 선택)"
             collapsed={collapsedGroups.has("sort")}
@@ -1892,6 +1957,17 @@ export default function Wishlist() {
         </div>
         {view === "library" && manualFormOpen && (
           <section className="panel manualAddPanel">
+            <div className="manualAddHeader">
+              <span>게임 추가</span>
+              <button
+                type="button"
+                className="filterCloseBtn"
+                onClick={closeManualForm}
+                aria-label="닫기"
+              >
+                ✕
+              </button>
+            </div>
             <div className="row">
               <div className="field">
                 <label>게임 이름 검색 (Steam에 있으면 이미지/장르 자동으로 채워짐)</label>
@@ -1918,11 +1994,9 @@ export default function Wishlist() {
                   className="smallBtn"
                   onClick={addManualCustom}
                   disabled={!manualQuery.trim() || manualAdding}
+                  title="검색 결과에 원하는 게임이 없을 때, Steam 정보 없이 입력한 이름 그대로 추가합니다"
                 >
-                  매칭 없이 이름만 추가
-                </button>
-                <button type="button" className="smallBtn" onClick={closeManualForm}>
-                  취소
+                  검색 결과 없이 이름만 추가
                 </button>
               </div>
             </div>
