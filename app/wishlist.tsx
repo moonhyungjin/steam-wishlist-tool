@@ -407,8 +407,25 @@ function GameRow({
   // to - everything else about a manual entry behaves the same either way.
   const manual = manualPlatform[item.appid];
   const linkable = item.appid > 0;
+  // A manual entry is never actually owned in this account's library even when it matched a real
+  // Steam appid, so the steam:// launch-the-installed-client attempt would just burn its timeout
+  // for nothing - go straight to the store page instead.
+  const tryLibrary = view === "library" && !manual;
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
+      {manual && (
+        <span className="rowBadge manual">
+          {MANUAL_PLATFORM_LABELS[manual]}
+          <button
+            type="button"
+            className="manualRemoveBtn"
+            onClick={() => onRemoveManual(item.appid)}
+            title="목록에서 제거"
+          >
+            ×
+          </button>
+        </span>
+      )}
       <div className="coverWrap">
         {linkable ? (
           <a
@@ -417,12 +434,12 @@ function GameRow({
             target="_blank"
             rel="noopener noreferrer"
             title={
-              view === "library"
+              tryLibrary
                 ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
                 : "스팀 상점 페이지 열기"
             }
             onClick={(e) => {
-              if (view !== "library" || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              if (!tryLibrary || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
               e.preventDefault();
               openLibraryOrStore(item.appid);
             }}
@@ -438,23 +455,6 @@ function GameRow({
             <div className="loadingCover">이미지 없음</div>
           </div>
         )}
-        {manual && (
-          <span className="coverBadge manual">
-            {MANUAL_PLATFORM_LABELS[manual]}
-            <button
-              type="button"
-              className="manualRemoveBtn"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onRemoveManual(item.appid);
-              }}
-              title="목록에서 제거"
-            >
-              ×
-            </button>
-          </span>
-        )}
       </div>
       <div className="info">
         <h3>
@@ -465,12 +465,12 @@ function GameRow({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => {
-                if (view !== "library" || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                if (!tryLibrary || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                 e.preventDefault();
                 openLibraryOrStore(item.appid);
               }}
               title={
-                view === "library"
+                tryLibrary
                   ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
                   : "스팀 상점 페이지 열기"
               }

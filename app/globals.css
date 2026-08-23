@@ -505,6 +505,7 @@ button:disabled {
   flex: none;
 }
 .game {
+  position: relative;
   display: flex;
   gap: 16px;
   align-items: center;
@@ -528,10 +529,10 @@ button:disabled {
   flex: none;
   overflow: hidden;
 }
-.coverBadge {
+.rowBadge {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 8px;
+  right: 12px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -539,9 +540,10 @@ button:disabled {
   font-size: 11px;
   padding: 0 6px;
   border-radius: 4px;
+  z-index: 1;
 }
-.coverBadge.manual {
-  background: rgba(151, 107, 214, 0.9);
+.rowBadge.manual {
+  background: #7c4fd6;
   color: white;
 }
 .cover img {
@@ -724,11 +726,16 @@ button:disabled {
   gap: 8px;
 }
 .manualAddRow select {
-  background: #0c1420;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #0c1420;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none' stroke='%2391a0b4' stroke-width='1.5'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 8px 24px 8px 10px;
+  padding: 8px 30px 8px 10px;
   font-size: 13px;
 }
 .manualAddHeader {
