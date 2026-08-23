@@ -732,6 +732,17 @@ export default function Wishlist() {
   const [excludeAdult, setExcludeAdult] = useState(false);
   const [demoOnly, setDemoOnly] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  // On mobile the sidebar stacks above the game list instead of sitting beside it, so every
+  // filter group expanded by default (especially the ~40-entry genre list) buries the list under
+  // a wall of checkboxes. Collapse everything on first mount there; desktop keeps them all open.
+  useLayoutEffect(() => {
+    if (window.innerWidth <= 900) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCollapsedGroups(
+        new Set(["discount", "korean", "libraryFilter", "status", "rating", "sort", "genre"]),
+      );
+    }
+  }, []);
   function toggleGroup(key: string) {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);

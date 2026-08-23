@@ -664,6 +664,10 @@ button:disabled {
     overflow-y: visible;
   }
   .mainArea {
+    /* flex: 1 (flex-basis: 0) from the base rule wins over height in a column flex container
+       whose parent has no definite height, collapsing this to near-nothing - flex: none lets the
+       explicit height apply instead. */
+    flex: none;
     height: 640px;
   }
   .row {
@@ -671,6 +675,16 @@ button:disabled {
   }
   button {
     height: 44px;
+  }
+  /* h2 + search input + itemCount/refresh/layout-toggle all on one row overflows a phone width -
+     let the search input wrap to its own full-width line below the rest. */
+  .sectionHead {
+    flex-wrap: wrap;
+  }
+  .searchInput {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
   }
   .game {
     align-items: flex-start;
