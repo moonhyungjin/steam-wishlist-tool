@@ -405,6 +405,10 @@ button:disabled {
   align-items: center;
   gap: 3px;
 }
+.cardBadgesRight {
+  left: auto;
+  right: 4px;
+}
 .cardBadge {
   line-height: 20px;
   font-size: 12px;

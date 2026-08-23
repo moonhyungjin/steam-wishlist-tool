@@ -650,31 +650,33 @@ function CardCell({
             ) : null}
           </div>
         ) : null}
-        {view === "library" && (status || rating || manual) ? (
+        {view === "library" && (status || rating) ? (
           <div className="cardBadges">
             {status && <span className="cardBadge status">{STATUS_LABELS[status]}</span>}
             {rating && <span className="cardBadge">{RATING_EMOJI[rating]}</span>}
-            {manual && (
-              // The only clickable thing in this overlay - stopped from bubbling up into the
-              // whole-card link, which would otherwise also navigate away on click.
-              <span className="cardBadge manual">
-                {MANUAL_PLATFORM_LABELS[manual]}
-                <button
-                  type="button"
-                  className="manualRemoveBtn"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onRemoveManual(item.appid);
-                  }}
-                  title="목록에서 제거"
-                >
-                  ×
-                </button>
-              </span>
-            )}
           </div>
         ) : null}
+        {manual && (
+          <div className="cardBadges cardBadgesRight">
+            {/* The only clickable thing in this overlay - stopped from bubbling up into the
+                whole-card link, which would otherwise also navigate away on click. */}
+            <span className="cardBadge manual">
+              {MANUAL_PLATFORM_LABELS[manual]}
+              <button
+                type="button"
+                className="manualRemoveBtn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRemoveManual(item.appid);
+                }}
+                title="목록에서 제거"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        )}
       </div>
       <div className="cardInfo">
         <h4>{g?.name ?? `Steam App ${item.appid}`}</h4>
