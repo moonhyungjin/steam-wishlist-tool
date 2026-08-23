@@ -1230,9 +1230,11 @@ export default function Wishlist() {
     [filteredItems, games, sortKey, achievementMap],
   );
   // Drives the mobile filter button's active state - the drawer hides the checkboxes themselves,
-  // so this is the only visible sign a filter is narrowing the list down.
+  // so this is the only visible sign a filter (or sort, which lives in the same drawer) is
+  // narrowing/reordering the list.
   const hasActiveFilter =
     genreFilter.length > 0 ||
+    sortKey !== null ||
     (view === "wishlist"
       ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter.length > 0
       : excludeAdult ||
