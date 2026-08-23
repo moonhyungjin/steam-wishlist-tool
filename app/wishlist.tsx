@@ -1306,24 +1306,43 @@ export default function Wishlist() {
                   />
                 </div>
               ) : (
-                <div className="field">
-                  <label>
-                    Steam API 키
-                    <span
-                      className="helpIcon"
-                      title="steamcommunity.com/dev/apikey 에서 발급받으세요 (Domain Name엔 아무거나 입력, 예: localhost). 개인정보 설정에서 '게임 세부정보'가 공개여야 라이브러리를 가져올 수 있습니다. Steam ID64는 찜목록 탭에서 입력한 값을 그대로 씁니다."
-                    >
-                      ?
-                    </span>
-                  </label>
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Steam API 키"
-                    onKeyDown={(e) => e.key === "Enter" && loadLibrary()}
-                  />
-                </div>
+                <>
+                  <div className="field">
+                    <label>
+                      Steam ID64
+                      <span
+                        className="helpIcon"
+                        title="프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요. 찜목록 탭과는 별개의 값이라, 라이브러리를 보고 싶은 계정의 ID64를 여기에 따로 입력하세요."
+                      >
+                        ?
+                      </span>
+                    </label>
+                    <input
+                      value={steamId}
+                      onChange={(e) => setSteamId(e.target.value)}
+                      placeholder="Steam ID64"
+                      onKeyDown={(e) => e.key === "Enter" && loadLibrary()}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>
+                      Steam API 키
+                      <span
+                        className="helpIcon"
+                        title="steamcommunity.com/dev/apikey 에서 발급받으세요 (Domain Name엔 아무거나 입력, 예: localhost). 개인정보 설정에서 '게임 세부정보'가 공개여야 라이브러리를 가져올 수 있습니다."
+                      >
+                        ?
+                      </span>
+                    </label>
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Steam API 키"
+                      onKeyDown={(e) => e.key === "Enter" && loadLibrary()}
+                    />
+                  </div>
+                </>
               )}
               <label className="sortCheck">
                 <input
