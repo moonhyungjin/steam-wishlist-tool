@@ -381,7 +381,6 @@ function GameRow({
       </a>
       <div className="info">
         <h3>
-          {g?.name ?? `Steam App ${item.appid}`}
           <a
             className="storeLink"
             href={`https://store.steampowered.com/app/${item.appid}`}
@@ -398,6 +397,7 @@ function GameRow({
                 : "스팀 상점 페이지 열기"
             }
           >
+            <span className="storeLinkText">{g?.name ?? `Steam App ${item.appid}`}</span>
             <svg
               width="12"
               height="12"
