@@ -608,6 +608,7 @@ button:disabled {
   background: #26354a;
   color: #b9c9d9;
   font-weight: normal;
+  text-decoration: none;
 }
 .chip.discount {
   background: #245a3a;

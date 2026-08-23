@@ -417,7 +417,16 @@ function GameRow({
         <div className="badges">
           {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
           {view === "wishlist" && g?.discountPercent ? (
-            <span className="chip discount">-{g.discountPercent}%</span>
+            <a
+              className="chip discount"
+              href={`https://steamdb.info/app/${item.appid}/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="SteamDB에서 가격 기록 보기"
+              onClick={(e) => e.stopPropagation()}
+            >
+              -{g.discountPercent}%
+            </a>
           ) : null}
           {view === "wishlist" && g?.metacritic != null ? (
             <span className={"chip " + scoreClass(g.metacritic)} title="Metacritic 점수">
@@ -1467,14 +1476,14 @@ export default function Wishlist() {
               collapsed={collapsedGroups.has("libraryFilter")}
               onToggle={() => toggleGroup("libraryFilter")}
             >
-              <label className="sortCheck">
+              {/* <label className="sortCheck">
                 <input
                   type="checkbox"
                   checked={excludeAdult}
                   onChange={() => setExcludeAdult((v) => !v)}
                 />
                 선정적 콘텐츠 제외
-              </label>
+              </label> */}
               <label className="sortCheck">
                 <input type="checkbox" checked={demoOnly} onChange={() => setDemoOnly((v) => !v)} />
                 데모만 보기
