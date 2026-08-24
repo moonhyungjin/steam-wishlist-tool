@@ -94,7 +94,6 @@ const RATING_STORAGE_KEY = "library:rating";
 // "별점" - purely personal enjoyment, separate from whether I'd recommend it to someone else.
 // Half-star increments (1~5, step 0.5).
 type StarRating = 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
-const STAR_VALUES: StarRating[] = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 const STAR_STORAGE_KEY = "library:stars";
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
@@ -185,7 +184,7 @@ function prioritizeAchievementOrder(
     genreFilter: string[];
     statusFilter: (PlayStatus | "none")[];
     ratingFilter: (Rating | "none")[];
-    starFilter: (StarRating | "none")[];
+    starMinFilter: number;
     platformFilter: ("steam" | ManualPlatform)[];
     excludeAdult: boolean;
     excludeDemo: boolean;
@@ -214,9 +213,8 @@ function prioritizeAchievementOrder(
       const r = filters.ratingMap[item.appid] ?? "none";
       if (!filters.ratingFilter.includes(r)) return false;
     }
-    if (filters.starFilter.length) {
-      const st = filters.starMap[item.appid] ?? "none";
-      if (!filters.starFilter.includes(st)) return false;
+    if (filters.starMinFilter && (filters.starMap[item.appid] ?? 0) < filters.starMinFilter) {
+      return false;
     }
     if (filters.platformFilter.length) {
       const p = filters.manualPlatform[item.appid] ?? "steam";
@@ -1146,19 +1144,17 @@ export default function Wishlist() {
     } catch {}
     pushSync({ starMap: next });
   }
-  const [starFilter, setStarFilter] = useState<(StarRating | "none")[]>([]);
-  function toggleStarFilter(s: StarRating | "none") {
-    setStarFilter((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
-  }
-  const starCounts = useMemo(() => {
-    const counts: Record<string, number> = { none: 0 };
-    for (const v of STAR_VALUES) counts[v] = 0;
+  // A single "N점 이상" threshold via a slider, rather than an exact-match checkbox per half-star
+  // value - 0 means the filter is off (dragged all the way to the empty end).
+  const [starMinFilter, setStarMinFilter] = useState(0);
+  const starMinCount = useMemo(() => {
+    if (!starMinFilter) return 0;
+    let count = 0;
     for (const item of combinedLibItems) {
-      const s = starMap[item.appid];
-      counts[s ?? "none"]++;
+      if ((starMap[item.appid] ?? 0) >= starMinFilter) count++;
     }
-    return counts;
-  }, [combinedLibItems, starMap]);
+    return count;
+  }, [combinedLibItems, starMap, starMinFilter]);
   const [platformFilter, setPlatformFilter] = useState<("steam" | ManualPlatform)[]>([]);
   function togglePlatformFilter(p: "steam" | ManualPlatform) {
     setPlatformFilter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
@@ -1326,9 +1322,8 @@ export default function Wishlist() {
         const r = ratingMap[item.appid] ?? "none";
         if (!ratingFilter.includes(r)) return false;
       }
-      if (view === "library" && starFilter.length) {
-        const s = starMap[item.appid] ?? "none";
-        if (!starFilter.includes(s)) return false;
+      if (view === "library" && starMinFilter && (starMap[item.appid] ?? 0) < starMinFilter) {
+        return false;
       }
       if (view === "library" && platformFilter.length) {
         const p = manualPlatform[item.appid] ?? "steam";
@@ -1352,7 +1347,7 @@ export default function Wishlist() {
     statusMap,
     ratingFilter,
     ratingMap,
-    starFilter,
+    starMinFilter,
     starMap,
     platformFilter,
     manualPlatform,
@@ -1373,7 +1368,7 @@ export default function Wishlist() {
         excludeDemo ||
         statusFilter.length > 0 ||
         ratingFilter.length > 0 ||
-        starFilter.length > 0 ||
+        starMinFilter > 0 ||
         platformFilter.length > 0);
   const [listWrapRef, listSize] = useElementSize();
   const [layoutMode, setLayoutMode] = useState<"list" | "card">("list");
@@ -1680,7 +1675,7 @@ export default function Wishlist() {
         genreFilter,
         statusFilter,
         ratingFilter,
-        starFilter,
+        starMinFilter,
         platformFilter,
         excludeAdult,
         excludeDemo,
@@ -2015,24 +2010,29 @@ export default function Wishlist() {
               collapsed={collapsedGroups.has("star")}
               onToggle={() => toggleGroup("star")}
             >
-              {[...STAR_VALUES].reverse().map((v) => (
-                <label key={v} className="sortCheck">
-                  <input
-                    type="checkbox"
-                    checked={starFilter.includes(v)}
-                    onChange={() => toggleStarFilter(v)}
-                  />
-                  <StarGlyph /> {v} ({starCounts[v] ?? 0})
-                </label>
-              ))}
-              <label className="sortCheck">
+              <div className="starRangeRow">
                 <input
-                  type="checkbox"
-                  checked={starFilter.includes("none")}
-                  onChange={() => toggleStarFilter("none")}
+                  type="range"
+                  className="starSlider"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={starMinFilter}
+                  style={{
+                    background: `linear-gradient(to right, #f5d06e ${(starMinFilter / 5) * 100}%, #4b5b74 ${(starMinFilter / 5) * 100}%)`,
+                  }}
+                  onChange={(e) => setStarMinFilter(Number(e.target.value))}
                 />
-                미평가 ({starCounts.none})
-              </label>
+                <span className="starRangeLabel">
+                  {starMinFilter > 0 ? (
+                    <>
+                      <StarGlyph /> {starMinFilter} 이상 ({starMinCount})
+                    </>
+                  ) : (
+                    "전체"
+                  )}
+                </span>
+              </div>
             </FilterGroup>
           )}
           {view === "library" && (
