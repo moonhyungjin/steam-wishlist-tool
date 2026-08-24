@@ -526,8 +526,8 @@ button:disabled {
 .cover {
   display: block;
   width: 180px;
-  height: 88px;
-  border-radius: 7px;
+  height: 96px;
+  border-radius: 8px;
   background: #263e57;
   flex: none;
   overflow: hidden;
@@ -565,6 +565,9 @@ button:disabled {
 .info {
   min-width: 0;
   flex: 1;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .storeLink {
   display: inline-flex;
@@ -590,11 +593,11 @@ button:disabled {
   display: flex;
   align-items: center;
   min-width: 0;
-  margin: 0 0 5px;
   font-size: 16px;
+  line-height: 20px;
 }
 .meta {
-  margin: 4px 0;
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 16px;
@@ -605,7 +608,6 @@ button:disabled {
 .statusRow {
   display: flex;
   gap: 6px;
-  margin-top: 8px;
 }
 .statusChip {
   background: #0c1420;
@@ -655,7 +657,6 @@ button:disabled {
   gap: 6px;
   flex-wrap: nowrap;
   overflow: hidden;
-  margin-top: 8px;
 }
 .chip {
   display: inline-flex;
@@ -889,7 +890,6 @@ button:disabled {
     width: 100%;
   }
   .info h3 {
-    margin-bottom: 2px;
     line-height: 20px;
   }
   .meta {
