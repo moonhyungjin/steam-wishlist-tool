@@ -549,24 +549,6 @@ function GameRow({
       </div>
       <div className="info">
         <div className="titleRow">
-          {isMobile && view === "library" && (
-            <select
-              className="starSelect"
-              value={star ?? 0}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                onSetStar(item.appid, v === 0 ? null : (v as StarRating));
-              }}
-              title="내 별점 (재미/만족도)"
-            >
-              <option value={0}>–</option>
-              {STAR_VALUES.map((v) => (
-                <option key={v} value={v}>
-                  ★{v}
-                </option>
-              ))}
-            </select>
-          )}
           <h3>
             {linkable ? (
               <a
@@ -606,6 +588,27 @@ function GameRow({
               </span>
             )}
           </h3>
+          {isMobile && view === "library" && (
+            <span className="titleStarPicker">
+              <StarGlyph />
+              <select
+                className="starSelect"
+                value={star ?? 0}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  onSetStar(item.appid, v === 0 ? null : (v as StarRating));
+                }}
+                title="내 별점 (재미/만족도)"
+              >
+                <option value={0}>–</option>
+                {STAR_VALUES.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </span>
+          )}
         </div>
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
         <div className="badges">
@@ -2026,18 +2029,27 @@ export default function Wishlist() {
               onToggle={() => toggleGroup("star")}
             >
               <div className="starRangeRow">
-                <input
-                  type="range"
-                  className="starSlider"
-                  min={0}
-                  max={5}
-                  step={0.5}
-                  value={starMinFilter}
-                  style={{
-                    background: `linear-gradient(to right, #f5d06e ${(starMinFilter / 5) * 100}%, #4b5b74 ${(starMinFilter / 5) * 100}%)`,
-                  }}
-                  onChange={(e) => setStarMinFilter(Number(e.target.value))}
-                />
+                <div className="sliderContainer">
+                  <div className="sliderTrack">
+                    <div
+                      className="sliderProgress"
+                      style={{ width: `${(starMinFilter / 5) * 100}%` }}
+                    />
+                    <div
+                      className="sliderHandle"
+                      style={{ left: `${(starMinFilter / 5) * 100}%` }}
+                    />
+                  </div>
+                  <input
+                    type="range"
+                    className="starSlider"
+                    min={0}
+                    max={5}
+                    step={0.5}
+                    value={starMinFilter}
+                    onChange={(e) => setStarMinFilter(Number(e.target.value))}
+                  />
+                </div>
                 <div className="starRangeTicks">
                   <span>0</span>
                   <span>1</span>

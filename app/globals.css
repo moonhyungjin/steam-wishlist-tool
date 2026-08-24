@@ -630,13 +630,26 @@ button:disabled {
   font-size: 16px;
   line-height: 20px;
 }
+.titleStarPicker {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #f5d06e;
+}
+.titleStarPicker .starGlyph {
+  width: 14px;
+  height: 14px;
+}
 .starSelect {
   flex: none;
+  height: 26px;
   background: #0c1420;
   border: 1px solid var(--line);
   color: #f5d06e;
   border-radius: 6px;
-  padding: 2px 4px;
+  padding: 0 4px;
   font-size: 12px;
   cursor: pointer;
 }
@@ -741,43 +754,50 @@ button:disabled {
   color: var(--muted);
   padding: 0 1px;
 }
+/* Track/progress/handle are plain divs driven by inline width/left % - the real <input type=range>
+   sits on top, fully transparent, and does nothing but capture drag/click/keyboard input. Simpler
+   and more predictable than fighting ::-webkit-slider-thumb/::-moz-range-thumb cross-browser. */
+.sliderContainer {
+  position: relative;
+  height: 14px;
+  display: flex;
+  align-items: center;
+}
+.sliderTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: #4b5b74;
+}
+.sliderProgress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: #f5d06e;
+}
+.sliderHandle {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: #f5d06e;
+  pointer-events: none;
+}
 .starSlider {
-  -webkit-appearance: none;
-  appearance: none;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 3px;
-  border-radius: 999px;
-  background: #4b5b74;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
   cursor: pointer;
-  outline: none;
-}
-.starSlider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #f5d06e;
-  border: none;
-  cursor: pointer;
-}
-.starSlider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #f5d06e;
-  border: none;
-  cursor: pointer;
-}
-.starSlider::-moz-range-track {
-  height: 3px;
-  border-radius: 999px;
-  background: #4b5b74;
-}
-.starSlider::-moz-range-progress {
-  height: 3px;
-  border-radius: 999px;
-  background: #f5d06e;
 }
 .badges {
   display: flex;
