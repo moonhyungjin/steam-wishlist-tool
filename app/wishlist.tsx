@@ -395,6 +395,27 @@ function StarGlyph() {
     </svg>
   );
 }
+// Read-only 5-star row (same bg/fg overlay trick as StarPicker, minus the click handling) - used
+// wherever a half-star value needs to read as an actual star rating instead of a bare number.
+function StarRow({ value }: { value: number }) {
+  return (
+    <span className="starRowDisplay">
+      {[1, 2, 3, 4, 5].map((i) => {
+        const fillPct = value >= i ? 100 : value >= i - 0.5 ? 50 : 0;
+        return (
+          <span key={i} className="starRowIcon">
+            <span className="starBg">
+              <StarGlyph />
+            </span>
+            <span className="starFg" style={{ width: `${fillPct}%` }}>
+              <StarGlyph />
+            </span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 // Half-star picker: each of the 5 positions is a button with two overlaid glyphs (a dim background
 // star, and a gold foreground star clipped to 0/50/100% width) - clicking the left vs right half of
 // a button picks the half-star vs full-star value for that position. Hover previews the pick before
@@ -598,14 +619,8 @@ function GameRow({
                 popoverTarget={`star-popover-${item.appid}`}
                 title="내 별점 (재미/만족도)"
               >
-                {star != null ? (
-                  <>
-                    <StarGlyph />
-                    {star}
-                  </>
-                ) : (
-                  "평가 없음"
-                )}
+                <StarGlyph />
+                {star != null ? star : "평가 없음"}
               </button>
               <div
                 popover="auto"
@@ -2073,7 +2088,7 @@ export default function Wishlist() {
                     checked={starFilter.includes(v)}
                     onChange={() => toggleStarFilter(v)}
                   />
-                  <StarGlyph /> {v} ({starCounts[v] ?? 0})
+                  <StarRow value={v} /> ({starCounts[v] ?? 0})
                 </label>
               ))}
               <label className="sortCheck">

@@ -556,7 +556,7 @@ button:disabled {
 }
 .rowBadges {
   position: absolute;
-  top: 8px;
+  top: 12px;
   right: 12px;
   display: flex;
   flex-direction: column;
@@ -633,7 +633,7 @@ button:disabled {
 .titleStarPicker {
   flex: none;
   margin-left: auto;
-  height: 26px;
+  height: 20px;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -743,6 +743,16 @@ button:disabled {
 .starPicker {
   display: inline-flex;
   gap: 2px;
+}
+.starRowDisplay {
+  display: inline-flex;
+  gap: 1px;
+  font-size: 13px;
+}
+.starRowIcon {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
 }
 .starBtn {
   position: relative;
