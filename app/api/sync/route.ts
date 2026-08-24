@@ -18,6 +18,7 @@ function getRedis(): Redis | null {
 type SyncData = {
   statusMap?: Record<number, string>;
   ratingMap?: Record<number, string>;
+  starMap?: Record<number, number>;
   achievementMap?: Record<number, { achieved: number; total: number; percent: number } | null>;
 };
 
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "steamId가 필요합니다." }, { status: 400 });
   const client = getRedis();
   if (!client) return NextResponse.json({ configured: false });
-  const { statusMap, ratingMap, achievementMap }: SyncData = body;
-  await client.set(`sync:${steamId}`, { statusMap, ratingMap, achievementMap });
+  const { statusMap, ratingMap, starMap, achievementMap }: SyncData = body;
+  await client.set(`sync:${steamId}`, { statusMap, ratingMap, starMap, achievementMap });
   return NextResponse.json({ ok: true });
 }

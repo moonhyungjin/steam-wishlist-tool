@@ -76,20 +76,26 @@ const LIBRARY_SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "achievement-desc", label: "업적 비율 높은순(미완성)" },
   { value: "name-asc", label: "이름순" },
 ];
-type PlayStatus = "planned" | "playing" | "completed" | "incomplete" | "dropped";
+// "planned" (미플레이) was dropped as a status: as a chip choice it means the same thing as no
+// status at all (미분류), so it added a redundant button without adding information.
+type PlayStatus = "playing" | "completed" | "incomplete" | "dropped";
 const STATUS_LABELS: Record<PlayStatus, string> = {
-  planned: "예정",
-  playing: "진행중",
+  playing: "플레이중",
   completed: "완료",
-  incomplete: "미완료",
+  incomplete: "보류",
   dropped: "하차",
 };
-const STATUS_ORDER: PlayStatus[] = ["planned", "playing", "completed", "incomplete", "dropped"];
+const STATUS_ORDER: PlayStatus[] = ["playing", "completed", "incomplete", "dropped"];
 const STATUS_STORAGE_KEY = "library:status";
 type Rating = "like" | "dislike";
 const RATING_EMOJI: Record<Rating, string> = { like: "👍", dislike: "👎" };
-const RATING_LABELS: Record<Rating, string> = { like: "좋아요", dislike: "싫어요" };
+const RATING_LABELS: Record<Rating, string> = { like: "추천", dislike: "비추천" };
 const RATING_STORAGE_KEY = "library:rating";
+// "별점" - purely personal enjoyment, separate from whether I'd recommend it to someone else.
+// Half-star increments (1~5, step 0.5).
+type StarRating = 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
+const STAR_VALUES: StarRating[] = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+const STAR_STORAGE_KEY = "library:stars";
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
 const ACHIEVEMENT_CHUNK = 40;
@@ -179,11 +185,13 @@ function prioritizeAchievementOrder(
     genreFilter: string[];
     statusFilter: (PlayStatus | "none")[];
     ratingFilter: (Rating | "none")[];
+    starFilter: (StarRating | "none")[];
     platformFilter: ("steam" | ManualPlatform)[];
     excludeAdult: boolean;
-    demoOnly: boolean;
+    excludeDemo: boolean;
     statusMap: Record<number, PlayStatus>;
     ratingMap: Record<number, Rating>;
+    starMap: Record<number, StarRating>;
     manualPlatform: Record<number, ManualPlatform>;
   },
 ): number[] {
@@ -192,7 +200,7 @@ function prioritizeAchievementOrder(
     const g = loaded[item.appid];
     if (q && !(g?.name ?? "").toLowerCase().includes(q)) return false;
     if (filters.excludeAdult && g?.adultContent) return false;
-    if (filters.demoOnly && !g?.isDemo) return false;
+    if (filters.excludeDemo && g?.isDemo) return false;
     if (
       filters.genreFilter.length &&
       !filters.genreFilter.some((genre) => g?.genres.includes(genre))
@@ -205,6 +213,10 @@ function prioritizeAchievementOrder(
     if (filters.ratingFilter.length) {
       const r = filters.ratingMap[item.appid] ?? "none";
       if (!filters.ratingFilter.includes(r)) return false;
+    }
+    if (filters.starFilter.length) {
+      const st = filters.starMap[item.appid] ?? "none";
+      if (!filters.starFilter.includes(st)) return false;
     }
     if (filters.platformFilter.length) {
       const p = filters.manualPlatform[item.appid] ?? "steam";
@@ -366,6 +378,68 @@ function openLibraryOrStore(appid: number) {
   window.addEventListener("blur", onBlur);
   window.location.href = `steam://nav/games/details/${appid}`;
 }
+// A plumper star polygon (inner/outer radius ratio ~0.5, vs. the classic ~0.38) traced with a
+// round-joined stroke in the same color as the fill - that combination is what rounds off both the
+// outer points and the inner notches, instead of the sharp glyph a plain "★" character gives.
+function StarGlyph() {
+  return (
+    <svg
+      className="starGlyph"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    >
+      <polygon points="12,2 14.94,7.96 21.51,8.91 16.76,13.55 17.88,20.09 12,17 6.12,20.09 7.25,13.55 2.49,8.91 9.06,7.96" />
+    </svg>
+  );
+}
+// Half-star picker: each of the 5 positions is a button with two overlaid glyphs (a dim background
+// star, and a gold foreground star clipped to 0/50/100% width) - clicking the left vs right half of
+// a button picks the half-star vs full-star value for that position. Hover previews the pick before
+// committing, same as any star-rating widget.
+function StarPicker({
+  value,
+  onChange,
+}: {
+  value: StarRating | undefined;
+  onChange: (v: StarRating | null) => void;
+}) {
+  const [hover, setHover] = useState<StarRating | null>(null);
+  const display = hover ?? value ?? 0;
+  function pickFromEvent(e: { currentTarget: HTMLButtonElement; clientX: number }, i: number) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const leftHalf = e.clientX - rect.left < rect.width / 2;
+    return (leftHalf ? i - 0.5 : i) as StarRating;
+  }
+  return (
+    <span className="starPicker" onMouseLeave={() => setHover(null)}>
+      {[1, 2, 3, 4, 5].map((i) => {
+        const fillPct = display >= i ? 100 : display >= i - 0.5 ? 50 : 0;
+        return (
+          <button
+            key={i}
+            type="button"
+            className="starBtn"
+            onMouseMove={(e) => setHover(pickFromEvent(e, i))}
+            onClick={(e) => {
+              const picked = pickFromEvent(e, i);
+              onChange(value === picked ? null : picked);
+            }}
+          >
+            <span className="starBg">
+              <StarGlyph />
+            </span>
+            <span className="starFg" style={{ width: `${fillPct}%` }}>
+              <StarGlyph />
+            </span>
+          </button>
+        );
+      })}
+    </span>
+  );
+}
 function GameRow({
   index,
   style,
@@ -376,6 +450,8 @@ function GameRow({
   onSetStatus,
   ratingMap,
   onSetRating,
+  starMap,
+  onSetStar,
   achievementMap,
   checkingAchievements,
   onCheckAchievement,
@@ -391,6 +467,8 @@ function GameRow({
   onSetStatus: (appid: number, status: PlayStatus | null) => void;
   ratingMap: Record<number, Rating>;
   onSetRating: (appid: number, rating: Rating | null) => void;
+  starMap: Record<number, StarRating>;
+  onSetStar: (appid: number, star: StarRating | null) => void;
   achievementMap: Record<number, AchievementInfo | null>;
   checkingAchievements: Set<number>;
   onCheckAchievement: (appid: number) => void;
@@ -403,6 +481,7 @@ function GameRow({
   const g = games[item.appid];
   const status = statusMap[item.appid];
   const rating = ratingMap[item.appid];
+  const star = starMap[item.appid];
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
@@ -415,18 +494,27 @@ function GameRow({
   const tryLibrary = view === "library" && !manual;
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
-      {manual && (
-        <span className="rowBadge manual">
-          {MANUAL_PLATFORM_LABELS[manual]}
-          <button
-            type="button"
-            className="manualRemoveBtn"
-            onClick={() => onRemoveManual(item.appid)}
-            title="목록에서 제거"
-          >
-            ×
-          </button>
-        </span>
+      {(manual || view === "library") && (
+        <div className="rowBadges">
+          {manual && (
+            <span className="rowBadge manual">
+              {MANUAL_PLATFORM_LABELS[manual]}
+              <button
+                type="button"
+                className="manualRemoveBtn"
+                onClick={() => onRemoveManual(item.appid)}
+                title="목록에서 제거"
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {view === "library" && (
+            <span className="rowBadge stars" title="내 별점 (재미/만족도)">
+              <StarPicker value={star} onChange={(v) => onSetStar(item.appid, v)} />
+            </span>
+          )}
+        </div>
       )}
       <div className="coverWrap">
         {linkable ? (
@@ -573,14 +661,6 @@ function GameRow({
               {checkingAchievement ? "업적 확인 중..." : "업적 확인중 (클릭)"}
             </button>
           ) : null}
-          {g ? (
-            <span
-              className={"chip " + (g.koreanSupported ? "good" : "bad")}
-              title="인터페이스/자막/더빙 중 하나라도 한국어를 지원하는지 여부"
-            >
-              {g.koreanSupported ? "한국어 지원" : "한국어 미지원"}
-            </span>
-          ) : null}
           {g?.comingSoon ? (
             <span className="chip">{g.releaseUnannounced ? "출시 미정" : "출시 예정"}</span>
           ) : null}
@@ -631,6 +711,7 @@ function CardCell({
   columnCount,
   statusMap,
   ratingMap,
+  starMap,
   manualPlatform,
   onRemoveManual,
 }: CellComponentProps<{
@@ -640,6 +721,7 @@ function CardCell({
   columnCount: number;
   statusMap: Record<number, PlayStatus>;
   ratingMap: Record<number, Rating>;
+  starMap: Record<number, StarRating>;
   manualPlatform: Record<number, ManualPlatform>;
   onRemoveManual: (appid: number) => void;
 }>) {
@@ -649,6 +731,7 @@ function CardCell({
   const g = games[item.appid];
   const status = statusMap[item.appid];
   const rating = ratingMap[item.appid];
+  const star = starMap[item.appid];
   const manual = manualPlatform[item.appid];
   const linkable = item.appid > 0;
   const cardContent = (
@@ -671,17 +754,11 @@ function CardCell({
             ) : null}
           </div>
         ) : null}
-        {view === "library" && (status || rating) ? (
+        {view === "library" && manual ? (
           <div className="cardBadges">
-            {status && <span className="cardBadge status">{STATUS_LABELS[status]}</span>}
-            {rating && <span className="cardBadge">{RATING_EMOJI[rating]}</span>}
-          </div>
-        ) : null}
-        {manual && (
-          <div className="cardBadges cardBadgesRight">
-            {/* The only clickable thing in this overlay - stopped from bubbling up into the
-                whole-card link, which would otherwise also navigate away on click. */}
             <span className="cardBadge manual">
+              {/* The only clickable thing in this overlay - stopped from bubbling up into the
+                  whole-card link, which would otherwise also navigate away on click. */}
               {MANUAL_PLATFORM_LABELS[manual]}
               <button
                 type="button"
@@ -697,7 +774,19 @@ function CardCell({
               </button>
             </span>
           </div>
-        )}
+        ) : null}
+        {view === "library" && (status || star || rating) ? (
+          <div className="cardBadges cardBadgesBottomRight">
+            {status && <span className="cardBadge status">{STATUS_LABELS[status]}</span>}
+            {star && (
+              <span className="cardBadge stars">
+                <StarGlyph />
+                {star}
+              </span>
+            )}
+            {rating && <span className="cardBadge">{RATING_EMOJI[rating]}</span>}
+          </div>
+        ) : null}
       </div>
       <div className="cardInfo">
         <h4>{g?.name ?? `Steam App ${item.appid}`}</h4>
@@ -949,7 +1038,7 @@ export default function Wishlist() {
     setKoreanFilter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
   }
   const [excludeAdult, setExcludeAdult] = useState(false);
-  const [demoOnly, setDemoOnly] = useState(false);
+  const [excludeDemo, setExcludeDemo] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   // Mirrors the 900px CSS breakpoint so JS-driven layout decisions (row height, the filter
   // drawer) stay in sync with it, including live orientation/resize changes.
@@ -1011,7 +1100,6 @@ export default function Wishlist() {
   }
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {
-      planned: 0,
       playing: 0,
       completed: 0,
       incomplete: 0,
@@ -1047,6 +1135,30 @@ export default function Wishlist() {
     }
     return counts;
   }, [combinedLibItems, ratingMap]);
+  const [starMap, setStarMap] = useState<Record<number, StarRating>>({});
+  function setGameStar(appid: number, star: StarRating | null) {
+    const next = { ...starMap };
+    if (star) next[appid] = star;
+    else delete next[appid];
+    setStarMap(next);
+    try {
+      localStorage.setItem(STAR_STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+    pushSync({ starMap: next });
+  }
+  const [starFilter, setStarFilter] = useState<(StarRating | "none")[]>([]);
+  function toggleStarFilter(s: StarRating | "none") {
+    setStarFilter((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+  }
+  const starCounts = useMemo(() => {
+    const counts: Record<string, number> = { none: 0 };
+    for (const v of STAR_VALUES) counts[v] = 0;
+    for (const item of combinedLibItems) {
+      const s = starMap[item.appid];
+      counts[s ?? "none"]++;
+    }
+    return counts;
+  }, [combinedLibItems, starMap]);
   const [platformFilter, setPlatformFilter] = useState<("steam" | ManualPlatform)[]>([]);
   function togglePlatformFilter(p: "steam" | ManualPlatform) {
     setPlatformFilter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
@@ -1081,6 +1193,7 @@ export default function Wishlist() {
   function pushSync(overrides: {
     statusMap?: Record<number, PlayStatus>;
     ratingMap?: Record<number, Rating>;
+    starMap?: Record<number, StarRating>;
     achievementMap?: Record<number, AchievementInfo | null>;
   }) {
     const id = libSteamId.trim();
@@ -1092,6 +1205,7 @@ export default function Wishlist() {
         steamId: id,
         statusMap: overrides.statusMap ?? statusMap,
         ratingMap: overrides.ratingMap ?? ratingMap,
+        starMap: overrides.starMap ?? starMap,
         achievementMap: overrides.achievementMap ?? achievementMap,
       }),
     }).catch(() => {});
@@ -1121,6 +1235,12 @@ export default function Wishlist() {
           setRatingMap(d.ratingMap);
           try {
             localStorage.setItem(RATING_STORAGE_KEY, JSON.stringify(d.ratingMap));
+          } catch {}
+        }
+        if (d.starMap && (Object.keys(d.starMap).length > 0 || Object.keys(starMap).length === 0)) {
+          setStarMap(d.starMap);
+          try {
+            localStorage.setItem(STAR_STORAGE_KEY, JSON.stringify(d.starMap));
           } catch {}
         }
         if (
@@ -1195,7 +1315,7 @@ export default function Wishlist() {
         if (!koreanFilter.includes(k)) return false;
       }
       if (view === "library" && excludeAdult && g?.adultContent) return false;
-      if (view === "library" && demoOnly && !g?.isDemo) return false;
+      if (view === "library" && excludeDemo && g?.isDemo) return false;
       if (genreFilter.length && !genreFilter.some((genre) => g?.genres.includes(genre)))
         return false;
       if (view === "library" && statusFilter.length) {
@@ -1205,6 +1325,10 @@ export default function Wishlist() {
       if (view === "library" && ratingFilter.length) {
         const r = ratingMap[item.appid] ?? "none";
         if (!ratingFilter.includes(r)) return false;
+      }
+      if (view === "library" && starFilter.length) {
+        const s = starMap[item.appid] ?? "none";
+        if (!starFilter.includes(s)) return false;
       }
       if (view === "library" && platformFilter.length) {
         const p = manualPlatform[item.appid] ?? "steam";
@@ -1221,13 +1345,15 @@ export default function Wishlist() {
     excludeComingSoon,
     koreanFilter,
     excludeAdult,
-    demoOnly,
+    excludeDemo,
     genreFilter,
     view,
     statusFilter,
     statusMap,
     ratingFilter,
     ratingMap,
+    starFilter,
+    starMap,
     platformFilter,
     manualPlatform,
   ]);
@@ -1244,9 +1370,10 @@ export default function Wishlist() {
     (view === "wishlist"
       ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter.length > 0
       : excludeAdult ||
-        demoOnly ||
+        excludeDemo ||
         statusFilter.length > 0 ||
         ratingFilter.length > 0 ||
+        starFilter.length > 0 ||
         platformFilter.length > 0);
   const [listWrapRef, listSize] = useElementSize();
   const [layoutMode, setLayoutMode] = useState<"list" | "card">("list");
@@ -1288,6 +1415,8 @@ export default function Wishlist() {
       if (status && typeof status === "object") setStatusMap(status);
       const rating = JSON.parse(localStorage.getItem(RATING_STORAGE_KEY) ?? "null");
       if (rating && typeof rating === "object") setRatingMap(rating);
+      const stars = JSON.parse(localStorage.getItem(STAR_STORAGE_KEY) ?? "null");
+      if (stars && typeof stars === "object") setStarMap(stars);
       const achievements = JSON.parse(localStorage.getItem(ACHIEVEMENT_STORAGE_KEY) ?? "null");
       if (achievements && typeof achievements === "object") setAchievementMap(achievements);
       // Item/game caches are already restored above; only the profiles still need a fresh fetch to
@@ -1551,11 +1680,13 @@ export default function Wishlist() {
         genreFilter,
         statusFilter,
         ratingFilter,
+        starFilter,
         platformFilter,
         excludeAdult,
-        demoOnly,
+        excludeDemo,
         statusMap,
         ratingMap,
+        starMap,
         manualPlatform,
       });
       enrichAchievements(achievementOrder, id, key, achievementMap, updateAchievements).catch(
@@ -1570,6 +1701,14 @@ export default function Wishlist() {
   const loadActive = view === "wishlist" ? loadWishlist : loadLibrary;
   return (
     <div className="page">
+      {loading && progress.total > 0 && (
+        <div
+          className="topProgressBar"
+          title={`게임 정보 불러오는 중 ${progress.done} / ${progress.total}`}
+        >
+          <i style={{ width: `${(progress.done / progress.total) * 100}%` }} />
+        </div>
+      )}
       <aside className="sidebar">
         <header>
           <p className="eyebrow">PERSONAL STEAM TOOL</p>
@@ -1754,6 +1893,46 @@ export default function Wishlist() {
               </label>
             </FilterGroup>
           )}
+          {view === "library" && (
+            <FilterGroup
+              title="필터"
+              collapsed={collapsedGroups.has("libraryFilter")}
+              onToggle={() => toggleGroup("libraryFilter")}
+            >
+              {/* <label className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={excludeAdult}
+                  onChange={() => setExcludeAdult((v) => !v)}
+                />
+                선정적 콘텐츠 제외
+              </label> */}
+              <label className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={excludeDemo}
+                  onChange={() => setExcludeDemo((v) => !v)}
+                />
+                데모 제외
+              </label>
+            </FilterGroup>
+          )}
+          <FilterGroup
+            title="정렬 (하나만 선택)"
+            collapsed={collapsedGroups.has("sort")}
+            onToggle={() => toggleGroup("sort")}
+          >
+            {(view === "wishlist" ? WISHLIST_SORT_OPTIONS : LIBRARY_SORT_OPTIONS).map((opt) => (
+              <label key={opt.value} className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={sortKey === opt.value}
+                  onChange={() => selectSortKey(opt.value)}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </FilterGroup>
           {view === "wishlist" && (
             <FilterGroup
               title="한국어"
@@ -1780,22 +1959,28 @@ export default function Wishlist() {
           )}
           {view === "library" && (
             <FilterGroup
-              title="필터"
-              collapsed={collapsedGroups.has("libraryFilter")}
-              onToggle={() => toggleGroup("libraryFilter")}
+              title="플랫폼"
+              collapsed={collapsedGroups.has("platform")}
+              onToggle={() => toggleGroup("platform")}
             >
-              {/* <label className="sortCheck">
+              <label className="sortCheck">
                 <input
                   type="checkbox"
-                  checked={excludeAdult}
-                  onChange={() => setExcludeAdult((v) => !v)}
+                  checked={platformFilter.includes("steam")}
+                  onChange={() => togglePlatformFilter("steam")}
                 />
-                선정적 콘텐츠 제외
-              </label> */}
-              <label className="sortCheck">
-                <input type="checkbox" checked={demoOnly} onChange={() => setDemoOnly((v) => !v)} />
-                데모만 보기
+                Steam ({platformCounts.steam})
               </label>
+              {(["epic", "stove", "other"] as const).map((p) => (
+                <label key={p} className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={platformFilter.includes(p)}
+                    onChange={() => togglePlatformFilter(p)}
+                  />
+                  {MANUAL_PLATFORM_LABELS[p]} ({platformCounts[p]})
+                </label>
+              ))}
             </FilterGroup>
           )}
           {view === "library" && (
@@ -1826,6 +2011,32 @@ export default function Wishlist() {
           )}
           {view === "library" && (
             <FilterGroup
+              title="별점"
+              collapsed={collapsedGroups.has("star")}
+              onToggle={() => toggleGroup("star")}
+            >
+              {[...STAR_VALUES].reverse().map((v) => (
+                <label key={v} className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={starFilter.includes(v)}
+                    onChange={() => toggleStarFilter(v)}
+                  />
+                  <StarGlyph /> {v} ({starCounts[v] ?? 0})
+                </label>
+              ))}
+              <label className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={starFilter.includes("none")}
+                  onChange={() => toggleStarFilter("none")}
+                />
+                미평가 ({starCounts.none})
+              </label>
+            </FilterGroup>
+          )}
+          {view === "library" && (
+            <FilterGroup
               title="평가"
               collapsed={collapsedGroups.has("rating")}
               onToggle={() => toggleGroup("rating")}
@@ -1850,48 +2061,6 @@ export default function Wishlist() {
               </label>
             </FilterGroup>
           )}
-          {view === "library" && (
-            <FilterGroup
-              title="플랫폼"
-              collapsed={collapsedGroups.has("platform")}
-              onToggle={() => toggleGroup("platform")}
-            >
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={platformFilter.includes("steam")}
-                  onChange={() => togglePlatformFilter("steam")}
-                />
-                Steam ({platformCounts.steam})
-              </label>
-              {(["epic", "stove", "other"] as const).map((p) => (
-                <label key={p} className="sortCheck">
-                  <input
-                    type="checkbox"
-                    checked={platformFilter.includes(p)}
-                    onChange={() => togglePlatformFilter(p)}
-                  />
-                  {MANUAL_PLATFORM_LABELS[p]} ({platformCounts[p]})
-                </label>
-              ))}
-            </FilterGroup>
-          )}
-          <FilterGroup
-            title="정렬 (하나만 선택)"
-            collapsed={collapsedGroups.has("sort")}
-            onToggle={() => toggleGroup("sort")}
-          >
-            {(view === "wishlist" ? WISHLIST_SORT_OPTIONS : LIBRARY_SORT_OPTIONS).map((opt) => (
-              <label key={opt.value} className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={sortKey === opt.value}
-                  onChange={() => selectSortKey(opt.value)}
-                />
-                {opt.label}
-              </label>
-            ))}
-          </FilterGroup>
           {genreCounts.length > 0 && (
             <FilterGroup
               title="장르"
@@ -1937,19 +2106,6 @@ export default function Wishlist() {
             />
           </div>
           <div className="headRight">
-            {loading && progress.total > 0 && (
-              <div
-                className="miniProgress"
-                title={`게임 정보 불러오는 중 ${progress.done} / ${progress.total}`}
-              >
-                <span>
-                  {progress.done} / {progress.total}
-                </span>
-                <div className="miniBar">
-                  <i style={{ width: `${(progress.done / progress.total) * 100}%` }} />
-                </div>
-              </div>
-            )}
             <span className="itemCount">
               <span className="itemCountLabel">
                 {view === "wishlist" ? "찜목록" : "보유 게임"}{" "}
@@ -2108,6 +2264,8 @@ export default function Wishlist() {
                 onSetStatus: setGameStatus,
                 ratingMap,
                 onSetRating: setGameRating,
+                starMap,
+                onSetStar: setGameStar,
                 achievementMap,
                 checkingAchievements,
                 onCheckAchievement: checkOneAchievement,
@@ -2136,6 +2294,7 @@ export default function Wishlist() {
                     columnCount,
                     statusMap,
                     ratingMap,
+                    starMap,
                     manualPlatform,
                     onRemoveManual: removeManualGame,
                   }}

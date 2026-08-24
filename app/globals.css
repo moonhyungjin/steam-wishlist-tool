@@ -9,6 +9,21 @@
 * {
   box-sizing: border-box;
 }
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin: 0;
+}
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 html,
 body {
   height: 100%;
@@ -253,21 +268,16 @@ button:disabled {
   margin-left: auto;
   flex: none;
 }
-.miniProgress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
+.topProgressBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: transparent;
+  z-index: 100;
 }
-.miniBar {
-  width: 90px;
-  height: 6px;
-  background: #0b1420;
-  border-radius: 99px;
-  overflow: hidden;
-}
-.miniBar i {
+.topProgressBar i {
   display: block;
   height: 100%;
   background: var(--accent);
@@ -412,6 +422,12 @@ button:disabled {
   left: auto;
   right: 4px;
 }
+.cardBadgesBottomRight {
+  top: auto;
+  left: auto;
+  bottom: 4px;
+  right: 4px;
+}
 .cardBadge {
   line-height: 20px;
   font-size: 12px;
@@ -432,6 +448,12 @@ button:disabled {
 .cardBadge.status {
   background: rgba(27, 109, 155, 0.85);
   color: white;
+}
+.cardBadge.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #f5d06e;
 }
 .cardBadge.manual {
   display: inline-flex;
@@ -532,10 +554,17 @@ button:disabled {
   flex: none;
   overflow: hidden;
 }
-.rowBadge {
+.rowBadges {
   position: absolute;
   top: 8px;
   right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  z-index: 1;
+}
+.rowBadge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -543,7 +572,6 @@ button:disabled {
   font-size: 11px;
   padding: 0 6px;
   border-radius: 4px;
-  z-index: 1;
 }
 .rowBadge.manual {
   background: #7c4fd6;
@@ -650,6 +678,39 @@ button:disabled {
   border-color: var(--accent);
   background: rgba(102, 192, 244, 0.14);
   opacity: 1;
+}
+.starPicker {
+  display: inline-flex;
+  gap: 2px;
+}
+.starBtn {
+  position: relative;
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.starGlyph {
+  display: block;
+  width: 1em;
+  height: 1em;
+}
+.starBg,
+.starFg {
+  display: block;
+}
+.starBg {
+  color: #4b5b74;
+}
+.starFg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  color: #f5d06e;
 }
 .badges {
   display: flex;
@@ -908,6 +969,9 @@ button:disabled {
   .statusChip,
   .ratingChip {
     height: 26px;
+  }
+  .starBtn {
+    height: 22px;
   }
   /* The 5 status chips + rating chips were ~2px too wide to share a line at phone width, wrapping
      the rating chips onto their own second line - trimming chip padding buys back just enough. */
