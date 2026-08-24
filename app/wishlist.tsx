@@ -613,6 +613,19 @@ function GameRow({
                     starPopoverRef.current?.hidePopover();
                   }}
                 />
+                {/* StarPicker itself only clears when you tap the exact same half-star spot
+                    again, which isn't discoverable on a touch popover with no hover preview -
+                    give mobile an explicit clear action. */}
+                <button
+                  type="button"
+                  className="starClearBtn"
+                  onClick={() => {
+                    onSetStar(item.appid, null);
+                    starPopoverRef.current?.hidePopover();
+                  }}
+                >
+                  미평가로 초기화
+                </button>
               </div>
             </>
           )}
@@ -774,7 +787,7 @@ function CardCell({
           <div className="loadingCover">{linkable ? "LOADING" : "이미지 없음"}</div>
         )}
         {view === "wishlist" && (g?.metacritic != null || g?.reviewPositive != null) ? (
-          <div className="cardBadges">
+          <div className="cardBadges cardBadgesBottomRight">
             {g.metacritic != null ? (
               <span className={"cardBadge " + scoreClass(g.metacritic)}>메타 {g.metacritic}</span>
             ) : null}
