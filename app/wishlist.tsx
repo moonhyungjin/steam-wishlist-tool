@@ -594,12 +594,18 @@ function GameRow({
             <>
               <button
                 type="button"
-                className="titleStarPicker"
+                className={"titleStarPicker" + (star == null ? " unset" : "")}
                 popoverTarget={`star-popover-${item.appid}`}
                 title="내 별점 (재미/만족도)"
               >
-                <StarGlyph />
-                {star ?? "–"}
+                {star != null ? (
+                  <>
+                    <StarGlyph />
+                    {star}
+                  </>
+                ) : (
+                  "평가 없음"
+                )}
               </button>
               <div
                 popover="auto"
@@ -2082,7 +2088,7 @@ export default function Wishlist() {
           )}
           {view === "library" && (
             <FilterGroup
-              title="평가"
+              title="추천"
               collapsed={collapsedGroups.has("rating")}
               onToggle={() => toggleGroup("rating")}
             >

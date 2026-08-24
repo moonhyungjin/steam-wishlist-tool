@@ -637,29 +637,35 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 3px;
-  background: #0c1420;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0 8px;
+  background: none;
+  border: none;
+  padding: 0;
   color: #f5d06e;
   font-size: 12px;
   cursor: pointer;
+}
+.titleStarPicker.unset {
+  color: var(--muted);
 }
 .titleStarPicker .starGlyph {
   width: 14px;
   height: 14px;
 }
+/* display must stay off the bare selector - [popover] is display:none by default until shown, and
+   an unconditional display here would override that, leaving every row's popover stuck visible. */
 .starPopover {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px 14px;
   color: var(--text);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.starPopover:popover-open {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 .starPopover::backdrop {
   background: rgba(0, 0, 0, 0.4);
