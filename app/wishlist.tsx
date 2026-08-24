@@ -866,12 +866,17 @@ export default function Wishlist() {
   const [wlLoading, setWlLoading] = useState(false);
   const [wlProgress, setWlProgress] = useState({ done: 0, total: 0 });
   const [wlError, setWlError] = useState("");
+  // Distinguishes "never fetched" from "fetched, got zero back" - the latter almost always means
+  // the target account's wishlist/library visibility is private, since Steam returns an empty
+  // result rather than an explicit permission error either way.
+  const [wlFetchedOnce, setWlFetchedOnce] = useState(false);
 
   const [libItems, setLibItems] = useState<Item[]>([]);
   const [libGames, setLibGames] = useState<Record<number, Game>>({});
   const [libLoading, setLibLoading] = useState(false);
   const [libProgress, setLibProgress] = useState({ done: 0, total: 0 });
   const [libError, setLibError] = useState("");
+  const [libFetchedOnce, setLibFetchedOnce] = useState(false);
   const [manualPlatform, setManualPlatform] = useState<Record<number, ManualPlatform>>({});
   const [manualGames, setManualGames] = useState<Record<number, Game>>({});
   function persistManual(
@@ -908,6 +913,7 @@ export default function Wishlist() {
   const loading = view === "wishlist" ? wlLoading : libLoading;
   const progress = view === "wishlist" ? wlProgress : libProgress;
   const error = view === "wishlist" ? wlError : libError;
+  const fetchedOnce = view === "wishlist" ? wlFetchedOnce : libFetchedOnce;
   const steamId = view === "wishlist" ? wlSteamId : libSteamId;
   const setSteamId = view === "wishlist" ? setWlSteamId : setLibSteamId;
   const profile = view === "wishlist" ? wlProfile : libProfile;
@@ -1440,6 +1446,7 @@ export default function Wishlist() {
       if (!r.ok) throw new Error(d.error);
       const list: Item[] = (d.items ?? []).map((x: { appid: number }) => ({ appid: x.appid }));
       setWlItems(list);
+      setWlFetchedOnce(true);
       setWlEditingCreds(false);
       const listAppids = new Set(list.map((x) => x.appid));
       const existing: Record<number, Game> = {};
@@ -1520,6 +1527,7 @@ export default function Wishlist() {
         playtimeMinutes: x.playtimeMinutes,
       }));
       setLibItems(list);
+      setLibFetchedOnce(true);
       setLibEditingCreds(false);
       const listAppids = new Set(list.map((x) => x.appid));
       const existing: Record<number, Game> = {};
@@ -2076,9 +2084,13 @@ export default function Wishlist() {
         <div className="listWrap" ref={listWrapRef}>
           {!items.length ? (
             <div className="empty">
-              {view === "wishlist"
-                ? "Steam ID64를 입력하면 실제 찜목록을 가져옵니다."
-                : "Steam ID64와 API 키를 입력하면 보유 게임 목록을 가져옵니다."}
+              {fetchedOnce
+                ? "가져온 항목이 없어요. 이 계정의 " +
+                  (view === "wishlist" ? "찜목록" : "라이브러리") +
+                  "이 비공개이거나 실제로 비어있을 수 있어요 (Steam은 둘을 구분해서 알려주지 않아요)."
+                : view === "wishlist"
+                  ? "Steam ID64를 입력하면 실제 찜목록을 가져옵니다."
+                  : "Steam ID64와 API 키를 입력하면 보유 게임 목록을 가져옵니다."}
             </div>
           ) : !sortedItems.length ? (
             <div className="empty">조건에 맞는 게임이 없습니다.</div>
