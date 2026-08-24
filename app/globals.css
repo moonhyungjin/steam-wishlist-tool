@@ -617,12 +617,28 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .info h3 {
   display: flex;
   align-items: center;
   min-width: 0;
   font-size: 16px;
   line-height: 20px;
+}
+.starSelect {
+  flex: none;
+  background: #0c1420;
+  border: 1px solid var(--line);
+  color: #f5d06e;
+  border-radius: 6px;
+  padding: 2px 4px;
+  font-size: 12px;
+  cursor: pointer;
 }
 .meta {
   margin: 0;
@@ -714,28 +730,22 @@ button:disabled {
 }
 .starRangeRow {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
   padding: 5px 2px;
 }
-.starRangeLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 13px;
+.starRangeTicks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
   color: var(--muted);
-  white-space: nowrap;
-}
-.starRangeLabel .starGlyph {
-  width: 0.9em;
-  height: 0.9em;
-  color: #f5d06e;
+  padding: 0 1px;
 }
 .starSlider {
   -webkit-appearance: none;
   appearance: none;
-  flex: 1;
-  height: 4px;
+  width: 100%;
+  height: 3px;
   border-radius: 999px;
   background: #4b5b74;
   cursor: pointer;
@@ -760,12 +770,12 @@ button:disabled {
   cursor: pointer;
 }
 .starSlider::-moz-range-track {
-  height: 4px;
+  height: 3px;
   border-radius: 999px;
   background: #4b5b74;
 }
 .starSlider::-moz-range-progress {
-  height: 4px;
+  height: 3px;
   border-radius: 999px;
   background: #f5d06e;
 }

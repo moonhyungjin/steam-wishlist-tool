@@ -94,6 +94,7 @@ const RATING_STORAGE_KEY = "library:rating";
 // "별점" - purely personal enjoyment, separate from whether I'd recommend it to someone else.
 // Half-star increments (1~5, step 0.5).
 type StarRating = 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
+const STAR_VALUES: StarRating[] = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 const STAR_STORAGE_KEY = "library:stars";
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
@@ -457,6 +458,7 @@ function GameRow({
   manualPlatform,
   onRemoveManual,
   steamId,
+  isMobile,
 }: RowComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -474,6 +476,7 @@ function GameRow({
   manualPlatform: Record<number, ManualPlatform>;
   steamId: string;
   onRemoveManual: (appid: number) => void;
+  isMobile: boolean;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -492,7 +495,7 @@ function GameRow({
   const tryLibrary = view === "library" && !manual;
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
-      {(manual || view === "library") && (
+      {(manual || (view === "library" && !isMobile)) && (
         <div className="rowBadges">
           {manual && (
             <span className="rowBadge manual">
@@ -507,7 +510,7 @@ function GameRow({
               </button>
             </span>
           )}
-          {view === "library" && (
+          {view === "library" && !isMobile && (
             <span className="rowBadge stars" title="내 별점 (재미/만족도)">
               <StarPicker value={star} onChange={(v) => onSetStar(item.appid, v)} />
             </span>
@@ -545,45 +548,65 @@ function GameRow({
         )}
       </div>
       <div className="info">
-        <h3>
-          {linkable ? (
-            <a
-              className="storeLink"
-              href={`https://store.steampowered.com/app/${item.appid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                if (!tryLibrary || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-                e.preventDefault();
-                openLibraryOrStore(item.appid);
+        <div className="titleRow">
+          {isMobile && view === "library" && (
+            <select
+              className="starSelect"
+              value={star ?? 0}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                onSetStar(item.appid, v === 0 ? null : (v as StarRating));
               }}
-              title={
-                tryLibrary
-                  ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
-                  : "스팀 상점 페이지 열기"
-              }
+              title="내 별점 (재미/만족도)"
             >
-              <span className="storeLinkText">{g?.name ?? `Steam App ${item.appid}`}</span>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-            </a>
-          ) : (
-            <span className="storeLink" style={{ color: "var(--text)" }}>
-              <span className="storeLinkText">{g?.name ?? `Steam App ${item.appid}`}</span>
-            </span>
+              <option value={0}>–</option>
+              {STAR_VALUES.map((v) => (
+                <option key={v} value={v}>
+                  ★{v}
+                </option>
+              ))}
+            </select>
           )}
-        </h3>
+          <h3>
+            {linkable ? (
+              <a
+                className="storeLink"
+                href={`https://store.steampowered.com/app/${item.appid}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (!tryLibrary || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                  e.preventDefault();
+                  openLibraryOrStore(item.appid);
+                }}
+                title={
+                  tryLibrary
+                    ? "Steam 라이브러리에서 열기 (Steam 미설치 시 상점 페이지)"
+                    : "스팀 상점 페이지 열기"
+                }
+              >
+                <span className="storeLinkText">{g?.name ?? `Steam App ${item.appid}`}</span>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
+              </a>
+            ) : (
+              <span className="storeLink" style={{ color: "var(--text)" }}>
+                <span className="storeLinkText">{g?.name ?? `Steam App ${item.appid}`}</span>
+              </span>
+            )}
+          </h3>
+        </div>
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
         <div className="badges">
           {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
@@ -1147,14 +1170,6 @@ export default function Wishlist() {
   // A single "N점 이상" threshold via a slider, rather than an exact-match checkbox per half-star
   // value - 0 means the filter is off (dragged all the way to the empty end).
   const [starMinFilter, setStarMinFilter] = useState(0);
-  const starMinCount = useMemo(() => {
-    if (!starMinFilter) return 0;
-    let count = 0;
-    for (const item of combinedLibItems) {
-      if ((starMap[item.appid] ?? 0) >= starMinFilter) count++;
-    }
-    return count;
-  }, [combinedLibItems, starMap, starMinFilter]);
   const [platformFilter, setPlatformFilter] = useState<("steam" | ManualPlatform)[]>([]);
   function togglePlatformFilter(p: "steam" | ManualPlatform) {
     setPlatformFilter((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
@@ -2023,15 +2038,14 @@ export default function Wishlist() {
                   }}
                   onChange={(e) => setStarMinFilter(Number(e.target.value))}
                 />
-                <span className="starRangeLabel">
-                  {starMinFilter > 0 ? (
-                    <>
-                      <StarGlyph /> {starMinFilter} 이상 ({starMinCount})
-                    </>
-                  ) : (
-                    "전체"
-                  )}
-                </span>
+                <div className="starRangeTicks">
+                  <span>0</span>
+                  <span>1</span>
+                  <span>2</span>
+                  <span>3</span>
+                  <span>4</span>
+                  <span>5</span>
+                </div>
               </div>
             </FilterGroup>
           )}
@@ -2273,6 +2287,7 @@ export default function Wishlist() {
                 manualPlatform,
                 onRemoveManual: removeManualGame,
                 steamId,
+                isMobile,
               }}
               style={{ height: listSize.height, width: "100%" }}
             />
