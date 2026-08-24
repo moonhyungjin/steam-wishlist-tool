@@ -483,6 +483,7 @@ function GameRow({
   const status = statusMap[item.appid];
   const rating = ratingMap[item.appid];
   const star = starMap[item.appid];
+  const starPopoverRef = useRef<HTMLDivElement>(null);
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
@@ -589,25 +590,31 @@ function GameRow({
             )}
           </h3>
           {isMobile && view === "library" && (
-            <span className="titleStarPicker">
-              <StarGlyph />
-              <select
-                className="starSelect"
-                value={star ?? 0}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  onSetStar(item.appid, v === 0 ? null : (v as StarRating));
-                }}
+            <>
+              <button
+                type="button"
+                className="titleStarPicker"
+                popoverTarget={`star-popover-${item.appid}`}
                 title="내 별점 (재미/만족도)"
               >
-                <option value={0}>–</option>
-                {STAR_VALUES.map((v) => (
-                  <option key={v} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </span>
+                <StarGlyph />
+                {star ?? "–"}
+              </button>
+              <div
+                popover="auto"
+                id={`star-popover-${item.appid}`}
+                className="starPopover"
+                ref={starPopoverRef}
+              >
+                <StarPicker
+                  value={star}
+                  onChange={(v) => {
+                    onSetStar(item.appid, v);
+                    starPopoverRef.current?.hidePopover();
+                  }}
+                />
+              </div>
+            </>
           )}
         </div>
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
