@@ -480,7 +480,6 @@ function GameRow({
   manualPlatform,
   onRemoveManual,
   steamId,
-  isMobile,
 }: RowComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -498,7 +497,6 @@ function GameRow({
   manualPlatform: Record<number, ManualPlatform>;
   steamId: string;
   onRemoveManual: (appid: number) => void;
-  isMobile: boolean;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -518,26 +516,19 @@ function GameRow({
   const tryLibrary = view === "library" && !manual;
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
-      {(manual || (view === "library" && !isMobile)) && (
+      {manual && (
         <div className="rowBadges">
-          {manual && (
-            <span className="rowBadge manual">
-              {MANUAL_PLATFORM_LABELS[manual]}
-              <button
-                type="button"
-                className="manualRemoveBtn"
-                onClick={() => onRemoveManual(item.appid)}
-                title="목록에서 제거"
-              >
-                ×
-              </button>
-            </span>
-          )}
-          {view === "library" && !isMobile && (
-            <span className="rowBadge stars" title="내 별점 (재미/만족도)">
-              <StarPicker value={star} onChange={(v) => onSetStar(item.appid, v)} />
-            </span>
-          )}
+          <span className="rowBadge manual">
+            {MANUAL_PLATFORM_LABELS[manual]}
+            <button
+              type="button"
+              className="manualRemoveBtn"
+              onClick={() => onRemoveManual(item.appid)}
+              title="목록에서 제거"
+            >
+              ×
+            </button>
+          </span>
         </div>
       )}
       <div className="coverWrap">
@@ -611,7 +602,7 @@ function GameRow({
               </span>
             )}
           </h3>
-          {isMobile && view === "library" && (
+          {view === "library" && (
             <>
               <button
                 type="button"
@@ -2339,7 +2330,6 @@ export default function Wishlist() {
                 manualPlatform,
                 onRemoveManual: removeManualGame,
                 steamId,
-                isMobile,
               }}
               style={{ height: listSize.height, width: "100%" }}
             />
