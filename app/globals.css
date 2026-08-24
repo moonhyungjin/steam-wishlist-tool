@@ -556,7 +556,7 @@ button:disabled {
 }
 .rowBadges {
   position: absolute;
-  top: 12px;
+  top: 15px;
   right: 12px;
   display: flex;
   flex-direction: column;
@@ -634,6 +634,7 @@ button:disabled {
   flex: none;
   margin-left: auto;
   height: 20px;
+  line-height: 20px;
   display: flex;
   align-items: center;
   gap: 3px;
