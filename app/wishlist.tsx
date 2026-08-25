@@ -1572,7 +1572,7 @@ export default function Wishlist() {
         .then((d) => setManualResults(d.items ?? []))
         .catch(() => setManualResults([]))
         .finally(() => setManualSearching(false));
-    }, 300);
+    }, 200);
     return () => clearTimeout(timer);
   }, [manualQuery, manualFormOpen]);
   function closeManualForm() {
