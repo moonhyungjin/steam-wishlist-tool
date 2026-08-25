@@ -1245,9 +1245,9 @@ export default function Wishlist() {
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
   const [excludeEarlyAccess, setExcludeEarlyAccess] = useState(false);
   const [excludeComingSoon, setExcludeComingSoon] = useState(false);
-  const [koreanFilter, setKoreanFilter] = useState<("supported" | "unsupported")[]>([]);
-  function toggleKoreanFilter(v: "supported" | "unsupported") {
-    setKoreanFilter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
+  const [koreanFilter, setKoreanFilter] = useState<"supported" | "unsupported" | null>(null);
+  function selectKoreanFilter(v: "supported" | "unsupported") {
+    setKoreanFilter((prev) => (prev === v ? null : v));
   }
   const [excludeAdult, setExcludeAdult] = useState(false);
   const [excludeDemo, setExcludeDemo] = useState(false);
@@ -1522,9 +1522,9 @@ export default function Wishlist() {
       if (view === "wishlist" && onlyDiscounted && !(g && g.discountPercent > 0)) return false;
       if (view === "wishlist" && excludeEarlyAccess && g?.earlyAccess) return false;
       if (view === "wishlist" && excludeComingSoon && g?.comingSoon) return false;
-      if (view === "wishlist" && koreanFilter.length) {
+      if (view === "wishlist" && koreanFilter) {
         const k = g?.koreanSupported ? "supported" : "unsupported";
-        if (!koreanFilter.includes(k)) return false;
+        if (koreanFilter !== k) return false;
       }
       if (view === "library" && excludeAdult && g?.adultContent) return false;
       if (view === "library" && excludeDemo && g?.isDemo) return false;
@@ -1580,7 +1580,7 @@ export default function Wishlist() {
     genreFilter.length > 0 ||
     sortKey !== null ||
     (view === "wishlist"
-      ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter.length > 0
+      ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter !== null
       : excludeAdult ||
         excludeDemo ||
         statusFilter.length > 0 ||
@@ -2081,14 +2081,15 @@ export default function Wishlist() {
             </FilterGroup>
           )}
           <FilterGroup
-            title="정렬 (하나만 선택)"
+            title="정렬"
             collapsed={collapsedGroups.has("sort")}
             onToggle={() => toggleGroup("sort")}
           >
             {(view === "wishlist" ? WISHLIST_SORT_OPTIONS : LIBRARY_SORT_OPTIONS).map((opt) => (
               <label key={opt.value} className="sortCheck">
                 <input
-                  type="checkbox"
+                  type="radio"
+                  name="sortKey"
                   checked={sortKey === opt.value}
                   onChange={() => selectSortKey(opt.value)}
                 />
@@ -2104,17 +2105,19 @@ export default function Wishlist() {
             >
               <label className="sortCheck">
                 <input
-                  type="checkbox"
-                  checked={koreanFilter.includes("supported")}
-                  onChange={() => toggleKoreanFilter("supported")}
+                  type="radio"
+                  name="koreanFilter"
+                  checked={koreanFilter === "supported"}
+                  onChange={() => selectKoreanFilter("supported")}
                 />
                 한국어 지원 ({koreanCounts.supported})
               </label>
               <label className="sortCheck">
                 <input
-                  type="checkbox"
-                  checked={koreanFilter.includes("unsupported")}
-                  onChange={() => toggleKoreanFilter("unsupported")}
+                  type="radio"
+                  name="koreanFilter"
+                  checked={koreanFilter === "unsupported"}
+                  onChange={() => selectKoreanFilter("unsupported")}
                 />
                 한국어 미지원 ({koreanCounts.unsupported})
               </label>
