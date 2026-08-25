@@ -96,6 +96,10 @@ const RATING_STORAGE_KEY = "library:rating";
 type StarRating = 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
 const STAR_VALUES: StarRating[] = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 const STAR_STORAGE_KEY = "library:stars";
+// Quadratic RPG-style curve: level N needs N^2 * GENRE_XP_PER_LEVEL_SQ cumulative hours (5h/20h/
+// 45h/80h/125h...) - cheap early levels, meaningfully harder later. Tune this one constant to
+// retune the whole curve.
+const GENRE_XP_PER_LEVEL_SQ = 5;
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
 const ACHIEVEMENT_CHUNK = 40;
@@ -137,6 +141,13 @@ const CARD_MIN_WIDTH = 190;
 const CARD_ROW_HEIGHT = 168;
 function scoreClass(n: number): string {
   return n >= 75 ? "good" : n >= 50 ? "mid" : "bad";
+}
+function genreLevelInfo(hours: number) {
+  const level = Math.floor(Math.sqrt(hours / GENRE_XP_PER_LEVEL_SQ));
+  const thisLevelHours = level ** 2 * GENRE_XP_PER_LEVEL_SQ;
+  const nextLevelHours = (level + 1) ** 2 * GENRE_XP_PER_LEVEL_SQ;
+  const progress = (hours - thisLevelHours) / (nextLevelHours - thisLevelHours);
+  return { level, progress };
 }
 function compareByKey(
   key: SortKey,
@@ -1045,7 +1056,7 @@ export default function Wishlist() {
   // A library refresh only ever touches libItems/libGames (the Steam-fetched half), so merging
   // manual entries in here - rather than mixing them into libItems itself - means they survive
   // every "라이브러리 가져오기" click instead of being wiped by it.
-  const combinedLibItems = useMemo(
+  const combinedLibItems: Item[] = useMemo(
     () => [...libItems, ...Object.keys(manualPlatform).map((id) => ({ appid: Number(id) }))],
     [libItems, manualPlatform],
   );
@@ -1053,6 +1064,24 @@ export default function Wishlist() {
     () => ({ ...libGames, ...manualGames }),
     [libGames, manualGames],
   );
+  // Reuses the same GENRE_ALLOWLIST the genre filter curates from raw community tags, so a game
+  // tagged both "액션" and "액션 RPG" credits both buckets - same overlap the filter already has,
+  // not worth a second, narrower list just for this. Manual entries have no playtimeMinutes (never
+  // actually tracked by Steam), so they silently contribute nothing - only real owned-and-played
+  // games level up a genre.
+  const genreXp = useMemo(() => {
+    const xp: Record<string, number> = {};
+    for (const item of combinedLibItems) {
+      const minutes = item.playtimeMinutes;
+      if (!minutes) continue;
+      const g = combinedLibGames[item.appid];
+      for (const genre of g?.genres ?? []) {
+        if (!GENRE_ALLOWLIST.has(genre)) continue;
+        xp[genre] = (xp[genre] ?? 0) + minutes / 60;
+      }
+    }
+    return xp;
+  }, [combinedLibItems, combinedLibGames]);
   const [manualFormOpen, setManualFormOpen] = useState(false);
   const [manualQuery, setManualQuery] = useState("");
   const [manualPlatformChoice, setManualPlatformChoice] = useState<ManualPlatform>("epic");
@@ -1061,6 +1090,9 @@ export default function Wishlist() {
   >([]);
   const [manualSearching, setManualSearching] = useState(false);
   const [manualAdding, setManualAdding] = useState(false);
+  // Brief "✓ 추가됨" confirmation so rapid-fire adds (the panel no longer closes on add) still
+  // feel confirmed - cleared by the timeout from the *next* add, or manually after 2s.
+  const [lastAddedName, setLastAddedName] = useState<string | null>(null);
 
   const items = view === "wishlist" ? wlItems : combinedLibItems;
   const games = view === "wishlist" ? wlGames : combinedLibGames;
@@ -1367,6 +1399,13 @@ export default function Wishlist() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, GENRE_FILTER_LIMIT);
   }, [items, games]);
+  const genreLevels = useMemo(
+    () =>
+      Object.entries(genreXp)
+        .map(([genre, hours]) => ({ genre, hours, ...genreLevelInfo(hours) }))
+        .sort((a, b) => b.hours - a.hours),
+    [genreXp],
+  );
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     return items.filter((item) => {
@@ -1575,6 +1614,15 @@ export default function Wishlist() {
     setManualQuery("");
     setManualResults([]);
   }
+  // Adding a game shouldn't close the whole panel - clearing just the query/results (autoFocus
+  // on the input keeps focus) lets the user search-then-add the next game right away, which is
+  // what actually makes adding several games in a row fast.
+  function confirmManualAdd(name: string) {
+    setManualQuery("");
+    setManualResults([]);
+    setLastAddedName(name);
+    setTimeout(() => setLastAddedName((cur) => (cur === name ? null : cur)), 2000);
+  }
   async function addManualMatched(appid: number, name: string) {
     setManualAdding(true);
     try {
@@ -1585,7 +1633,7 @@ export default function Wishlist() {
       setManualPlatform(nextPlatform);
       setManualGames(nextGames);
       persistManual(nextPlatform, nextGames);
-      closeManualForm();
+      confirmManualAdd(name);
     } finally {
       setManualAdding(false);
     }
@@ -1600,7 +1648,7 @@ export default function Wishlist() {
     setManualPlatform(nextPlatform);
     setManualGames(nextGames);
     persistManual(nextPlatform, nextGames);
-    closeManualForm();
+    confirmManualAdd(name);
   }
   function removeManualGame(appid: number) {
     const nextPlatform = { ...manualPlatform };
@@ -2144,6 +2192,24 @@ export default function Wishlist() {
               ))}
             </FilterGroup>
           )}
+          {view === "library" && genreLevels.length > 0 && (
+            <FilterGroup
+              title="장르 레벨"
+              collapsed={collapsedGroups.has("genreLevel")}
+              onToggle={() => toggleGroup("genreLevel")}
+            >
+              {genreLevels.map(({ genre, hours, level, progress }) => (
+                <div key={genre} className="genreLevelRow">
+                  <span className="genreLevelName">{genre}</span>
+                  <span className="genreLevelValue">Lv.{level}</span>
+                  <div className="genreLevelBar">
+                    <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
+                  </div>
+                  <span className="genreLevelHours">{Math.round(hours)}h</span>
+                </div>
+              ))}
+            </FilterGroup>
+          )}
         </section>
       </aside>
       <main className="mainArea">
@@ -2283,6 +2349,7 @@ export default function Wishlist() {
               </div>
             </div>
             {manualSearching && <p className="meta">검색 중...</p>}
+            {lastAddedName && <p className="manualAddedNote">✓ {lastAddedName} 추가됨</p>}
             {manualResults.length > 0 && (
               <ul className="manualResults">
                 {manualResults.map((r) => (

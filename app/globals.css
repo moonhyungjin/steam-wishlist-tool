@@ -529,6 +529,44 @@ button:disabled {
   cursor: pointer;
   flex: none;
 }
+.genreLevelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.genreLevelName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.genreLevelValue {
+  flex: none;
+  color: var(--accent);
+  font-weight: bold;
+}
+.genreLevelBar {
+  flex: none;
+  width: 56px;
+  height: 4px;
+  border-radius: 999px;
+  background: #4b5b74;
+  overflow: hidden;
+}
+.genreLevelBar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.genreLevelHours {
+  flex: none;
+  width: 44px;
+  text-align: right;
+}
 .game {
   position: relative;
   display: flex;
@@ -851,6 +889,11 @@ button:disabled {
 }
 .manualAddPanel {
   padding: 16px;
+}
+.manualAddedNote {
+  margin: 8px 0 0;
+  color: #6bd68a;
+  font-size: 12px;
 }
 .manualAddPanel .field label {
   display: block;
