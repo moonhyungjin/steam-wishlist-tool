@@ -92,11 +92,16 @@ body {
   gap: 10px;
   margin-top: 12px;
 }
+.profileCardText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
 .profileTopGenre {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
 }
 .genreLevelMoreBtn {
   height: auto;

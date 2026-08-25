@@ -1576,6 +1576,7 @@ export default function Wishlist() {
         .sort((a, b) => b.hours - a.hours),
     [genreXp],
   );
+  const genreLevelPopoverRef = useRef<HTMLDivElement>(null);
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     return items.filter((item) => {
@@ -1938,33 +1939,6 @@ export default function Wishlist() {
         <header>
           <p className="eyebrow">PERSONAL STEAM TOOL</p>
           <h1>{view === "wishlist" ? "My Steam Wishlist" : "My Steam Library"}</h1>
-          {view === "library" && genreLevels.length > 0 && (
-            <div className="profileTopGenre">
-              <span className="genreLevelBadge">
-                {genreLevels[0].genre} <b>Lv.{genreLevels[0].level}</b>
-              </span>
-              <button
-                type="button"
-                className="genreLevelMoreBtn"
-                popoverTarget="genre-level-popover"
-              >
-                더보기
-              </button>
-              <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
-                <div className="genreLevelPopoverTitle">장르 레벨</div>
-                {genreLevels.map(({ genre, hours, level, progress }) => (
-                  <div key={genre} className="genreLevelRow">
-                    <span className="genreLevelName">{genre}</span>
-                    <span className="genreLevelValue">Lv.{level}</span>
-                    <div className="genreLevelBar">
-                      <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
-                    </div>
-                    <span className="genreLevelHours">{Math.round(hours)}h</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           {(profile || !formVisible) && (
             <div className="profileRow">
               {profile && (
@@ -1978,7 +1952,30 @@ export default function Wishlist() {
                   {profile.avatarUrl && (
                     <img className="profileAvatar" src={profile.avatarUrl} alt="" />
                   )}
-                  <span className="profileName">{profile.personaName}</span>
+                  <div className="profileCardText">
+                    {view === "library" && genreLevels.length > 0 && (
+                      <div className="profileTopGenre">
+                        <span className="genreLevelBadge">
+                          {genreLevels[0].genre} <b>Lv.{genreLevels[0].level}</b>
+                        </span>
+                        <button
+                          type="button"
+                          className="genreLevelMoreBtn"
+                          onClick={(e) => {
+                            // Nested inside the profile <a>, so a plain popoverTarget button
+                            // would have its invoker default action cancelled by preventDefault
+                            // (both share the same click event) - open it manually instead.
+                            e.preventDefault();
+                            e.stopPropagation();
+                            genreLevelPopoverRef.current?.showPopover();
+                          }}
+                        >
+                          더보기
+                        </button>
+                      </div>
+                    )}
+                    <span className="profileName">{profile.personaName}</span>
+                  </div>
                 </a>
               )}
               {!formVisible && (
@@ -1986,6 +1983,21 @@ export default function Wishlist() {
                   계정 변경
                 </button>
               )}
+            </div>
+          )}
+          {view === "library" && genreLevels.length > 0 && (
+            <div popover="auto" ref={genreLevelPopoverRef} className="genreLevelPopover">
+              <div className="genreLevelPopoverTitle">장르 레벨</div>
+              {genreLevels.map(({ genre, hours, level, progress }) => (
+                <div key={genre} className="genreLevelRow">
+                  <span className="genreLevelName">{genre}</span>
+                  <span className="genreLevelValue">Lv.{level}</span>
+                  <div className="genreLevelBar">
+                    <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
+                  </div>
+                  <span className="genreLevelHours">{Math.round(hours)}h</span>
+                </div>
+              ))}
             </div>
           )}
         </header>
