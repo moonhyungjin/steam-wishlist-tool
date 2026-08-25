@@ -852,6 +852,11 @@ button:disabled {
 .manualAddPanel {
   padding: 16px;
 }
+.manualSearchingNote {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
 .manualAddedNote {
   margin: 8px 0 0;
   color: #6bd68a;

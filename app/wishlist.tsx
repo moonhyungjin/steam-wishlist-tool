@@ -2295,7 +2295,7 @@ export default function Wishlist() {
                 </button>
               </div>
             </div>
-            {manualSearching && <p className="meta">검색 중...</p>}
+            {manualSearching && <p className="manualSearchingNote">검색 중...</p>}
             {lastAddedName && <p className="manualAddedNote">✓ {lastAddedName} 추가됨</p>}
             {manualResults.length > 0 && (
               <ul className="manualResults">
