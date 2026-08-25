@@ -96,38 +96,6 @@ const RATING_STORAGE_KEY = "library:rating";
 type StarRating = 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
 const STAR_VALUES: StarRating[] = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 const STAR_STORAGE_KEY = "library:stars";
-// Deliberately much smaller than the genre *filter*'s GENRE_ALLOWLIST (100+ raw Steam tags) - that
-// list is great for filtering (fine-grained facets are useful there) but terrible for leveling,
-// since near-synonyms ("1인칭 슈팅"/"히어로 슈팅"/"익스트랙션 슈터") would each level up as their
-// own separate, diluted bucket instead of one meaningful "슈팅" level. This list only has broad,
-// non-overlapping top-level genres.
-const GENRE_LEVEL_ALLOWLIST = new Set([
-  "액션",
-  "어드벤처",
-  "RPG",
-  "전략",
-  "시뮬레이션",
-  "스포츠",
-  "레이싱",
-  "캐주얼",
-  "인디",
-  "퍼즐",
-  "플랫폼",
-  "슈팅",
-  "공포",
-  "생존",
-  "로그라이크",
-  "격투",
-  "MMO",
-  "샌드박스",
-  "비주얼 노벨",
-  "리듬",
-  "MOBA",
-]);
-// Quadratic RPG-style curve: level N needs N^2 * GENRE_XP_PER_LEVEL_SQ cumulative hours (5h/20h/
-// 45h/80h/125h...) - cheap early levels, meaningfully harder later. Tune this one constant to
-// retune the whole curve.
-const GENRE_XP_PER_LEVEL_SQ = 5;
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
 const ACHIEVEMENT_CHUNK = 40;
@@ -169,13 +137,6 @@ const CARD_MIN_WIDTH = 190;
 const CARD_ROW_HEIGHT = 168;
 function scoreClass(n: number): string {
   return n >= 75 ? "good" : n >= 50 ? "mid" : "bad";
-}
-function genreLevelInfo(hours: number) {
-  const level = Math.floor(Math.sqrt(hours / GENRE_XP_PER_LEVEL_SQ));
-  const thisLevelHours = level ** 2 * GENRE_XP_PER_LEVEL_SQ;
-  const nextLevelHours = (level + 1) ** 2 * GENRE_XP_PER_LEVEL_SQ;
-  const progress = (hours - thisLevelHours) / (nextLevelHours - thisLevelHours);
-  return { level, progress };
 }
 function compareByKey(
   key: SortKey,
@@ -1092,22 +1053,6 @@ export default function Wishlist() {
     () => ({ ...libGames, ...manualGames }),
     [libGames, manualGames],
   );
-  // Uses GENRE_LEVEL_ALLOWLIST, not the filter's broader GENRE_ALLOWLIST - see the comment on that
-  // constant. Manual entries have no playtimeMinutes (never actually tracked by Steam), so they
-  // silently contribute nothing - only real owned-and-played games level up a genre.
-  const genreXp = useMemo(() => {
-    const xp: Record<string, number> = {};
-    for (const item of combinedLibItems) {
-      const minutes = item.playtimeMinutes;
-      if (!minutes) continue;
-      const g = combinedLibGames[item.appid];
-      for (const genre of g?.genres ?? []) {
-        if (!GENRE_LEVEL_ALLOWLIST.has(genre)) continue;
-        xp[genre] = (xp[genre] ?? 0) + minutes / 60;
-      }
-    }
-    return xp;
-  }, [combinedLibItems, combinedLibGames]);
   const [manualFormOpen, setManualFormOpen] = useState(false);
   const [manualQuery, setManualQuery] = useState("");
   const [manualPlatformChoice, setManualPlatformChoice] = useState<ManualPlatform>("epic");
@@ -1425,13 +1370,6 @@ export default function Wishlist() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, GENRE_FILTER_LIMIT);
   }, [items, games]);
-  const genreLevels = useMemo(
-    () =>
-      Object.entries(genreXp)
-        .map(([genre, hours]) => ({ genre, hours, ...genreLevelInfo(hours) }))
-        .sort((a, b) => b.hours - a.hours),
-    [genreXp],
-  );
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     return items.filter((item) => {
@@ -1874,37 +1812,6 @@ export default function Wishlist() {
                 </button>
               )}
             </div>
-          )}
-          {view === "library" && genreLevels.length > 0 && (
-            <>
-              <button
-                type="button"
-                className="genreLevelBadgeTrigger"
-                popoverTarget="genre-level-popover"
-              >
-                {genreLevels.slice(0, 3).map(({ genre, level }) => (
-                  <span key={genre} className="genreLevelBadge">
-                    {genre} <b>Lv.{level}</b>
-                  </span>
-                ))}
-                {genreLevels.length > 3 && (
-                  <span className="genreLevelBadge genreLevelMore">+{genreLevels.length - 3}</span>
-                )}
-              </button>
-              <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
-                <div className="genreLevelPopoverTitle">장르 레벨</div>
-                {genreLevels.map(({ genre, hours, level, progress }) => (
-                  <div key={genre} className="genreLevelRow">
-                    <span className="genreLevelName">{genre}</span>
-                    <span className="genreLevelValue">Lv.{level}</span>
-                    <div className="genreLevelBar">
-                      <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
-                    </div>
-                    <span className="genreLevelHours">{Math.round(hours)}h</span>
-                  </div>
-                ))}
-              </div>
-            </>
           )}
         </header>
         <div className="viewTabs">
