@@ -1556,15 +1556,17 @@ export default function Wishlist() {
     lastLibPersistAt.current = now;
     persistTo(LIBRARY_CACHE_KEY, libSteamId, itemsValue, gamesValue);
   }
-  // Debounced so typing doesn't fire a request per keystroke.
+  // Debounced so typing doesn't fire a request per keystroke - "검색 중" only turns on once the
+  // debounce actually settles and the request goes out, not on every keystroke while still
+  // typing, or it reads as searching immediately on each key instead of waiting you out.
   useEffect(() => {
     if (!manualFormOpen || manualQuery.trim().length < 2) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setManualResults([]);
       return;
     }
-    setManualSearching(true);
     const timer = setTimeout(() => {
+      setManualSearching(true);
       fetch(`/api/search-game?term=${encodeURIComponent(manualQuery.trim())}`)
         .then((r) => r.json())
         .then((d) => setManualResults(d.items ?? []))
