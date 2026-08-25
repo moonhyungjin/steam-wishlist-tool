@@ -907,6 +907,159 @@ function FilterGroup({
     </div>
   );
 }
+// Split out from Wishlist so typing in the search box only re-renders this small panel instead of
+// the entire app - manualQuery lived in Wishlist's own state before, and every keystroke was
+// re-rendering the whole sidebar (every FilterGroup) plus the virtualized list/grid's rowProps/
+// cellProps (fresh object each render, so react-window couldn't skip re-rendering visible rows
+// either), which is exactly why typing felt laggy despite the input itself doing very little.
+function ManualAddPanel({
+  onAdd,
+  onClose,
+}: {
+  onAdd: (appid: number, platform: ManualPlatform, game: Game) => void;
+  onClose: () => void;
+}) {
+  const [manualQuery, setManualQuery] = useState("");
+  const [manualPlatformChoice, setManualPlatformChoice] = useState<ManualPlatform>("epic");
+  const [manualResults, setManualResults] = useState<
+    { appid: number; name: string; image: string | null }[]
+  >([]);
+  const [manualSearching, setManualSearching] = useState(false);
+  const [manualAdding, setManualAdding] = useState(false);
+  // Brief "✓ 추가됨" confirmation so rapid-fire adds (the panel no longer closes on add) still
+  // feel confirmed - cleared by the timeout from the *next* add, or manually after 2s.
+  const [lastAddedName, setLastAddedName] = useState<string | null>(null);
+  // Explicit search (button click / Enter) instead of live-as-you-type: the ~300-400ms Steam
+  // storesearch round trip doesn't get any faster either way, but firing it only when the user
+  // actually asks for it means there's never a request in flight the user didn't ask for, and no
+  // "is it searching right now?" ambiguity while still composing the query.
+  function runManualSearch() {
+    const q = manualQuery.trim();
+    if (q.length < 2) {
+      setManualResults([]);
+      return;
+    }
+    setManualSearching(true);
+    fetch(`/api/search-game?term=${encodeURIComponent(q)}`)
+      .then((r) => r.json())
+      .then((d) => setManualResults(d.items ?? []))
+      .catch(() => setManualResults([]))
+      .finally(() => setManualSearching(false));
+  }
+  // Adding a game shouldn't close the whole panel - clearing just the query/results (autoFocus
+  // on the input keeps focus) lets the user search-then-add the next game right away, which is
+  // what actually makes adding several games in a row fast.
+  function confirmManualAdd(name: string) {
+    setManualQuery("");
+    setManualResults([]);
+    setLastAddedName(name);
+    setTimeout(() => setLastAddedName((cur) => (cur === name ? null : cur)), 2000);
+  }
+  async function addManualMatched(appid: number, name: string) {
+    setManualAdding(true);
+    try {
+      const loaded = await enrichGames([appid], {}, () => {});
+      const game = loaded[appid] ?? blankGame(appid, name);
+      onAdd(appid, manualPlatformChoice, game);
+      confirmManualAdd(name);
+    } finally {
+      setManualAdding(false);
+    }
+  }
+  function addManualCustom() {
+    const name = manualQuery.trim();
+    if (!name) return;
+    // Negative so it can never collide with a real Steam appid.
+    const appid = -Date.now();
+    onAdd(appid, manualPlatformChoice, blankGame(appid, name));
+    confirmManualAdd(name);
+  }
+  return (
+    <section className="panel manualAddPanel">
+      <div className="manualAddHeader">
+        <span>게임 추가</span>
+        <button type="button" className="filterCloseBtn" onClick={onClose} aria-label="닫기">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          >
+            <line x1="4" y1="4" x2="20" y2="20" />
+            <line x1="20" y1="4" x2="4" y2="20" />
+          </svg>
+        </button>
+      </div>
+      <div className="row">
+        <div className="manualSearchRow">
+          <input
+            autoFocus
+            value={manualQuery}
+            onChange={(e) => {
+              setManualQuery(e.target.value);
+              setManualResults([]);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") runManualSearch();
+            }}
+            placeholder="게임 이름"
+          />
+          <button
+            type="button"
+            className="smallBtn"
+            onClick={runManualSearch}
+            disabled={manualQuery.trim().length < 2}
+          >
+            검색
+          </button>
+        </div>
+        <div className="manualAddRow">
+          <select
+            value={manualPlatformChoice}
+            onChange={(e) => setManualPlatformChoice(e.target.value as ManualPlatform)}
+          >
+            {(Object.keys(MANUAL_PLATFORM_LABELS) as ManualPlatform[]).map((p) => (
+              <option key={p} value={p}>
+                {MANUAL_PLATFORM_LABELS[p]}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="smallBtn"
+            onClick={addManualCustom}
+            disabled={!manualQuery.trim() || manualAdding}
+            title="검색 결과에 원하는 게임이 없을 때, Steam 정보 없이 입력한 이름 그대로 추가합니다"
+          >
+            검색 결과 없이 이름만 추가
+          </button>
+        </div>
+      </div>
+      {manualSearching && <p className="manualSearchingNote">검색 중...</p>}
+      {lastAddedName && <p className="manualAddedNote">✓ {lastAddedName} 추가됨</p>}
+      {manualResults.length > 0 && (
+        <ul className="manualResults">
+          {manualResults.map((r) => (
+            <li key={r.appid}>
+              <button
+                type="button"
+                className="manualResultBtn"
+                onClick={() => addManualMatched(r.appid, r.name)}
+                disabled={manualAdding}
+              >
+                {r.image && <img src={r.image} alt="" />}
+                <span>{r.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 // Shared by both loaders: fetch store data for whatever appids aren't already loaded, then keep
 // retrying just the still-missing ones a few times at a gentle pace. Returns the cumulative map;
 // onProgress is called after every chunk so callers can mirror it into their own state/cache.
@@ -1054,16 +1207,6 @@ export default function Wishlist() {
     [libGames, manualGames],
   );
   const [manualFormOpen, setManualFormOpen] = useState(false);
-  const [manualQuery, setManualQuery] = useState("");
-  const [manualPlatformChoice, setManualPlatformChoice] = useState<ManualPlatform>("epic");
-  const [manualResults, setManualResults] = useState<
-    { appid: number; name: string; image: string | null }[]
-  >([]);
-  const [manualSearching, setManualSearching] = useState(false);
-  const [manualAdding, setManualAdding] = useState(false);
-  // Brief "✓ 추가됨" confirmation so rapid-fire adds (the panel no longer closes on add) still
-  // feel confirmed - cleared by the timeout from the *next* add, or manually after 2s.
-  const [lastAddedName, setLastAddedName] = useState<string | null>(null);
 
   const items = view === "wishlist" ? wlItems : combinedLibItems;
   const games = view === "wishlist" ? wlGames : combinedLibGames;
@@ -1555,65 +1698,6 @@ export default function Wishlist() {
     if (now - lastLibPersistAt.current < 1500) return;
     lastLibPersistAt.current = now;
     persistTo(LIBRARY_CACHE_KEY, libSteamId, itemsValue, gamesValue);
-  }
-  // Explicit search (button click / Enter) instead of live-as-you-type: the ~300-400ms Steam
-  // storesearch round trip doesn't get any faster either way, but firing it only when the user
-  // actually asks for it - instead of debounced on every pause while typing - means there's
-  // never a request in flight the user didn't ask for, and no "is it searching right now?"
-  // ambiguity while still composing the query.
-  function runManualSearch() {
-    const q = manualQuery.trim();
-    if (q.length < 2) {
-      setManualResults([]);
-      return;
-    }
-    setManualSearching(true);
-    fetch(`/api/search-game?term=${encodeURIComponent(q)}`)
-      .then((r) => r.json())
-      .then((d) => setManualResults(d.items ?? []))
-      .catch(() => setManualResults([]))
-      .finally(() => setManualSearching(false));
-  }
-  function closeManualForm() {
-    setManualFormOpen(false);
-    setManualQuery("");
-    setManualResults([]);
-  }
-  // Adding a game shouldn't close the whole panel - clearing just the query/results (autoFocus
-  // on the input keeps focus) lets the user search-then-add the next game right away, which is
-  // what actually makes adding several games in a row fast.
-  function confirmManualAdd(name: string) {
-    setManualQuery("");
-    setManualResults([]);
-    setLastAddedName(name);
-    setTimeout(() => setLastAddedName((cur) => (cur === name ? null : cur)), 2000);
-  }
-  async function addManualMatched(appid: number, name: string) {
-    setManualAdding(true);
-    try {
-      const loaded = await enrichGames([appid], {}, () => {});
-      const game = loaded[appid] ?? blankGame(appid, name);
-      const nextPlatform = { ...manualPlatform, [appid]: manualPlatformChoice };
-      const nextGames = { ...manualGames, [appid]: game };
-      setManualPlatform(nextPlatform);
-      setManualGames(nextGames);
-      persistManual(nextPlatform, nextGames);
-      confirmManualAdd(name);
-    } finally {
-      setManualAdding(false);
-    }
-  }
-  function addManualCustom() {
-    const name = manualQuery.trim();
-    if (!name) return;
-    // Negative so it can never collide with a real Steam appid.
-    const appid = -Date.now();
-    const nextPlatform = { ...manualPlatform, [appid]: manualPlatformChoice };
-    const nextGames = { ...manualGames, [appid]: blankGame(appid, name) };
-    setManualPlatform(nextPlatform);
-    setManualGames(nextGames);
-    persistManual(nextPlatform, nextGames);
-    confirmManualAdd(name);
   }
   function removeManualGame(appid: number) {
     const nextPlatform = { ...manualPlatform };
@@ -2240,94 +2324,16 @@ export default function Wishlist() {
           </div>
         </div>
         {view === "library" && manualFormOpen && (
-          <section className="panel manualAddPanel">
-            <div className="manualAddHeader">
-              <span>게임 추가</span>
-              <button
-                type="button"
-                className="filterCloseBtn"
-                onClick={closeManualForm}
-                aria-label="닫기"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                >
-                  <line x1="4" y1="4" x2="20" y2="20" />
-                  <line x1="20" y1="4" x2="4" y2="20" />
-                </svg>
-              </button>
-            </div>
-            <div className="row">
-              <div className="manualSearchRow">
-                <input
-                  autoFocus
-                  value={manualQuery}
-                  onChange={(e) => {
-                    setManualQuery(e.target.value);
-                    setManualResults([]);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") runManualSearch();
-                  }}
-                  placeholder="게임 이름"
-                />
-                <button
-                  type="button"
-                  className="smallBtn"
-                  onClick={runManualSearch}
-                  disabled={manualQuery.trim().length < 2}
-                >
-                  검색
-                </button>
-              </div>
-              <div className="manualAddRow">
-                <select
-                  value={manualPlatformChoice}
-                  onChange={(e) => setManualPlatformChoice(e.target.value as ManualPlatform)}
-                >
-                  {(Object.keys(MANUAL_PLATFORM_LABELS) as ManualPlatform[]).map((p) => (
-                    <option key={p} value={p}>
-                      {MANUAL_PLATFORM_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="smallBtn"
-                  onClick={addManualCustom}
-                  disabled={!manualQuery.trim() || manualAdding}
-                  title="검색 결과에 원하는 게임이 없을 때, Steam 정보 없이 입력한 이름 그대로 추가합니다"
-                >
-                  검색 결과 없이 이름만 추가
-                </button>
-              </div>
-            </div>
-            {manualSearching && <p className="manualSearchingNote">검색 중...</p>}
-            {lastAddedName && <p className="manualAddedNote">✓ {lastAddedName} 추가됨</p>}
-            {manualResults.length > 0 && (
-              <ul className="manualResults">
-                {manualResults.map((r) => (
-                  <li key={r.appid}>
-                    <button
-                      type="button"
-                      className="manualResultBtn"
-                      onClick={() => addManualMatched(r.appid, r.name)}
-                      disabled={manualAdding}
-                    >
-                      {r.image && <img src={r.image} alt="" />}
-                      <span>{r.name}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <ManualAddPanel
+            onAdd={(appid, platform, game) => {
+              const nextPlatform = { ...manualPlatform, [appid]: platform };
+              const nextGames = { ...manualGames, [appid]: game };
+              setManualPlatform(nextPlatform);
+              setManualGames(nextGames);
+              persistManual(nextPlatform, nextGames);
+            }}
+            onClose={() => setManualFormOpen(false)}
+          />
         )}
         <div className="listWrap" ref={listWrapRef}>
           {!items.length ? (
