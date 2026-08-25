@@ -929,12 +929,18 @@ function ManualAddPanel({
   // Brief "✓ 추가됨" confirmation so rapid-fire adds (the panel no longer closes on add) still
   // feel confirmed - cleared by the timeout from the *next* add, or manually after 2s.
   const [lastAddedName, setLastAddedName] = useState<string | null>(null);
+  // Korean (and other IME) input fires onChange for every intermediate jamo composition state
+  // ("ㅇ" -> "아" -> "안" -> ...), not just the finished syllable - without this, each of those
+  // partial states could restart/fire the debounce below, searching for half-typed garbage.
+  const [isComposing, setIsComposing] = useState(false);
   // Debounced live search - now that this panel is its own component (see the comment above
   // ManualAddPanel), typing here no longer re-renders the whole app, so the earlier "feels slow"
   // complaint was actually that re-render cost, not this. "검색 중" only turns on once the
   // debounce actually settles and the request goes out, not on every keystroke while still
-  // typing, or it reads as searching immediately on each key instead of waiting you out.
+  // typing, or it reads as searching immediately on each key instead of waiting you out. Skips
+  // entirely while isComposing - see the comment on that state.
   useEffect(() => {
+    if (isComposing) return;
     if (manualQuery.trim().length < 2) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setManualResults([]);
@@ -949,7 +955,7 @@ function ManualAddPanel({
         .finally(() => setManualSearching(false));
     }, 200);
     return () => clearTimeout(timer);
-  }, [manualQuery]);
+  }, [manualQuery, isComposing]);
   // Adding a game shouldn't close the whole panel - clearing just the query/results (autoFocus
   // on the input keeps focus) lets the user search-then-add the next game right away, which is
   // what actually makes adding several games in a row fast.
@@ -1003,6 +1009,11 @@ function ManualAddPanel({
             autoFocus
             value={manualQuery}
             onChange={(e) => setManualQuery(e.target.value)}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={(e) => {
+              setIsComposing(false);
+              setManualQuery(e.currentTarget.value);
+            }}
             placeholder="게임 이름"
           />
         </div>
