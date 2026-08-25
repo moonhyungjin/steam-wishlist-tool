@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grid, List, type CellComponentProps, type RowComponentProps } from "react-window";
 type Item = { appid: number; playtimeMinutes?: number };
 type View = "wishlist" | "library";
@@ -1556,25 +1556,24 @@ export default function Wishlist() {
     lastLibPersistAt.current = now;
     persistTo(LIBRARY_CACHE_KEY, libSteamId, itemsValue, gamesValue);
   }
-  // Debounced so typing doesn't fire a request per keystroke - "검색 중" only turns on once the
-  // debounce actually settles and the request goes out, not on every keystroke while still
-  // typing, or it reads as searching immediately on each key instead of waiting you out.
-  useEffect(() => {
-    if (!manualFormOpen || manualQuery.trim().length < 2) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Explicit search (button click / Enter) instead of live-as-you-type: the ~300-400ms Steam
+  // storesearch round trip doesn't get any faster either way, but firing it only when the user
+  // actually asks for it - instead of debounced on every pause while typing - means there's
+  // never a request in flight the user didn't ask for, and no "is it searching right now?"
+  // ambiguity while still composing the query.
+  function runManualSearch() {
+    const q = manualQuery.trim();
+    if (q.length < 2) {
       setManualResults([]);
       return;
     }
-    const timer = setTimeout(() => {
-      setManualSearching(true);
-      fetch(`/api/search-game?term=${encodeURIComponent(manualQuery.trim())}`)
-        .then((r) => r.json())
-        .then((d) => setManualResults(d.items ?? []))
-        .catch(() => setManualResults([]))
-        .finally(() => setManualSearching(false));
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [manualQuery, manualFormOpen]);
+    setManualSearching(true);
+    fetch(`/api/search-game?term=${encodeURIComponent(q)}`)
+      .then((r) => r.json())
+      .then((d) => setManualResults(d.items ?? []))
+      .catch(() => setManualResults([]))
+      .finally(() => setManualSearching(false));
+  }
   function closeManualForm() {
     setManualFormOpen(false);
     setManualQuery("");
@@ -2265,13 +2264,27 @@ export default function Wishlist() {
               </button>
             </div>
             <div className="row">
-              <div className="field">
+              <div className="manualSearchRow">
                 <input
                   autoFocus
                   value={manualQuery}
-                  onChange={(e) => setManualQuery(e.target.value)}
+                  onChange={(e) => {
+                    setManualQuery(e.target.value);
+                    setManualResults([]);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") runManualSearch();
+                  }}
                   placeholder="게임 이름"
                 />
+                <button
+                  type="button"
+                  className="smallBtn"
+                  onClick={runManualSearch}
+                  disabled={manualQuery.trim().length < 2}
+                >
+                  검색
+                </button>
               </div>
               <div className="manualAddRow">
                 <select

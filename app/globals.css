@@ -868,6 +868,11 @@ button:disabled {
   font-size: 12px;
   margin-bottom: 6px;
 }
+.manualSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .manualAddRow {
   display: flex;
   align-items: center;
