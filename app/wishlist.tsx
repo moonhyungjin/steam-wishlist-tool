@@ -718,6 +718,14 @@ function GameRow({
               {checkingAchievement ? "업적 확인 중..." : "업적 확인중 (클릭)"}
             </button>
           ) : null}
+          {g && !g.koreanSupported ? (
+            <span
+              className="chip bad"
+              title="인터페이스/자막/더빙 중 하나라도 한국어를 지원하는지 여부"
+            >
+              한국어 미지원
+            </span>
+          ) : null}
           {g?.comingSoon ? (
             <span className="chip">{g.releaseUnannounced ? "출시 미정" : "출시 예정"}</span>
           ) : null}
