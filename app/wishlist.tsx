@@ -1875,6 +1875,37 @@ export default function Wishlist() {
               )}
             </div>
           )}
+          {view === "library" && genreLevels.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="genreLevelBadgeTrigger"
+                popoverTarget="genre-level-popover"
+              >
+                {genreLevels.slice(0, 3).map(({ genre, level }) => (
+                  <span key={genre} className="genreLevelBadge">
+                    {genre} <b>Lv.{level}</b>
+                  </span>
+                ))}
+                {genreLevels.length > 3 && (
+                  <span className="genreLevelBadge genreLevelMore">+{genreLevels.length - 3}</span>
+                )}
+              </button>
+              <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
+                <div className="genreLevelPopoverTitle">장르 레벨</div>
+                {genreLevels.map(({ genre, hours, level, progress }) => (
+                  <div key={genre} className="genreLevelRow">
+                    <span className="genreLevelName">{genre}</span>
+                    <span className="genreLevelValue">Lv.{level}</span>
+                    <div className="genreLevelBar">
+                      <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
+                    </div>
+                    <span className="genreLevelHours">{Math.round(hours)}h</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </header>
         <div className="viewTabs">
           <button
@@ -2218,24 +2249,6 @@ export default function Wishlist() {
               ))}
             </FilterGroup>
           )}
-          {view === "library" && genreLevels.length > 0 && (
-            <FilterGroup
-              title="장르 레벨"
-              collapsed={collapsedGroups.has("genreLevel")}
-              onToggle={() => toggleGroup("genreLevel")}
-            >
-              {genreLevels.map(({ genre, hours, level, progress }) => (
-                <div key={genre} className="genreLevelRow">
-                  <span className="genreLevelName">{genre}</span>
-                  <span className="genreLevelValue">Lv.{level}</span>
-                  <div className="genreLevelBar">
-                    <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
-                  </div>
-                  <span className="genreLevelHours">{Math.round(hours)}h</span>
-                </div>
-              ))}
-            </FilterGroup>
-          )}
         </section>
       </aside>
       <main className="mainArea">
@@ -2344,7 +2357,6 @@ export default function Wishlist() {
             </div>
             <div className="row">
               <div className="field">
-                <label>게임 이름 검색 (Steam에 있으면 이미지/장르 자동으로 채워짐)</label>
                 <input
                   autoFocus
                   value={manualQuery}
