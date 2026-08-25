@@ -96,6 +96,34 @@ const RATING_STORAGE_KEY = "library:rating";
 type StarRating = 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
 const STAR_VALUES: StarRating[] = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 const STAR_STORAGE_KEY = "library:stars";
+// Deliberately much smaller than the genre *filter*'s GENRE_ALLOWLIST (100+ raw Steam tags) - that
+// list is great for filtering (fine-grained facets are useful there) but terrible for leveling,
+// since near-synonyms ("1인칭 슈팅"/"히어로 슈팅"/"익스트랙션 슈터") would each level up as their
+// own separate, diluted bucket instead of one meaningful "슈팅" level. This list only has broad,
+// non-overlapping top-level genres.
+const GENRE_LEVEL_ALLOWLIST = new Set([
+  "액션",
+  "어드벤처",
+  "RPG",
+  "전략",
+  "시뮬레이션",
+  "스포츠",
+  "레이싱",
+  "캐주얼",
+  "인디",
+  "퍼즐",
+  "플랫폼",
+  "슈팅",
+  "공포",
+  "생존",
+  "로그라이크",
+  "격투",
+  "MMO",
+  "샌드박스",
+  "비주얼 노벨",
+  "리듬",
+  "MOBA",
+]);
 // Quadratic RPG-style curve: level N needs N^2 * GENRE_XP_PER_LEVEL_SQ cumulative hours (5h/20h/
 // 45h/80h/125h...) - cheap early levels, meaningfully harder later. Tune this one constant to
 // retune the whole curve.
@@ -1064,11 +1092,9 @@ export default function Wishlist() {
     () => ({ ...libGames, ...manualGames }),
     [libGames, manualGames],
   );
-  // Reuses the same GENRE_ALLOWLIST the genre filter curates from raw community tags, so a game
-  // tagged both "액션" and "액션 RPG" credits both buckets - same overlap the filter already has,
-  // not worth a second, narrower list just for this. Manual entries have no playtimeMinutes (never
-  // actually tracked by Steam), so they silently contribute nothing - only real owned-and-played
-  // games level up a genre.
+  // Uses GENRE_LEVEL_ALLOWLIST, not the filter's broader GENRE_ALLOWLIST - see the comment on that
+  // constant. Manual entries have no playtimeMinutes (never actually tracked by Steam), so they
+  // silently contribute nothing - only real owned-and-played games level up a genre.
   const genreXp = useMemo(() => {
     const xp: Record<string, number> = {};
     for (const item of combinedLibItems) {
@@ -1076,7 +1102,7 @@ export default function Wishlist() {
       if (!minutes) continue;
       const g = combinedLibGames[item.appid];
       for (const genre of g?.genres ?? []) {
-        if (!GENRE_ALLOWLIST.has(genre)) continue;
+        if (!GENRE_LEVEL_ALLOWLIST.has(genre)) continue;
         xp[genre] = (xp[genre] ?? 0) + minutes / 60;
       }
     }
