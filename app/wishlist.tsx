@@ -1938,6 +1938,33 @@ export default function Wishlist() {
         <header>
           <p className="eyebrow">PERSONAL STEAM TOOL</p>
           <h1>{view === "wishlist" ? "My Steam Wishlist" : "My Steam Library"}</h1>
+          {view === "library" && genreLevels.length > 0 && (
+            <div className="profileTopGenre">
+              <span className="genreLevelBadge">
+                {genreLevels[0].genre} <b>Lv.{genreLevels[0].level}</b>
+              </span>
+              <button
+                type="button"
+                className="genreLevelMoreBtn"
+                popoverTarget="genre-level-popover"
+              >
+                더보기
+              </button>
+              <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
+                <div className="genreLevelPopoverTitle">장르 레벨</div>
+                {genreLevels.map(({ genre, hours, level, progress }) => (
+                  <div key={genre} className="genreLevelRow">
+                    <span className="genreLevelName">{genre}</span>
+                    <span className="genreLevelValue">Lv.{level}</span>
+                    <div className="genreLevelBar">
+                      <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
+                    </div>
+                    <span className="genreLevelHours">{Math.round(hours)}h</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {(profile || !formVisible) && (
             <div className="profileRow">
               {profile && (
@@ -1960,37 +1987,6 @@ export default function Wishlist() {
                 </button>
               )}
             </div>
-          )}
-          {view === "library" && genreLevels.length > 0 && (
-            <>
-              <button
-                type="button"
-                className="genreLevelBadgeTrigger"
-                popoverTarget="genre-level-popover"
-              >
-                {genreLevels.slice(0, 3).map(({ genre, level }) => (
-                  <span key={genre} className="genreLevelBadge">
-                    {genre} <b>Lv.{level}</b>
-                  </span>
-                ))}
-                {genreLevels.length > 3 && (
-                  <span className="genreLevelBadge genreLevelMore">+{genreLevels.length - 3}</span>
-                )}
-              </button>
-              <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
-                <div className="genreLevelPopoverTitle">장르 레벨</div>
-                {genreLevels.map(({ genre, hours, level, progress }) => (
-                  <div key={genre} className="genreLevelRow">
-                    <span className="genreLevelName">{genre}</span>
-                    <span className="genreLevelValue">Lv.{level}</span>
-                    <div className="genreLevelBar">
-                      <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
-                    </div>
-                    <span className="genreLevelHours">{Math.round(hours)}h</span>
-                  </div>
-                ))}
-              </div>
-            </>
           )}
         </header>
         <div className="viewTabs">
