@@ -932,8 +932,8 @@ button:disabled {
   border-color: var(--accent);
 }
 .manualResultBtn img {
-  width: 60px;
-  height: 24px;
+  width: 80px;
+  height: 32px;
   object-fit: cover;
   border-radius: 4px;
   flex: none;
