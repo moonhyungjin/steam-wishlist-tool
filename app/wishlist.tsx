@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grid, List, type CellComponentProps, type RowComponentProps } from "react-window";
 type Item = { appid: number; playtimeMinutes?: number };
 type View = "wishlist" | "library";
@@ -929,23 +929,27 @@ function ManualAddPanel({
   // Brief "✓ 추가됨" confirmation so rapid-fire adds (the panel no longer closes on add) still
   // feel confirmed - cleared by the timeout from the *next* add, or manually after 2s.
   const [lastAddedName, setLastAddedName] = useState<string | null>(null);
-  // Explicit search (button click / Enter) instead of live-as-you-type: the ~300-400ms Steam
-  // storesearch round trip doesn't get any faster either way, but firing it only when the user
-  // actually asks for it means there's never a request in flight the user didn't ask for, and no
-  // "is it searching right now?" ambiguity while still composing the query.
-  function runManualSearch() {
-    const q = manualQuery.trim();
-    if (q.length < 2) {
+  // Debounced live search - now that this panel is its own component (see the comment above
+  // ManualAddPanel), typing here no longer re-renders the whole app, so the earlier "feels slow"
+  // complaint was actually that re-render cost, not this. "검색 중" only turns on once the
+  // debounce actually settles and the request goes out, not on every keystroke while still
+  // typing, or it reads as searching immediately on each key instead of waiting you out.
+  useEffect(() => {
+    if (manualQuery.trim().length < 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setManualResults([]);
       return;
     }
-    setManualSearching(true);
-    fetch(`/api/search-game?term=${encodeURIComponent(q)}`)
-      .then((r) => r.json())
-      .then((d) => setManualResults(d.items ?? []))
-      .catch(() => setManualResults([]))
-      .finally(() => setManualSearching(false));
-  }
+    const timer = setTimeout(() => {
+      setManualSearching(true);
+      fetch(`/api/search-game?term=${encodeURIComponent(manualQuery.trim())}`)
+        .then((r) => r.json())
+        .then((d) => setManualResults(d.items ?? []))
+        .catch(() => setManualResults([]))
+        .finally(() => setManualSearching(false));
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [manualQuery]);
   // Adding a game shouldn't close the whole panel - clearing just the query/results (autoFocus
   // on the input keeps focus) lets the user search-then-add the next game right away, which is
   // what actually makes adding several games in a row fast.
@@ -994,27 +998,13 @@ function ManualAddPanel({
         </button>
       </div>
       <div className="row">
-        <div className="manualSearchRow">
+        <div className="field">
           <input
             autoFocus
             value={manualQuery}
-            onChange={(e) => {
-              setManualQuery(e.target.value);
-              setManualResults([]);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") runManualSearch();
-            }}
+            onChange={(e) => setManualQuery(e.target.value)}
             placeholder="게임 이름"
           />
-          <button
-            type="button"
-            className="smallBtn"
-            onClick={runManualSearch}
-            disabled={manualQuery.trim().length < 2}
-          >
-            검색
-          </button>
         </div>
         <div className="manualAddRow">
           <select
