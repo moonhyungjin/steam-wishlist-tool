@@ -716,42 +716,6 @@ function GameRow({
               </button>
             </span>
           )}
-          {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
-          {view === "wishlist" && g?.discountPercent ? (
-            <a
-              className="chip discount"
-              href={`https://steamdb.info/app/${item.appid}/`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="SteamDB에서 가격 기록 보기"
-              onClick={(e) => e.stopPropagation()}
-            >
-              -{g.discountPercent}%
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-            </a>
-          ) : null}
-          {view === "wishlist" && g?.metacritic != null ? (
-            <span className={"chip " + scoreClass(g.metacritic)} title="Metacritic 점수">
-              메타 {g.metacritic}
-            </span>
-          ) : null}
-          {view === "wishlist" && g?.reviewPositive != null ? (
-            <span className={"chip " + scoreClass(g.reviewPositive)} title="Steam 리뷰 긍정 비율">
-              리뷰 {g.reviewPositive}%
-            </span>
-          ) : null}
           {manual ? (
             editingPlaytime ? (
               <span className="chip playtimeEdit">
@@ -792,6 +756,42 @@ function GameRow({
             )
           ) : item.playtimeMinutes != null ? (
             <span className="chip">플레이타임 {(item.playtimeMinutes / 60).toFixed(1)}시간</span>
+          ) : null}
+          {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
+          {view === "wishlist" && g?.discountPercent ? (
+            <a
+              className="chip discount"
+              href={`https://steamdb.info/app/${item.appid}/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="SteamDB에서 가격 기록 보기"
+              onClick={(e) => e.stopPropagation()}
+            >
+              -{g.discountPercent}%
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </a>
+          ) : null}
+          {view === "wishlist" && g?.metacritic != null ? (
+            <span className={"chip " + scoreClass(g.metacritic)} title="Metacritic 점수">
+              메타 {g.metacritic}
+            </span>
+          ) : null}
+          {view === "wishlist" && g?.reviewPositive != null ? (
+            <span className={"chip " + scoreClass(g.reviewPositive)} title="Steam 리뷰 긍정 비율">
+              리뷰 {g.reviewPositive}%
+            </span>
           ) : null}
           {achievement != null ? (
             <a

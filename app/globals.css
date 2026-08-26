@@ -1013,7 +1013,7 @@ button:disabled {
 }
 .chip.playtimeChip {
   border: none;
-  font: inherit;
+  font-family: inherit;
   cursor: pointer;
 }
 .chip.playtimeChip:hover {
