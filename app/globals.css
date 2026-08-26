@@ -581,6 +581,7 @@ button:disabled {
 .genreChartScroll {
   max-height: 216px;
   overflow-y: auto;
+  padding-right: 10px;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -707,9 +708,6 @@ button:disabled {
   padding: 6px 0;
   font-size: 12px;
   cursor: pointer;
-}
-.genreTab:not(:first-child) {
-  border-left: 1px solid var(--line);
 }
 .genreTab.active {
   border-bottom-color: var(--accent);
