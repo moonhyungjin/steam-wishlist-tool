@@ -560,43 +560,91 @@ button:disabled {
   cursor: pointer;
   flex: none;
 }
-.genreLevelRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 2px;
-  font-size: 13px;
-  color: var(--muted);
-}
-.genreLevelName {
-  flex: 1;
+/* Shared row anatomy for both chart rows below - label, then the mark, then the value. */
+.chartLabel {
+  flex: 0 0 64px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
 }
-.genreLevelValue {
+.chartValue {
   flex: none;
-  color: var(--accent);
-  font-weight: bold;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
 }
-.genreLevelBar {
-  flex: none;
-  width: 56px;
-  height: 4px;
-  border-radius: 999px;
+.chartMore {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  padding: 4px 0 2px;
+}
+/* Magnitude bar - one hue, grows from a single (left) baseline, scaled to the largest value
+   shown so bar length is directly comparable across genres. */
+.chartRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.chartTrack {
+  flex: 1;
+  height: 10px;
+  border-radius: 4px;
   background: #4b5b74;
   overflow: hidden;
 }
-.genreLevelBar i {
+.chartBar {
   display: block;
   height: 100%;
+  border-radius: 4px;
   background: var(--accent);
 }
-.genreLevelHours {
+/* Diverging bar - centered on the 0% baseline, growing left (bad) or right (good) from it. */
+.divergeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.divergeTrack {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 10px;
+}
+.divergeHalf {
+  flex: 1;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+}
+.divergeHalf.bad {
+  justify-content: flex-end;
+}
+.divergeHalf.good {
+  justify-content: flex-start;
+}
+.divergeCenter {
   flex: none;
-  width: 44px;
-  text-align: right;
+  width: 1px;
+  height: 100%;
+  background: var(--line);
+}
+.divergeBar {
+  display: block;
+  height: 100%;
+}
+.divergeBar.bad {
+  background: #ef7a86;
+  border-radius: 4px 0 0 4px;
+}
+.divergeBar.good {
+  background: #6bd68a;
+  border-radius: 0 4px 4px 0;
 }
 .genreLevelBadge {
   display: inline-flex;
@@ -614,7 +662,7 @@ button:disabled {
 }
 /* display must stay off the bare selector, same reason as .starPopover - see its comment. */
 .genreLevelPopover {
-  width: 260px;
+  width: 300px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -640,15 +688,13 @@ button:disabled {
   padding-top: 10px;
   border-top: 1px solid var(--line);
 }
-.genreTasteValue {
-  flex: none;
+.chartValue.good {
+  color: #6bd68a;
   font-weight: bold;
 }
-.genreTasteValue.good {
-  color: #6bd68a;
-}
-.genreTasteValue.bad {
+.chartValue.bad {
   color: #ef7a86;
+  font-weight: bold;
 }
 .game {
   position: relative;

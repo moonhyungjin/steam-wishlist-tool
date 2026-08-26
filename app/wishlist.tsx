@@ -131,6 +131,15 @@ const GENRE_XP_PER_LEVEL_SQ = 5;
 // A genre only enters the taste profile once it's shown up in at least this many owned games -
 // below that, one 5-star fluke or one dropped game would swing the average wildly on pure noise.
 const TASTE_MIN_GAMES = 12;
+// The diverging taste chart's fixed +/-domain, in percentage points off the 1.0 baseline -
+// affinity can theoretically range from about -28% to +100%, so 150 gives every real value
+// headroom while keeping the 0% baseline a stable, comparable reference point across renders
+// (a max-of-the-data scale would make the same score draw a different bar length depending on
+// what else is in the library that day).
+const TASTE_PCT_DOMAIN = 150;
+// Popover rows are a quick-glance chart, not a full report - past this many, cap and say so
+// rather than growing the popover past one screenful.
+const GENRE_CHART_LIMIT = 8;
 // How much a single game's hours count toward its genres' taste score, relative to the 1.0
 // baseline "just average" case - deliberately separate from GENRE_XP_PER_LEVEL_SQ's pure-hours
 // level curve, since this is about how much the player *liked* the time spent, not how much they
@@ -2044,32 +2053,65 @@ export default function Wishlist() {
           {view === "library" && genreLevels.length > 0 && (
             <div popover="auto" ref={genreLevelPopoverRef} className="genreLevelPopover">
               <div className="genreLevelPopoverTitle">장르 레벨</div>
-              {genreLevels.map(({ genre, hours, level, progress }) => (
-                <div key={genre} className="genreLevelRow">
-                  <span className="genreLevelName">{genre}</span>
-                  <span className="genreLevelValue">Lv.{level}</span>
-                  <div className="genreLevelBar">
-                    <i style={{ width: `${Math.min(progress, 1) * 100}%` }} />
+              {(() => {
+                const shown = genreLevels.slice(0, GENRE_CHART_LIMIT);
+                const maxHours = shown[0]?.hours || 1;
+                return shown.map(({ genre, hours, level }) => (
+                  <div
+                    key={genre}
+                    className="chartRow"
+                    title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
+                  >
+                    <span className="chartLabel">{genre}</span>
+                    <div className="chartTrack">
+                      <i className="chartBar" style={{ width: `${(hours / maxHours) * 100}%` }} />
+                    </div>
+                    <span className="chartValue">
+                      Lv.{level} · {Math.round(hours)}h
+                    </span>
                   </div>
-                  <span className="genreLevelHours">{Math.round(hours)}h</span>
-                </div>
-              ))}
+                ));
+              })()}
+              {genreLevels.length > GENRE_CHART_LIMIT && (
+                <div className="chartMore">+{genreLevels.length - GENRE_CHART_LIMIT}개 더</div>
+              )}
               {genreTaste.length > 0 && (
                 <>
                   <div className="genreLevelPopoverTitle genreTasteTitle">선호 장르 (실험)</div>
-                  {genreTaste.map(({ genre, games, affinity }) => {
+                  {genreTaste.slice(0, GENRE_CHART_LIMIT).map(({ genre, games, affinity }) => {
                     const pct = Math.round((affinity - 1) * 100);
+                    const barPct =
+                      (Math.min(Math.abs(pct), TASTE_PCT_DOMAIN) / TASTE_PCT_DOMAIN) * 100;
                     return (
-                      <div key={genre} className="genreLevelRow">
-                        <span className="genreLevelName">{genre}</span>
-                        <span className={"genreTasteValue " + (pct >= 0 ? "good" : "bad")}>
+                      <div
+                        key={genre}
+                        className="divergeRow"
+                        title={`${genre} · ${games}개 게임 · ${pct >= 0 ? "+" : ""}${pct}%`}
+                      >
+                        <span className="chartLabel">{genre}</span>
+                        <div className="divergeTrack">
+                          <div className="divergeHalf bad">
+                            {pct < 0 && (
+                              <i className="divergeBar bad" style={{ width: `${barPct}%` }} />
+                            )}
+                          </div>
+                          <div className="divergeCenter" />
+                          <div className="divergeHalf good">
+                            {pct >= 0 && (
+                              <i className="divergeBar good" style={{ width: `${barPct}%` }} />
+                            )}
+                          </div>
+                        </div>
+                        <span className={"chartValue " + (pct >= 0 ? "good" : "bad")}>
                           {pct >= 0 ? "+" : ""}
                           {pct}%
                         </span>
-                        <span className="genreLevelHours">{games}개</span>
                       </div>
                     );
                   })}
+                  {genreTaste.length > GENRE_CHART_LIMIT && (
+                    <div className="chartMore">+{genreTaste.length - GENRE_CHART_LIMIT}개 더</div>
+                  )}
                 </>
               )}
             </div>
