@@ -581,6 +581,7 @@ function GameRow({
   manualPlatform,
   onRemoveManual,
   onSetManualPlaytime,
+  genreTasteMap,
   steamId,
 }: RowComponentProps<{
   items: Item[];
@@ -600,6 +601,7 @@ function GameRow({
   steamId: string;
   onRemoveManual: (appid: number) => void;
   onSetManualPlaytime: (appid: number, hours: number | null) => void;
+  genreTasteMap: Record<string, { affinity: number; games: number }>;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -610,6 +612,7 @@ function GameRow({
   const [editingPlaytime, setEditingPlaytime] = useState(false);
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
+  const recommend = view === "wishlist" ? recommendScore(g?.genres, genreTasteMap) : null;
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
   // to - everything else about a manual entry behaves the same either way.
   const manual = manualPlatform[item.appid];
@@ -822,6 +825,15 @@ function GameRow({
           {view === "wishlist" && g?.reviewPositive != null ? (
             <span className={"chip " + scoreClass(g.reviewPositive)} title="Steam 리뷰 긍정 비율">
               리뷰 {g.reviewPositive}%
+            </span>
+          ) : null}
+          {recommend != null ? (
+            <span
+              className={"chip " + (recommend >= 1 ? "good" : "bad")}
+              title="이 게임의 장르와 내 장르 선호도를 비교한 점수 (실험적 기능)"
+            >
+              추천 {recommend >= 1 ? "+" : ""}
+              {Math.round((recommend - 1) * 100)}%
             </span>
           ) : null}
           {achievement != null ? (
@@ -2775,6 +2787,7 @@ export default function Wishlist() {
                 manualPlatform,
                 onRemoveManual: removeManualGame,
                 onSetManualPlaytime: setManualPlaytimeHours,
+                genreTasteMap,
                 steamId,
               }}
               style={{ height: listSize.height, width: "100%" }}
