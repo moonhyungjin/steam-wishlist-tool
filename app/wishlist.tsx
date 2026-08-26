@@ -98,6 +98,11 @@ const RATING_STORAGE_KEY = "library:rating";
 type StarRating = 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
 const STAR_VALUES: StarRating[] = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 const STAR_STORAGE_KEY = "library:stars";
+// Genre level/taste/recommendation still need more real-world tuning before going live - this
+// keeps every entry point (profile badge, popover, wishlist sort option, recommend chip) off in
+// production while the underlying code, data model, and DB sync all ship as-is. Flip to true when
+// ready to launch instead of re-threading these checks individually.
+const GENRE_LEVELING_ENABLED = false;
 // Deliberately much smaller than the genre *filter*'s GENRE_ALLOWLIST (100+ raw Steam tags) - that
 // list is great for filtering (fine-grained facets are useful there) but terrible for leveling,
 // since near-synonyms ("1인칭 슈팅"/"히어로 슈팅"/"익스트랙션 슈터") would each level up as their
@@ -615,7 +620,7 @@ function GameRow({
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
   const recommend =
-    view === "wishlist" && sortKey === "recommend-desc"
+    GENRE_LEVELING_ENABLED && view === "wishlist" && sortKey === "recommend-desc"
       ? recommendScore(g?.genres, genreTasteMap)
       : null;
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
@@ -1750,7 +1755,9 @@ export default function Wishlist() {
   // Otherwise the badge would show *your* library's genre level next to a friend's wishlist
   // profile (wishlist and library intentionally support different steamIds - see their comment).
   const showGenreLevels =
-    genreLevels.length > 0 && (view === "library" || wlSteamId === libSteamId);
+    GENRE_LEVELING_ENABLED &&
+    genreLevels.length > 0 &&
+    (view === "library" || wlSteamId === libSteamId);
   // Fine-grained GENRE_ALLOWLIST, not the coarse GENRE_LEVEL_ALLOWLIST - subgenre distinctions
   // like JRPG vs CRPG vs 액션 RPG matter here, unlike for the level badge where they'd just dilute
   // one bucket. A genre only surfaces once it's crossed TASTE_MIN_GAMES games, so a couple of
@@ -2499,7 +2506,7 @@ export default function Wishlist() {
               ? WISHLIST_SORT_OPTIONS.filter(
                   (opt) =>
                     opt.value !== "recommend-desc" ||
-                    (genreTaste.length > 0 && wlSteamId === libSteamId),
+                    (GENRE_LEVELING_ENABLED && genreTaste.length > 0 && wlSteamId === libSteamId),
                 )
               : LIBRARY_SORT_OPTIONS
             ).map((opt) => (
