@@ -1638,7 +1638,6 @@ export default function Wishlist() {
       }))
       .sort((a, b) => b.affinity - a.affinity);
   }, [combinedLibItems, combinedLibGames, statusMap, ratingMap, starMap, achievementMap]);
-  const genreLevelPopoverRef = useRef<HTMLDivElement>(null);
   const [genreTab, setGenreTab] = useState<"level" | "taste">("level");
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
@@ -2005,15 +2004,17 @@ export default function Wishlist() {
           {(profile || !formVisible) && (
             <div className="profileRow">
               {profile && (
-                <a
-                  className="profileCard"
-                  href={profile.profileUrl ?? undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Steam 프로필 열기"
-                >
+                <div className="profileCard">
                   {profile.avatarUrl && (
-                    <img className="profileAvatar" src={profile.avatarUrl} alt="" />
+                    <a
+                      className="profileAvatarLink"
+                      href={profile.profileUrl ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Steam 프로필 열기"
+                    >
+                      <img className="profileAvatar" src={profile.avatarUrl} alt="" />
+                    </a>
                   )}
                   <div className="profileCardText">
                     {view === "library" && genreLevels.length > 0 && (
@@ -2024,14 +2025,7 @@ export default function Wishlist() {
                         <button
                           type="button"
                           className="genreLevelMoreBtn"
-                          onClick={(e) => {
-                            // Nested inside the profile <a>, so a plain popoverTarget button
-                            // would have its invoker default action cancelled by preventDefault
-                            // (both share the same click event) - open it manually instead.
-                            e.preventDefault();
-                            e.stopPropagation();
-                            genreLevelPopoverRef.current?.showPopover();
-                          }}
+                          popoverTarget="genre-level-popover"
                         >
                           더보기
                         </button>
@@ -2039,7 +2033,7 @@ export default function Wishlist() {
                     )}
                     <span className="profileName">{profile.personaName}</span>
                   </div>
-                </a>
+                </div>
               )}
               {!formVisible && (
                 <button type="button" className="smallBtn" onClick={openCredsForm}>
@@ -2049,7 +2043,7 @@ export default function Wishlist() {
             </div>
           )}
           {view === "library" && genreLevels.length > 0 && (
-            <div popover="auto" ref={genreLevelPopoverRef} className="genreLevelPopover">
+            <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
               <div className="genreTabRow">
                 <button
                   type="button"

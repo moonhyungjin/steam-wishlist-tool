@@ -117,8 +117,12 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  text-decoration: none;
   min-width: 0;
+}
+.profileAvatarLink {
+  display: block;
+  flex: none;
+  border-radius: 50%;
 }
 .smallBtn {
   display: inline-flex;
@@ -168,8 +172,8 @@ body {
   text-overflow: ellipsis;
   max-width: 200px;
 }
-.profileCard:hover .profileName {
-  color: var(--accent);
+.profileAvatarLink:hover .profileAvatar {
+  filter: brightness(1.15);
 }
 .viewTabs {
   display: flex;
