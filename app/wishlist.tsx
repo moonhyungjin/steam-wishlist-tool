@@ -582,6 +582,7 @@ function GameRow({
   onRemoveManual,
   onSetManualPlaytime,
   genreTasteMap,
+  sortKey,
   steamId,
 }: RowComponentProps<{
   items: Item[];
@@ -602,6 +603,7 @@ function GameRow({
   onRemoveManual: (appid: number) => void;
   onSetManualPlaytime: (appid: number, hours: number | null) => void;
   genreTasteMap: Record<string, { affinity: number; games: number }>;
+  sortKey: SortKey | null;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -612,7 +614,10 @@ function GameRow({
   const [editingPlaytime, setEditingPlaytime] = useState(false);
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
-  const recommend = view === "wishlist" ? recommendScore(g?.genres, genreTasteMap) : null;
+  const recommend =
+    view === "wishlist" && sortKey === "recommend-desc"
+      ? recommendScore(g?.genres, genreTasteMap)
+      : null;
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
   // to - everything else about a manual entry behaves the same either way.
   const manual = manualPlatform[item.appid];
@@ -822,7 +827,7 @@ function GameRow({
               메타 {g.metacritic}
             </span>
           ) : null}
-          {view === "wishlist" && g?.reviewPositive != null ? (
+          {view === "wishlist" && g?.reviewPositive ? (
             <span className={"chip " + scoreClass(g.reviewPositive)} title="Steam 리뷰 긍정 비율">
               리뷰 {g.reviewPositive}%
             </span>
@@ -836,7 +841,7 @@ function GameRow({
               {Math.round((recommend - 1) * 100)}%
             </span>
           ) : null}
-          {achievement != null ? (
+          {achievement != null && achievement.achieved > 0 ? (
             <a
               className={"chip " + scoreClass(achievement.percent)}
               href={`https://steamcommunity.com/profiles/${steamId}/stats/${item.appid}/achievements`}
@@ -959,12 +964,12 @@ function CardCell({
         ) : (
           <div className="loadingCover">{linkable ? "LOADING" : "이미지 없음"}</div>
         )}
-        {view === "wishlist" && (g?.metacritic != null || g?.reviewPositive != null) ? (
+        {view === "wishlist" && (g?.metacritic != null || g?.reviewPositive) ? (
           <div className="cardBadges cardBadgesBottomRight">
             {g.metacritic != null ? (
               <span className={"cardBadge " + scoreClass(g.metacritic)}>메타 {g.metacritic}</span>
             ) : null}
-            {g.reviewPositive != null ? (
+            {g.reviewPositive ? (
               <span className={"cardBadge " + scoreClass(g.reviewPositive)}>
                 리뷰 {g.reviewPositive}%
               </span>
@@ -2788,6 +2793,7 @@ export default function Wishlist() {
                 onRemoveManual: removeManualGame,
                 onSetManualPlaytime: setManualPlaytimeHours,
                 genreTasteMap,
+                sortKey,
                 steamId,
               }}
               style={{ height: listSize.height, width: "100%" }}
