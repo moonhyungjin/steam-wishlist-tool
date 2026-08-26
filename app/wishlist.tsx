@@ -60,8 +60,10 @@ type SortKey =
   | "discount-end-asc"
   | "playtime-desc"
   | "achievement-desc"
-  | "name-asc";
+  | "name-asc"
+  | "recommend-desc";
 const WISHLIST_SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "recommend-desc", label: "추천도 높은순" },
   { value: "price-asc", label: "가격 낮은순" },
   { value: "review", label: "긍정 비율 높은순" },
   { value: "metacritic", label: "메타크리틱 높은순" },
@@ -208,12 +210,32 @@ function genreLevelInfo(hours: number) {
   const progress = (hours - thisLevelHours) / (nextLevelHours - thisLevelHours);
   return { level, progress };
 }
+// Hours-weighted-average taste affinity across whichever of the game's (fine-grained) tags have
+// enough library data to carry a taste score - weighted by each matching genre's own game count,
+// so a genre backed by 40 games doesn't get diluted by one that just barely cleared the floor.
+// null (not 0/neutral) means "no overlapping genre has taste data yet" - that's a different,
+// honest state from "known to be a middling match," and sorts to the bottom either way.
+function recommendScore(
+  genres: string[] | undefined,
+  taste: Record<string, { affinity: number; games: number }>,
+): number | null {
+  let weightSum = 0;
+  let scoreSum = 0;
+  for (const genre of genres ?? []) {
+    const t = taste[genre];
+    if (!t) continue;
+    weightSum += t.games;
+    scoreSum += t.affinity * t.games;
+  }
+  return weightSum > 0 ? scoreSum / weightSum : null;
+}
 function compareByKey(
   key: SortKey,
   a: Item,
   b: Item,
   games: Record<number, Game>,
   achievementMap: Record<number, AchievementInfo | null>,
+  genreTaste: Record<string, { affinity: number; games: number }>,
 ): number {
   const ga = games[a.appid];
   const gb = games[b.appid];
@@ -226,6 +248,14 @@ function compareByKey(
   if (key === "name-asc") return (ga?.name ?? "").localeCompare(gb?.name ?? "", "ko");
   if (key === "discount-end-asc")
     return (ga?.discountEndTimestamp ?? Infinity) - (gb?.discountEndTimestamp ?? Infinity);
+  if (key === "recommend-desc") {
+    const sa = recommendScore(ga?.genres, genreTaste);
+    const sb = recommendScore(gb?.genres, genreTaste);
+    if (sa == null && sb == null) return 0;
+    if (sa == null) return 1;
+    if (sb == null) return -1;
+    return sb - sa;
+  }
   return (gb?.releaseTimestamp ?? -Infinity) - (ga?.releaseTimestamp ?? -Infinity);
 }
 // Only one sort key applies at a time - combining several numeric criteria as a priority chain
@@ -237,9 +267,10 @@ function sortItems(
   games: Record<number, Game>,
   sortKey: SortKey | null,
   achievementMap: Record<number, AchievementInfo | null>,
+  genreTaste: Record<string, { affinity: number; games: number }>,
 ): Item[] {
   if (!sortKey) return items;
-  return [...items].sort((a, b) => compareByKey(sortKey, a, b, games, achievementMap));
+  return [...items].sort((a, b) => compareByKey(sortKey, a, b, games, achievementMap, genreTaste));
 }
 // Steam's achievement endpoint has no batch call and hard rate-limits after ~160 requests
 // regardless of pacing, so a big library can't be fully checked in one pass. Rather than burn
@@ -301,7 +332,7 @@ function prioritizeAchievementOrder(
   // it just falls back to library order for the games being prioritized.
   const ordered =
     sortKey && sortKey !== "achievement-desc"
-      ? [...matched].sort((a, b) => compareByKey(sortKey, a, b, loaded, {}))
+      ? [...matched].sort((a, b) => compareByKey(sortKey, a, b, loaded, {}, {}))
       : matched;
   return [...ordered, ...rest].map((item) => item.appid);
 }
@@ -1737,6 +1768,13 @@ export default function Wishlist() {
       }))
       .sort((a, b) => b.affinity - a.affinity);
   }, [combinedLibItems, combinedLibGames, statusMap, ratingMap, starMap, achievementMap]);
+  // Keyed by genre for O(1) lookup from recommendScore, rather than re-scanning the array per
+  // wishlist game on every sort comparison.
+  const genreTasteMap = useMemo(() => {
+    const map: Record<string, { affinity: number; games: number }> = {};
+    for (const { genre, affinity, games } of genreTaste) map[genre] = { affinity, games };
+    return map;
+  }, [genreTaste]);
   const [genreTab, setGenreTab] = useState<"level" | "taste">("level");
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
@@ -1794,8 +1832,8 @@ export default function Wishlist() {
     manualPlatform,
   ]);
   const sortedItems = useMemo(
-    () => sortItems(filteredItems, games, sortKey, achievementMap),
-    [filteredItems, games, sortKey, achievementMap],
+    () => sortItems(filteredItems, games, sortKey, achievementMap, genreTasteMap),
+    [filteredItems, games, sortKey, achievementMap, genreTasteMap],
   );
   // Drives the mobile filter button's active state - the drawer hides the checkboxes themselves,
   // so this is the only visible sign a filter (or sort, which lives in the same drawer) is
@@ -2187,7 +2225,7 @@ export default function Wishlist() {
                     className={"genreTab " + (genreTab === "taste" ? "active" : "")}
                     onClick={() => setGenreTab("taste")}
                   >
-                    선호 장르
+                    장르 선호도
                   </button>
                 )}
               </div>
@@ -2440,7 +2478,14 @@ export default function Wishlist() {
             collapsed={collapsedGroups.has("sort")}
             onToggle={() => toggleGroup("sort")}
           >
-            {(view === "wishlist" ? WISHLIST_SORT_OPTIONS : LIBRARY_SORT_OPTIONS).map((opt) => (
+            {(view === "wishlist"
+              ? WISHLIST_SORT_OPTIONS.filter(
+                  (opt) =>
+                    opt.value !== "recommend-desc" ||
+                    (genreTaste.length > 0 && wlSteamId === libSteamId),
+                )
+              : LIBRARY_SORT_OPTIONS
+            ).map((opt) => (
               <label key={opt.value} className="sortCheck">
                 <input
                   type="radio"
