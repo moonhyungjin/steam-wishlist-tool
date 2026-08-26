@@ -677,16 +677,30 @@ button:disabled {
 .genreLevelPopover::backdrop {
   background: rgba(0, 0, 0, 0.4);
 }
-.genreLevelPopoverTitle {
-  font-size: 13px;
-  font-weight: bold;
+.genreTabRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.genreTab {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 6px;
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.genreTab.active {
+  background: #1b6d9b;
+  border-color: var(--accent);
+  color: white;
+}
+.genreTasteHint {
+  font-size: 11px;
   color: var(--muted);
   margin-bottom: 6px;
-}
-.genreTasteTitle {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
 }
 .chartValue.good {
   color: #6bd68a;

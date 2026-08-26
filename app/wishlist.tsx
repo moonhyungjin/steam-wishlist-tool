@@ -1642,6 +1642,7 @@ export default function Wishlist() {
       .sort((a, b) => b.affinity - a.affinity);
   }, [combinedLibItems, combinedLibGames, statusMap, ratingMap, starMap, achievementMap]);
   const genreLevelPopoverRef = useRef<HTMLDivElement>(null);
+  const [genreTab, setGenreTab] = useState<"level" | "taste">("level");
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     return items.filter((item) => {
@@ -2052,32 +2053,48 @@ export default function Wishlist() {
           )}
           {view === "library" && genreLevels.length > 0 && (
             <div popover="auto" ref={genreLevelPopoverRef} className="genreLevelPopover">
-              <div className="genreLevelPopoverTitle">장르 레벨</div>
-              {(() => {
-                const shown = genreLevels.slice(0, GENRE_CHART_LIMIT);
-                const maxHours = shown[0]?.hours || 1;
-                return shown.map(({ genre, hours, level }) => (
-                  <div
-                    key={genre}
-                    className="chartRow"
-                    title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
+              <div className="genreTabRow">
+                <button
+                  type="button"
+                  className={"genreTab " + (genreTab === "level" ? "active" : "")}
+                  onClick={() => setGenreTab("level")}
+                >
+                  장르 레벨
+                </button>
+                {genreTaste.length > 0 && (
+                  <button
+                    type="button"
+                    className={"genreTab " + (genreTab === "taste" ? "active" : "")}
+                    onClick={() => setGenreTab("taste")}
                   >
-                    <span className="chartLabel">{genre}</span>
-                    <div className="chartTrack">
-                      <i className="chartBar" style={{ width: `${(hours / maxHours) * 100}%` }} />
+                    선호 장르
+                  </button>
+                )}
+              </div>
+              {genreTab === "level" &&
+                (() => {
+                  const shown = genreLevels.slice(0, GENRE_CHART_LIMIT);
+                  const maxHours = shown[0]?.hours || 1;
+                  return shown.map(({ genre, hours, level }) => (
+                    <div
+                      key={genre}
+                      className="chartRow"
+                      title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
+                    >
+                      <span className="chartLabel">{genre}</span>
+                      <div className="chartTrack">
+                        <i className="chartBar" style={{ width: `${(hours / maxHours) * 100}%` }} />
+                      </div>
+                      <span className="chartValue">Lv.{level}</span>
                     </div>
-                    <span className="chartValue">
-                      Lv.{level} · {Math.round(hours)}h
-                    </span>
-                  </div>
-                ));
-              })()}
-              {genreLevels.length > GENRE_CHART_LIMIT && (
+                  ));
+                })()}
+              {genreTab === "level" && genreLevels.length > GENRE_CHART_LIMIT && (
                 <div className="chartMore">+{genreLevels.length - GENRE_CHART_LIMIT}개 더</div>
               )}
-              {genreTaste.length > 0 && (
+              {genreTab === "taste" && genreTaste.length > 0 && (
                 <>
-                  <div className="genreLevelPopoverTitle genreTasteTitle">선호 장르 (실험)</div>
+                  <div className="genreTasteHint">실험적 기능 - 위시리스트 추천에 활용 예정</div>
                   {genreTaste.slice(0, GENRE_CHART_LIMIT).map(({ genre, games, affinity }) => {
                     const pct = Math.round((affinity - 1) * 100);
                     const barPct =
