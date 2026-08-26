@@ -129,6 +129,11 @@ body {
   border-color: var(--accent);
   color: var(--accent);
 }
+.smallBtn.iconOnly {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+}
 .filterCloseBtn {
   display: flex;
   align-items: center;
