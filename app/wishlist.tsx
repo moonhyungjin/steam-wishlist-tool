@@ -576,6 +576,7 @@ function GameRow({
   const rating = ratingMap[item.appid];
   const star = starMap[item.appid];
   const starPopoverRef = useRef<HTMLDivElement>(null);
+  const [editingPlaytime, setEditingPlaytime] = useState(false);
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
@@ -703,24 +704,43 @@ function GameRow({
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
         <div className="badges">
           {manual ? (
-            <span className="chip playtimeEdit">
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                placeholder="0"
-                defaultValue={item.playtimeMinutes ? item.playtimeMinutes / 60 : ""}
+            editingPlaytime ? (
+              <span className="chip playtimeEdit">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  autoFocus
+                  defaultValue={item.playtimeMinutes ? item.playtimeMinutes / 60 : ""}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const v = parseFloat(e.currentTarget.value);
+                      onSetManualPlaytime(item.appid, Number.isFinite(v) ? v : null);
+                      setEditingPlaytime(false);
+                    } else if (e.key === "Escape") {
+                      setEditingPlaytime(false);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const v = parseFloat(e.currentTarget.value);
+                    onSetManualPlaytime(item.appid, Number.isFinite(v) ? v : null);
+                    setEditingPlaytime(false);
+                  }}
+                />
+                시간
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="chip playtimeChip"
+                onClick={() => setEditingPlaytime(true)}
                 title="직접 입력한 플레이타임 - 장르 레벨/선호도 계산에 반영됩니다"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-                onBlur={(e) => {
-                  const v = parseFloat(e.currentTarget.value);
-                  onSetManualPlaytime(item.appid, Number.isFinite(v) ? v : null);
-                }}
-              />
-              시간
-            </span>
+              >
+                {item.playtimeMinutes != null
+                  ? `플레이타임 ${(item.playtimeMinutes / 60).toFixed(1)}시간 (수정)`
+                  : "플레이타임 입력"}
+              </button>
+            )
           ) : item.playtimeMinutes != null ? (
             <span className="chip">플레이타임 {(item.playtimeMinutes / 60).toFixed(1)}시간</span>
           ) : null}
