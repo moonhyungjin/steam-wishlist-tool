@@ -180,6 +180,9 @@ const MANUAL_PLATFORM_LABELS: Record<ManualPlatform, string> = {
 };
 const MANUAL_PLATFORM_STORAGE_KEY = "library:manual";
 const MANUAL_GAMES_STORAGE_KEY = "library:manualGames";
+// Manual entries have no Steam-tracked playtime, so without this they silently contribute
+// nothing to genre levels/taste - letting the user type a rough estimate lets them opt in.
+const MANUAL_PLAYTIME_STORAGE_KEY = "library:manualPlaytime";
 // Bump this whenever the Game shape changes - otherwise old cached entries silently keep
 // missing the new fields forever, since "resume from cache" treats them as already loaded.
 const CACHE_VERSION = 11;
@@ -546,6 +549,7 @@ function GameRow({
   rowHeight,
   manualPlatform,
   onRemoveManual,
+  onSetManualPlaytime,
   steamId,
 }: RowComponentProps<{
   items: Item[];
@@ -564,6 +568,7 @@ function GameRow({
   manualPlatform: Record<number, ManualPlatform>;
   steamId: string;
   onRemoveManual: (appid: number) => void;
+  onSetManualPlaytime: (appid: number, hours: number | null) => void;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -571,6 +576,7 @@ function GameRow({
   const rating = ratingMap[item.appid];
   const star = starMap[item.appid];
   const starPopoverRef = useRef<HTMLDivElement>(null);
+  const [editingPlaytime, setEditingPlaytime] = useState(false);
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
@@ -583,21 +589,6 @@ function GameRow({
   const tryLibrary = view === "library" && !manual;
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
-      {manual && (
-        <div className="rowBadges">
-          <span className="rowBadge manual">
-            {MANUAL_PLATFORM_LABELS[manual]}
-            <button
-              type="button"
-              className="manualRemoveBtn"
-              onClick={() => onRemoveManual(item.appid)}
-              title="목록에서 제거"
-            >
-              ×
-            </button>
-          </span>
-        </div>
-      )}
       <div className="coverWrap">
         {linkable ? (
           <a
@@ -712,6 +703,19 @@ function GameRow({
         </div>
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
         <div className="badges">
+          {manual && (
+            <span className="chip manual">
+              {MANUAL_PLATFORM_LABELS[manual]}
+              <button
+                type="button"
+                className="manualRemoveBtn"
+                onClick={() => onRemoveManual(item.appid)}
+                title="목록에서 제거"
+              >
+                ×
+              </button>
+            </span>
+          )}
           {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
           {view === "wishlist" && g?.discountPercent ? (
             <a
@@ -748,7 +752,45 @@ function GameRow({
               리뷰 {g.reviewPositive}%
             </span>
           ) : null}
-          {item.playtimeMinutes != null ? (
+          {manual ? (
+            editingPlaytime ? (
+              <span className="chip playtimeEdit">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  autoFocus
+                  defaultValue={item.playtimeMinutes ? item.playtimeMinutes / 60 : ""}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const v = parseFloat(e.currentTarget.value);
+                      onSetManualPlaytime(item.appid, Number.isFinite(v) ? v : null);
+                      setEditingPlaytime(false);
+                    } else if (e.key === "Escape") {
+                      setEditingPlaytime(false);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const v = parseFloat(e.currentTarget.value);
+                    onSetManualPlaytime(item.appid, Number.isFinite(v) ? v : null);
+                    setEditingPlaytime(false);
+                  }}
+                />
+                시간
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="chip playtimeChip"
+                onClick={() => setEditingPlaytime(true)}
+                title="직접 입력한 플레이타임 - 장르 레벨/선호도 계산에 반영됩니다"
+              >
+                {item.playtimeMinutes != null
+                  ? `플레이타임 ${(item.playtimeMinutes / 60).toFixed(1)}시간 (수정)`
+                  : "플레이타임 입력"}
+              </button>
+            )
+          ) : item.playtimeMinutes != null ? (
             <span className="chip">플레이타임 {(item.playtimeMinutes / 60).toFixed(1)}시간</span>
           ) : null}
           {achievement != null ? (
@@ -1254,6 +1296,7 @@ export default function Wishlist() {
   const [libFetchedOnce, setLibFetchedOnce] = useState(false);
   const [manualPlatform, setManualPlatform] = useState<Record<number, ManualPlatform>>({});
   const [manualGames, setManualGames] = useState<Record<number, Game>>({});
+  const [manualPlaytime, setManualPlaytime] = useState<Record<number, number>>({});
   function persistManual(
     platformValue: Record<number, ManualPlatform>,
     gamesValue: Record<number, Game>,
@@ -1263,12 +1306,27 @@ export default function Wishlist() {
       localStorage.setItem(MANUAL_GAMES_STORAGE_KEY, JSON.stringify(gamesValue));
     } catch {}
   }
+  function setManualPlaytimeHours(appid: number, hours: number | null) {
+    const next = { ...manualPlaytime };
+    if (hours == null || !(hours > 0)) delete next[appid];
+    else next[appid] = Math.round(hours * 60);
+    setManualPlaytime(next);
+    try {
+      localStorage.setItem(MANUAL_PLAYTIME_STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+  }
   // A library refresh only ever touches libItems/libGames (the Steam-fetched half), so merging
   // manual entries in here - rather than mixing them into libItems itself - means they survive
   // every "라이브러리 가져오기" click instead of being wiped by it.
   const combinedLibItems: Item[] = useMemo(
-    () => [...libItems, ...Object.keys(manualPlatform).map((id) => ({ appid: Number(id) }))],
-    [libItems, manualPlatform],
+    () => [
+      ...libItems,
+      ...Object.keys(manualPlatform).map((id) => ({
+        appid: Number(id),
+        playtimeMinutes: manualPlaytime[Number(id)],
+      })),
+    ],
+    [libItems, manualPlatform, manualPlaytime],
   );
   const combinedLibGames = useMemo(
     () => ({ ...libGames, ...manualGames }),
@@ -1754,6 +1812,11 @@ export default function Wishlist() {
       const manualGamesSaved = JSON.parse(localStorage.getItem(MANUAL_GAMES_STORAGE_KEY) ?? "null");
       if (manualGamesSaved && typeof manualGamesSaved === "object")
         setManualGames(manualGamesSaved);
+      const manualPlaytimeSaved = JSON.parse(
+        localStorage.getItem(MANUAL_PLAYTIME_STORAGE_KEY) ?? "null",
+      );
+      if (manualPlaytimeSaved && typeof manualPlaytimeSaved === "object")
+        setManualPlaytime(manualPlaytimeSaved);
       const status = JSON.parse(localStorage.getItem(STATUS_STORAGE_KEY) ?? "null");
       if (status && typeof status === "object") setStatusMap(status);
       const rating = JSON.parse(localStorage.getItem(RATING_STORAGE_KEY) ?? "null");
@@ -1839,6 +1902,7 @@ export default function Wishlist() {
     setManualPlatform(nextPlatform);
     setManualGames(nextGames);
     persistManual(nextPlatform, nextGames);
+    setManualPlaytimeHours(appid, null);
     setGameStatus(appid, null);
     setGameRating(appid, null);
   }
@@ -2630,6 +2694,7 @@ export default function Wishlist() {
                 rowHeight: isMobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT,
                 manualPlatform,
                 onRemoveManual: removeManualGame,
+                onSetManualPlaytime: setManualPlaytimeHours,
                 steamId,
               }}
               style={{ height: listSize.height, width: "100%" }}

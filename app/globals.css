@@ -756,29 +756,6 @@ button:disabled {
   flex: none;
   overflow: hidden;
 }
-.rowBadges {
-  position: absolute;
-  top: 15px;
-  right: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  z-index: 1;
-}
-.rowBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  line-height: 24px;
-  font-size: 11px;
-  padding: 0 6px;
-  border-radius: 4px;
-}
-.rowBadge.manual {
-  background: #7c4fd6;
-  color: white;
-}
 .cover img {
   width: 100%;
   height: 100%;
@@ -1033,6 +1010,28 @@ button:disabled {
   background: rgba(151, 107, 214, 0.18);
   color: #c6a9f5;
   gap: 4px;
+}
+.chip.playtimeChip {
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+.chip.playtimeChip:hover {
+  background: rgba(102, 192, 244, 0.18);
+  color: var(--accent);
+}
+.chip.playtimeEdit input {
+  width: 40px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--muted);
+  color: inherit;
+  font: inherit;
+  padding: 0;
+}
+.chip.playtimeEdit input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
 }
 .manualRemoveBtn {
   display: inline-flex;
