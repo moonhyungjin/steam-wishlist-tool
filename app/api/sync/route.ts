@@ -20,6 +20,11 @@ type SyncData = {
   ratingMap?: Record<number, string>;
   starMap?: Record<number, number>;
   achievementMap?: Record<number, { achieved: number; total: number; percent: number } | null>;
+  // Manually-added games (Epic/STOVE/기타) have no Steam-side record to re-fetch, unlike the
+  // wishlist/library item lists - so unlike those, this trio has to be synced verbatim.
+  manualPlatform?: Record<number, string>;
+  manualGames?: Record<number, unknown>;
+  manualPlaytime?: Record<number, number>;
 };
 
 export async function GET(request: NextRequest) {
@@ -39,7 +44,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "steamId가 필요합니다." }, { status: 400 });
   const client = getRedis();
   if (!client) return NextResponse.json({ configured: false });
-  const { statusMap, ratingMap, starMap, achievementMap }: SyncData = body;
-  await client.set(`sync:${steamId}`, { statusMap, ratingMap, starMap, achievementMap });
+  const {
+    statusMap,
+    ratingMap,
+    starMap,
+    achievementMap,
+    manualPlatform,
+    manualGames,
+    manualPlaytime,
+  }: SyncData = body;
+  await client.set(`sync:${steamId}`, {
+    statusMap,
+    ratingMap,
+    starMap,
+    achievementMap,
+    manualPlatform,
+    manualGames,
+    manualPlaytime,
+  });
   return NextResponse.json({ ok: true });
 }

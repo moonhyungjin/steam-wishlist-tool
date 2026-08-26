@@ -1305,6 +1305,7 @@ export default function Wishlist() {
       localStorage.setItem(MANUAL_PLATFORM_STORAGE_KEY, JSON.stringify(platformValue));
       localStorage.setItem(MANUAL_GAMES_STORAGE_KEY, JSON.stringify(gamesValue));
     } catch {}
+    pushSync({ manualPlatform: platformValue, manualGames: gamesValue });
   }
   function setManualPlaytimeHours(appid: number, hours: number | null) {
     const next = { ...manualPlaytime };
@@ -1314,6 +1315,7 @@ export default function Wishlist() {
     try {
       localStorage.setItem(MANUAL_PLAYTIME_STORAGE_KEY, JSON.stringify(next));
     } catch {}
+    pushSync({ manualPlaytime: next });
   }
   // A library refresh only ever touches libItems/libGames (the Steam-fetched half), so merging
   // manual entries in here - rather than mixing them into libItems itself - means they survive
@@ -1548,6 +1550,9 @@ export default function Wishlist() {
     ratingMap?: Record<number, Rating>;
     starMap?: Record<number, StarRating>;
     achievementMap?: Record<number, AchievementInfo | null>;
+    manualPlatform?: Record<number, ManualPlatform>;
+    manualGames?: Record<number, Game>;
+    manualPlaytime?: Record<number, number>;
   }) {
     const id = libSteamId.trim();
     if (!/^\d{17}$/.test(id)) return;
@@ -1560,6 +1565,9 @@ export default function Wishlist() {
         ratingMap: overrides.ratingMap ?? ratingMap,
         starMap: overrides.starMap ?? starMap,
         achievementMap: overrides.achievementMap ?? achievementMap,
+        manualPlatform: overrides.manualPlatform ?? manualPlatform,
+        manualGames: overrides.manualGames ?? manualGames,
+        manualPlaytime: overrides.manualPlaytime ?? manualPlaytime,
       }),
     }).catch(() => {});
   }
@@ -1603,6 +1611,33 @@ export default function Wishlist() {
           setAchievementMap(d.achievementMap);
           try {
             localStorage.setItem(ACHIEVEMENT_STORAGE_KEY, JSON.stringify(d.achievementMap));
+          } catch {}
+        }
+        if (
+          d.manualPlatform &&
+          (Object.keys(d.manualPlatform).length > 0 || Object.keys(manualPlatform).length === 0)
+        ) {
+          setManualPlatform(d.manualPlatform);
+          try {
+            localStorage.setItem(MANUAL_PLATFORM_STORAGE_KEY, JSON.stringify(d.manualPlatform));
+          } catch {}
+        }
+        if (
+          d.manualGames &&
+          (Object.keys(d.manualGames).length > 0 || Object.keys(manualGames).length === 0)
+        ) {
+          setManualGames(d.manualGames);
+          try {
+            localStorage.setItem(MANUAL_GAMES_STORAGE_KEY, JSON.stringify(d.manualGames));
+          } catch {}
+        }
+        if (
+          d.manualPlaytime &&
+          (Object.keys(d.manualPlaytime).length > 0 || Object.keys(manualPlaytime).length === 0)
+        ) {
+          setManualPlaytime(d.manualPlaytime);
+          try {
+            localStorage.setItem(MANUAL_PLAYTIME_STORAGE_KEY, JSON.stringify(d.manualPlaytime));
           } catch {}
         }
       })
