@@ -1028,9 +1028,10 @@ button:disabled {
   color: inherit;
   font: inherit;
   padding: 0;
-  /* Kills the native up/down spinner - it clashes with the pill shape (see the chip.manual
-     screenshot this was flagged from), and a stepper adds nothing for a "type it once" field. */
-  appearance: textfield;
+  /* appearance: none drops the native boxed/rounded text-field chrome that was showing through
+     the pill background. -moz-appearance: textfield is Firefox's own (oddly-named) way to drop
+     just the up/down spinner without that boxed look - the two aren't redundant. */
+  appearance: none;
   -moz-appearance: textfield;
 }
 .chip.playtimeEdit input::-webkit-outer-spin-button,

@@ -703,19 +703,6 @@ function GameRow({
         </div>
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
         <div className="badges">
-          {manual && (
-            <span className="chip manual">
-              {MANUAL_PLATFORM_LABELS[manual]}
-              <button
-                type="button"
-                className="manualRemoveBtn"
-                onClick={() => onRemoveManual(item.appid)}
-                title="목록에서 제거"
-              >
-                ×
-              </button>
-            </span>
-          )}
           {manual ? (
             editingPlaytime ? (
               <span className="chip playtimeEdit">
@@ -757,6 +744,19 @@ function GameRow({
           ) : item.playtimeMinutes != null ? (
             <span className="chip">플레이타임 {(item.playtimeMinutes / 60).toFixed(1)}시간</span>
           ) : null}
+          {manual && (
+            <span className="chip manual">
+              {MANUAL_PLATFORM_LABELS[manual]}
+              <button
+                type="button"
+                className="manualRemoveBtn"
+                onClick={() => onRemoveManual(item.appid)}
+                title="목록에서 제거"
+              >
+                ×
+              </button>
+            </span>
+          )}
           {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
           {view === "wishlist" && g?.discountPercent ? (
             <a
