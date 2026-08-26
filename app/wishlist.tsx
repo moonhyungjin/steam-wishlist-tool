@@ -1604,6 +1604,12 @@ export default function Wishlist() {
         .sort((a, b) => b.hours - a.hours),
     [genreXp],
   );
+  // Genre levels are always computed from the library, regardless of which tab is open - so show
+  // them on the wishlist tab too, but only when it's tracking the same account as the library.
+  // Otherwise the badge would show *your* library's genre level next to a friend's wishlist
+  // profile (wishlist and library intentionally support different steamIds - see their comment).
+  const showGenreLevels =
+    genreLevels.length > 0 && (view === "library" || wlSteamId === libSteamId);
   // Fine-grained GENRE_ALLOWLIST, not the coarse GENRE_LEVEL_ALLOWLIST - subgenre distinctions
   // like JRPG vs CRPG vs 액션 RPG matter here, unlike for the level badge where they'd just dilute
   // one bucket. A genre only surfaces once it's crossed TASTE_MIN_GAMES games, so a couple of
@@ -2017,7 +2023,7 @@ export default function Wishlist() {
                     </a>
                   )}
                   <div className="profileCardText">
-                    {view === "library" && genreLevels.length > 0 && (
+                    {showGenreLevels && (
                       <div className="profileTopGenre">
                         <button
                           type="button"
@@ -2039,7 +2045,7 @@ export default function Wishlist() {
               )}
             </div>
           )}
-          {view === "library" && genreLevels.length > 0 && (
+          {showGenreLevels && (
             <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
               <div className="genreTabRow">
                 <button
