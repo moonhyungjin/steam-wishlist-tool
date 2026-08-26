@@ -581,6 +581,21 @@ button:disabled {
 .genreChartScroll {
   max-height: 216px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.genreChartScroll::-webkit-scrollbar {
+  width: 6px;
+}
+.genreChartScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.genreChartScroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+.genreChartScroll::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 /* Magnitude bar - one hue, grows from a single (left) baseline, scaled to the largest value
    shown so bar length is directly comparable across genres. */
@@ -687,6 +702,7 @@ button:disabled {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
+  border-radius: 0;
   color: var(--muted);
   padding: 6px 0;
   font-size: 12px;
