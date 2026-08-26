@@ -2029,6 +2029,13 @@ export default function Wishlist() {
                           type="button"
                           className="genreLevelBadge"
                           popoverTarget="genre-level-popover"
+                          title={
+                            genreTaste[0]
+                              ? `선호 1위: ${genreTaste[0].genre} (${
+                                  Math.round((genreTaste[0].affinity - 1) * 100) >= 0 ? "+" : ""
+                                }${Math.round((genreTaste[0].affinity - 1) * 100)}%)`
+                              : undefined
+                          }
                         >
                           {genreLevels[0].genre} <b>Lv.{genreLevels[0].level}</b>
                         </button>
