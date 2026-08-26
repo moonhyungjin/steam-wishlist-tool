@@ -635,6 +635,21 @@ button:disabled {
   color: var(--muted);
   margin-bottom: 6px;
 }
+.genreTasteTitle {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.genreTasteValue {
+  flex: none;
+  font-weight: bold;
+}
+.genreTasteValue.good {
+  color: #6bd68a;
+}
+.genreTasteValue.bad {
+  color: #ef7a86;
+}
 .game {
   position: relative;
   display: flex;

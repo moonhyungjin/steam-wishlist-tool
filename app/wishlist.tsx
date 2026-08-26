@@ -128,6 +128,28 @@ const GENRE_LEVEL_ALLOWLIST = new Set([
 // 45h/80h/125h...) - cheap early levels, meaningfully harder later. Tune this one constant to
 // retune the whole curve.
 const GENRE_XP_PER_LEVEL_SQ = 5;
+// A genre only enters the taste profile once it's shown up in at least this many owned games -
+// below that, one 5-star fluke or one dropped game would swing the average wildly on pure noise.
+const TASTE_MIN_GAMES = 12;
+// How much a single game's hours count toward its genres' taste score, relative to the 1.0
+// baseline "just average" case - deliberately separate from GENRE_XP_PER_LEVEL_SQ's pure-hours
+// level curve, since this is about how much the player *liked* the time spent, not how much they
+// spent. Tune independently as real data comes in.
+function gameAffinity(
+  status: PlayStatus | undefined,
+  rating: Rating | undefined,
+  star: StarRating | undefined,
+  achievement: AchievementInfo | null | undefined,
+): number {
+  let affinity = 1;
+  if (status === "dropped") affinity *= 0.4;
+  else if (status === "completed") affinity *= 1.3;
+  if (rating === "like") affinity += 0.3;
+  else if (rating === "dislike") affinity -= 0.3;
+  if (star) affinity += ((star - 3) / 2) * 0.3;
+  if (achievement && achievement.percent >= 70) affinity += 0.1;
+  return affinity;
+}
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
 const ACHIEVEMENT_CHUNK = 40;
@@ -1576,6 +1598,40 @@ export default function Wishlist() {
         .sort((a, b) => b.hours - a.hours),
     [genreXp],
   );
+  // Fine-grained GENRE_ALLOWLIST, not the coarse GENRE_LEVEL_ALLOWLIST - subgenre distinctions
+  // like JRPG vs CRPG vs 액션 RPG matter here, unlike for the level badge where they'd just dilute
+  // one bucket. A genre only surfaces once it's crossed TASTE_MIN_GAMES games, so a couple of
+  // flukes (one dropped game, one over-generous 5-star) can't swing a tiny-sample average.
+  const genreTaste = useMemo(() => {
+    const gameCounts: Record<string, number> = {};
+    const hoursByGenre: Record<string, number> = {};
+    const weightedByGenre: Record<string, number> = {};
+    for (const item of combinedLibItems) {
+      const hours = (item.playtimeMinutes ?? 0) / 60;
+      if (!hours) continue;
+      const g = combinedLibGames[item.appid];
+      const affinity = gameAffinity(
+        statusMap[item.appid],
+        ratingMap[item.appid],
+        starMap[item.appid],
+        achievementMap[item.appid],
+      );
+      for (const genre of g?.genres ?? []) {
+        if (!GENRE_ALLOWLIST.has(genre)) continue;
+        gameCounts[genre] = (gameCounts[genre] ?? 0) + 1;
+        hoursByGenre[genre] = (hoursByGenre[genre] ?? 0) + hours;
+        weightedByGenre[genre] = (weightedByGenre[genre] ?? 0) + hours * affinity;
+      }
+    }
+    return Object.entries(gameCounts)
+      .filter(([, count]) => count >= TASTE_MIN_GAMES)
+      .map(([genre, count]) => ({
+        genre,
+        games: count,
+        affinity: weightedByGenre[genre] / hoursByGenre[genre],
+      }))
+      .sort((a, b) => b.affinity - a.affinity);
+  }, [combinedLibItems, combinedLibGames, statusMap, ratingMap, starMap, achievementMap]);
   const genreLevelPopoverRef = useRef<HTMLDivElement>(null);
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
@@ -1998,6 +2054,24 @@ export default function Wishlist() {
                   <span className="genreLevelHours">{Math.round(hours)}h</span>
                 </div>
               ))}
+              {genreTaste.length > 0 && (
+                <>
+                  <div className="genreLevelPopoverTitle genreTasteTitle">선호 장르 (실험)</div>
+                  {genreTaste.map(({ genre, games, affinity }) => {
+                    const pct = Math.round((affinity - 1) * 100);
+                    return (
+                      <div key={genre} className="genreLevelRow">
+                        <span className="genreLevelName">{genre}</span>
+                        <span className={"genreTasteValue " + (pct >= 0 ? "good" : "bad")}>
+                          {pct >= 0 ? "+" : ""}
+                          {pct}%
+                        </span>
+                        <span className="genreLevelHours">{games}개</span>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
         </header>
