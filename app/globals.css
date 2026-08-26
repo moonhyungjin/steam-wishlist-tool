@@ -1025,6 +1025,7 @@ button:disabled {
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--muted);
+  box-shadow: none;
   color: inherit;
   font: inherit;
   padding: 0;
@@ -1039,8 +1040,10 @@ button:disabled {
   -webkit-appearance: none;
   margin: 0;
 }
-.chip.playtimeEdit input:focus {
+.chip.playtimeEdit input:focus,
+.chip.playtimeEdit input:focus-visible {
   outline: none;
+  box-shadow: none;
   border-bottom-color: var(--accent);
 }
 .manualRemoveBtn {
