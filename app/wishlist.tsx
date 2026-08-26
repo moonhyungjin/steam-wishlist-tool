@@ -2019,15 +2019,12 @@ export default function Wishlist() {
                   <div className="profileCardText">
                     {view === "library" && genreLevels.length > 0 && (
                       <div className="profileTopGenre">
-                        <span className="genreLevelBadge">
-                          {genreLevels[0].genre} <b>Lv.{genreLevels[0].level}</b>
-                        </span>
                         <button
                           type="button"
-                          className="genreLevelMoreBtn"
+                          className="genreLevelBadge"
                           popoverTarget="genre-level-popover"
                         >
-                          더보기
+                          {genreLevels[0].genre} <b>Lv.{genreLevels[0].level}</b>
                         </button>
                       </div>
                     )}
