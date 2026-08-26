@@ -1011,20 +1011,10 @@ button:disabled {
   color: #c6a9f5;
   gap: 4px;
 }
-.chip.playtimeChip {
-  border: none;
-  font-family: inherit;
-  cursor: pointer;
-}
-.chip.playtimeChip:hover {
-  background: rgba(102, 192, 244, 0.18);
-  color: var(--accent);
-}
 .chip.playtimeEdit input {
   width: 32px;
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--muted);
   box-shadow: none;
   color: inherit;
   font: inherit;
@@ -1044,7 +1034,6 @@ button:disabled {
 .chip.playtimeEdit input:focus-visible {
   outline: none;
   box-shadow: none;
-  border-bottom-color: var(--accent);
 }
 .manualRemoveBtn {
   display: inline-flex;
