@@ -137,9 +137,6 @@ const TASTE_MIN_GAMES = 12;
 // (a max-of-the-data scale would make the same score draw a different bar length depending on
 // what else is in the library that day).
 const TASTE_PCT_DOMAIN = 150;
-// Popover rows are a quick-glance chart, not a full report - past this many, cap and say so
-// rather than growing the popover past one screenful.
-const GENRE_CHART_LIMIT = 8;
 // How much a single game's hours count toward its genres' taste score, relative to the 1.0
 // baseline "just average" case - deliberately separate from GENRE_XP_PER_LEVEL_SQ's pure-hours
 // level curve, since this is about how much the player *liked* the time spent, not how much they
@@ -2071,64 +2068,65 @@ export default function Wishlist() {
                   </button>
                 )}
               </div>
-              {genreTab === "level" &&
-                (() => {
-                  const shown = genreLevels.slice(0, GENRE_CHART_LIMIT);
-                  const maxHours = shown[0]?.hours || 1;
-                  return shown.map(({ genre, hours, level }) => (
-                    <div
-                      key={genre}
-                      className="chartRow"
-                      title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
-                    >
-                      <span className="chartLabel">{genre}</span>
-                      <div className="chartTrack">
-                        <i className="chartBar" style={{ width: `${(hours / maxHours) * 100}%` }} />
+              {genreTab === "level" && (
+                <div className="genreChartScroll">
+                  {(() => {
+                    const maxHours = genreLevels[0]?.hours || 1;
+                    return genreLevels.map(({ genre, hours, level }) => (
+                      <div
+                        key={genre}
+                        className="chartRow"
+                        title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
+                      >
+                        <span className="chartLabel">{genre}</span>
+                        <div className="chartTrack">
+                          <i
+                            className="chartBar"
+                            style={{ width: `${(hours / maxHours) * 100}%` }}
+                          />
+                        </div>
+                        <span className="chartValue">Lv.{level}</span>
                       </div>
-                      <span className="chartValue">Lv.{level}</span>
-                    </div>
-                  ));
-                })()}
-              {genreTab === "level" && genreLevels.length > GENRE_CHART_LIMIT && (
-                <div className="chartMore">+{genreLevels.length - GENRE_CHART_LIMIT}개 더</div>
+                    ));
+                  })()}
+                </div>
               )}
               {genreTab === "taste" && genreTaste.length > 0 && (
                 <>
                   <div className="genreTasteHint">실험적 기능 - 위시리스트 추천에 활용 예정</div>
-                  {genreTaste.slice(0, GENRE_CHART_LIMIT).map(({ genre, games, affinity }) => {
-                    const pct = Math.round((affinity - 1) * 100);
-                    const barPct =
-                      (Math.min(Math.abs(pct), TASTE_PCT_DOMAIN) / TASTE_PCT_DOMAIN) * 100;
-                    return (
-                      <div
-                        key={genre}
-                        className="divergeRow"
-                        title={`${genre} · ${games}개 게임 · ${pct >= 0 ? "+" : ""}${pct}%`}
-                      >
-                        <span className="chartLabel">{genre}</span>
-                        <div className="divergeTrack">
-                          <div className="divergeHalf bad">
-                            {pct < 0 && (
-                              <i className="divergeBar bad" style={{ width: `${barPct}%` }} />
-                            )}
+                  <div className="genreChartScroll">
+                    {genreTaste.map(({ genre, games, affinity }) => {
+                      const pct = Math.round((affinity - 1) * 100);
+                      const barPct =
+                        (Math.min(Math.abs(pct), TASTE_PCT_DOMAIN) / TASTE_PCT_DOMAIN) * 100;
+                      return (
+                        <div
+                          key={genre}
+                          className="divergeRow"
+                          title={`${genre} · ${games}개 게임 · ${pct >= 0 ? "+" : ""}${pct}%`}
+                        >
+                          <span className="chartLabel">{genre}</span>
+                          <div className="divergeTrack">
+                            <div className="divergeHalf bad">
+                              {pct < 0 && (
+                                <i className="divergeBar bad" style={{ width: `${barPct}%` }} />
+                              )}
+                            </div>
+                            <div className="divergeCenter" />
+                            <div className="divergeHalf good">
+                              {pct >= 0 && (
+                                <i className="divergeBar good" style={{ width: `${barPct}%` }} />
+                              )}
+                            </div>
                           </div>
-                          <div className="divergeCenter" />
-                          <div className="divergeHalf good">
-                            {pct >= 0 && (
-                              <i className="divergeBar good" style={{ width: `${barPct}%` }} />
-                            )}
-                          </div>
+                          <span className={"chartValue " + (pct >= 0 ? "good" : "bad")}>
+                            {pct >= 0 ? "+" : ""}
+                            {pct}%
+                          </span>
                         </div>
-                        <span className={"chartValue " + (pct >= 0 ? "good" : "bad")}>
-                          {pct >= 0 ? "+" : ""}
-                          {pct}%
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {genreTaste.length > GENRE_CHART_LIMIT && (
-                    <div className="chartMore">+{genreTaste.length - GENRE_CHART_LIMIT}개 더</div>
-                  )}
+                      );
+                    })}
+                  </div>
                 </>
               )}
             </div>

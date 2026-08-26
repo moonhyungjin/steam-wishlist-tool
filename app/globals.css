@@ -576,11 +576,11 @@ button:disabled {
   color: var(--muted);
   white-space: nowrap;
 }
-.chartMore {
-  font-size: 11px;
-  color: var(--muted);
-  text-align: center;
-  padding: 4px 0 2px;
+/* Fixed to roughly 8 rows tall - past that, scroll rather than truncate, so every genre stays
+   reachable instead of silently dropping behind a "+N more" count. */
+.genreChartScroll {
+  max-height: 216px;
+  overflow-y: auto;
 }
 /* Magnitude bar - one hue, grows from a single (left) baseline, scaled to the largest value
    shown so bar length is directly comparable across genres. */
@@ -679,23 +679,26 @@ button:disabled {
 }
 .genreTabRow {
   display: flex;
-  gap: 6px;
+  border-bottom: 1px solid var(--line);
   margin-bottom: 8px;
 }
 .genreTab {
   flex: 1;
   background: transparent;
-  border: 1px solid var(--line);
+  border: none;
+  border-bottom: 2px solid transparent;
   color: var(--muted);
-  padding: 6px;
-  border-radius: 7px;
+  padding: 6px 0;
   font-size: 12px;
   cursor: pointer;
 }
+.genreTab:not(:first-child) {
+  border-left: 1px solid var(--line);
+}
 .genreTab.active {
-  background: #1b6d9b;
-  border-color: var(--accent);
-  color: white;
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: bold;
 }
 .genreTasteHint {
   font-size: 11px;
