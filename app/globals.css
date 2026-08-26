@@ -92,12 +92,27 @@ body {
   gap: 10px;
   margin-top: 12px;
 }
+.profileCardText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.profileTopGenre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .profileCard {
   display: flex;
   align-items: center;
   gap: 10px;
-  text-decoration: none;
   min-width: 0;
+}
+.profileAvatarLink {
+  display: block;
+  flex: none;
+  border-radius: 50%;
 }
 .smallBtn {
   display: inline-flex;
@@ -113,6 +128,11 @@ body {
 .smallBtn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+.smallBtn.iconOnly {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
 }
 .filterCloseBtn {
   display: flex;
@@ -131,8 +151,8 @@ body {
   color: var(--accent);
 }
 .profileAvatar {
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: 2px solid var(--accent);
   flex: none;
@@ -147,8 +167,8 @@ body {
   text-overflow: ellipsis;
   max-width: 200px;
 }
-.profileCard:hover .profileName {
-  color: var(--accent);
+.profileAvatarLink:hover .profileAvatar {
+  filter: brightness(1.15);
 }
 .viewTabs {
   display: flex;
@@ -539,6 +559,178 @@ button:disabled {
   cursor: pointer;
   flex: none;
 }
+/* Shared row anatomy for both chart rows below - label, then the mark, then the value. */
+.chartLabel {
+  flex: 0 0 64px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chartValue {
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* Fixed to roughly 8 rows tall - past that, scroll rather than truncate, so every genre stays
+   reachable instead of silently dropping behind a "+N more" count. */
+.genreChartScroll {
+  max-height: 216px;
+  overflow-y: auto;
+  padding-right: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.genreChartScroll::-webkit-scrollbar {
+  width: 6px;
+}
+.genreChartScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.genreChartScroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+.genreChartScroll::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+/* Magnitude bar - one hue, grows from a single (left) baseline, scaled to the largest value
+   shown so bar length is directly comparable across genres. */
+.chartRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.chartTrack {
+  flex: 1;
+  height: 10px;
+  border-radius: 4px;
+  background: #4b5b74;
+  overflow: hidden;
+}
+.chartBar {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+/* Diverging bar - centered on the 0% baseline, growing left (bad) or right (good) from it. */
+.divergeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+.divergeTrack {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 10px;
+}
+.divergeHalf {
+  flex: 1;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+}
+.divergeHalf.bad {
+  justify-content: flex-end;
+}
+.divergeHalf.good {
+  justify-content: flex-start;
+}
+.divergeCenter {
+  flex: none;
+  width: 1px;
+  height: 100%;
+  background: var(--line);
+}
+.divergeBar {
+  display: block;
+  height: 100%;
+}
+.divergeBar.bad {
+  background: #ef7a86;
+  border-radius: 4px 0 0 4px;
+}
+.divergeBar.good {
+  background: #6bd68a;
+  border-radius: 0 4px 4px 0;
+}
+.genreLevelBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #0c1420;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.genreLevelBadge:hover {
+  border-color: var(--accent);
+}
+.genreLevelBadge b {
+  color: var(--accent);
+}
+/* display must stay off the bare selector, same reason as .starPopover - see its comment. */
+.genreLevelPopover {
+  width: 300px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.genreLevelPopover:popover-open {
+  display: flex;
+  flex-direction: column;
+}
+.genreLevelPopover::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.genreTabRow {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.genreTab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  padding: 6px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+.genreTab.active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: bold;
+}
+.genreTasteHint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.chartValue.good {
+  color: #6bd68a;
+  font-weight: bold;
+}
+.chartValue.bad {
+  color: #ef7a86;
+  font-weight: bold;
+}
 .game {
   position: relative;
   display: flex;
@@ -563,29 +755,6 @@ button:disabled {
   background: #263e57;
   flex: none;
   overflow: hidden;
-}
-.rowBadges {
-  position: absolute;
-  top: 15px;
-  right: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  z-index: 1;
-}
-.rowBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  line-height: 24px;
-  font-size: 11px;
-  padding: 0 6px;
-  border-radius: 4px;
-}
-.rowBadge.manual {
-  background: #7c4fd6;
-  color: white;
 }
 .cover img {
   width: 100%;
@@ -841,6 +1010,39 @@ button:disabled {
   background: rgba(151, 107, 214, 0.18);
   color: #c6a9f5;
   gap: 4px;
+}
+.chip.playtimeChip {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.chip.playtimeChip:hover {
+  background: rgba(102, 192, 244, 0.18);
+  color: var(--accent);
+}
+.chip.playtimeEdit input {
+  width: 32px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  /* appearance: none drops the native boxed/rounded text-field chrome that was showing through
+     the pill background. -moz-appearance: textfield is Firefox's own (oddly-named) way to drop
+     just the up/down spinner without that boxed look - the two aren't redundant. */
+  appearance: none;
+  -moz-appearance: textfield;
+}
+.chip.playtimeEdit input::-webkit-outer-spin-button,
+.chip.playtimeEdit input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.chip.playtimeEdit input:focus,
+.chip.playtimeEdit input:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 .manualRemoveBtn {
   display: inline-flex;

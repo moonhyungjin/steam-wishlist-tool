@@ -60,8 +60,10 @@ type SortKey =
   | "discount-end-asc"
   | "playtime-desc"
   | "achievement-desc"
-  | "name-asc";
+  | "name-asc"
+  | "recommend-desc";
 const WISHLIST_SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "recommend-desc", label: "추천도 높은순" },
   { value: "price-asc", label: "가격 낮은순" },
   { value: "review", label: "긍정 비율 높은순" },
   { value: "metacritic", label: "메타크리틱 높은순" },
@@ -96,6 +98,71 @@ const RATING_STORAGE_KEY = "library:rating";
 type StarRating = 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
 const STAR_VALUES: StarRating[] = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 const STAR_STORAGE_KEY = "library:stars";
+// Genre level/taste/recommendation still need more real-world tuning before going live - this
+// keeps every entry point (profile badge, popover, wishlist sort option, recommend chip) off in
+// production while the underlying code, data model, and DB sync all ship as-is. Flip to true when
+// ready to launch instead of re-threading these checks individually.
+const GENRE_LEVELING_ENABLED = false;
+// Deliberately much smaller than the genre *filter*'s GENRE_ALLOWLIST (100+ raw Steam tags) - that
+// list is great for filtering (fine-grained facets are useful there) but terrible for leveling,
+// since near-synonyms ("1인칭 슈팅"/"히어로 슈팅"/"익스트랙션 슈터") would each level up as their
+// own separate, diluted bucket instead of one meaningful "슈팅" level. This list only has broad,
+// non-overlapping top-level genres.
+const GENRE_LEVEL_ALLOWLIST = new Set([
+  "액션",
+  "어드벤처",
+  "RPG",
+  "전략",
+  "시뮬레이션",
+  "스포츠",
+  "레이싱",
+  "캐주얼",
+  "인디",
+  "퍼즐",
+  "플랫폼",
+  "슈팅",
+  "공포",
+  "생존",
+  "로그라이크",
+  "격투",
+  "MMO",
+  "샌드박스",
+  "비주얼 노벨",
+  "리듬",
+  "MOBA",
+]);
+// Quadratic RPG-style curve: level N needs N^2 * GENRE_XP_PER_LEVEL_SQ cumulative hours (5h/20h/
+// 45h/80h/125h...) - cheap early levels, meaningfully harder later. Tune this one constant to
+// retune the whole curve.
+const GENRE_XP_PER_LEVEL_SQ = 5;
+// A genre only enters the taste profile once it's shown up in at least this many owned games -
+// below that, one 5-star fluke or one dropped game would swing the average wildly on pure noise.
+const TASTE_MIN_GAMES = 12;
+// The diverging taste chart's fixed +/-domain, in percentage points off the 1.0 baseline -
+// affinity can theoretically range from about -28% to +100%, so 150 gives every real value
+// headroom while keeping the 0% baseline a stable, comparable reference point across renders
+// (a max-of-the-data scale would make the same score draw a different bar length depending on
+// what else is in the library that day).
+const TASTE_PCT_DOMAIN = 150;
+// How much a single game's hours count toward its genres' taste score, relative to the 1.0
+// baseline "just average" case - deliberately separate from GENRE_XP_PER_LEVEL_SQ's pure-hours
+// level curve, since this is about how much the player *liked* the time spent, not how much they
+// spent. Tune independently as real data comes in.
+function gameAffinity(
+  status: PlayStatus | undefined,
+  rating: Rating | undefined,
+  star: StarRating | undefined,
+  achievement: AchievementInfo | null | undefined,
+): number {
+  let affinity = 1;
+  if (status === "dropped") affinity *= 0.4;
+  else if (status === "completed") affinity *= 1.3;
+  if (rating === "like") affinity += 0.3;
+  else if (rating === "dislike") affinity -= 0.3;
+  if (star) affinity += ((star - 3) / 2) * 0.3;
+  if (achievement && achievement.percent >= 70) affinity += 0.1;
+  return affinity;
+}
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
 const ACHIEVEMENT_CHUNK = 40;
@@ -120,6 +187,9 @@ const MANUAL_PLATFORM_LABELS: Record<ManualPlatform, string> = {
 };
 const MANUAL_PLATFORM_STORAGE_KEY = "library:manual";
 const MANUAL_GAMES_STORAGE_KEY = "library:manualGames";
+// Manual entries have no Steam-tracked playtime, so without this they silently contribute
+// nothing to genre levels/taste - letting the user type a rough estimate lets them opt in.
+const MANUAL_PLAYTIME_STORAGE_KEY = "library:manualPlaytime";
 // Bump this whenever the Game shape changes - otherwise old cached entries silently keep
 // missing the new fields forever, since "resume from cache" treats them as already loaded.
 const CACHE_VERSION = 11;
@@ -138,12 +208,39 @@ const CARD_ROW_HEIGHT = 168;
 function scoreClass(n: number): string {
   return n >= 75 ? "good" : n >= 50 ? "mid" : "bad";
 }
+function genreLevelInfo(hours: number) {
+  const level = Math.floor(Math.sqrt(hours / GENRE_XP_PER_LEVEL_SQ));
+  const thisLevelHours = level ** 2 * GENRE_XP_PER_LEVEL_SQ;
+  const nextLevelHours = (level + 1) ** 2 * GENRE_XP_PER_LEVEL_SQ;
+  const progress = (hours - thisLevelHours) / (nextLevelHours - thisLevelHours);
+  return { level, progress };
+}
+// Hours-weighted-average taste affinity across whichever of the game's (fine-grained) tags have
+// enough library data to carry a taste score - weighted by each matching genre's own game count,
+// so a genre backed by 40 games doesn't get diluted by one that just barely cleared the floor.
+// null (not 0/neutral) means "no overlapping genre has taste data yet" - that's a different,
+// honest state from "known to be a middling match," and sorts to the bottom either way.
+function recommendScore(
+  genres: string[] | undefined,
+  taste: Record<string, { affinity: number; games: number }>,
+): number | null {
+  let weightSum = 0;
+  let scoreSum = 0;
+  for (const genre of genres ?? []) {
+    const t = taste[genre];
+    if (!t) continue;
+    weightSum += t.games;
+    scoreSum += t.affinity * t.games;
+  }
+  return weightSum > 0 ? scoreSum / weightSum : null;
+}
 function compareByKey(
   key: SortKey,
   a: Item,
   b: Item,
   games: Record<number, Game>,
   achievementMap: Record<number, AchievementInfo | null>,
+  genreTaste: Record<string, { affinity: number; games: number }>,
 ): number {
   const ga = games[a.appid];
   const gb = games[b.appid];
@@ -156,6 +253,14 @@ function compareByKey(
   if (key === "name-asc") return (ga?.name ?? "").localeCompare(gb?.name ?? "", "ko");
   if (key === "discount-end-asc")
     return (ga?.discountEndTimestamp ?? Infinity) - (gb?.discountEndTimestamp ?? Infinity);
+  if (key === "recommend-desc") {
+    const sa = recommendScore(ga?.genres, genreTaste);
+    const sb = recommendScore(gb?.genres, genreTaste);
+    if (sa == null && sb == null) return 0;
+    if (sa == null) return 1;
+    if (sb == null) return -1;
+    return sb - sa;
+  }
   return (gb?.releaseTimestamp ?? -Infinity) - (ga?.releaseTimestamp ?? -Infinity);
 }
 // Only one sort key applies at a time - combining several numeric criteria as a priority chain
@@ -167,9 +272,10 @@ function sortItems(
   games: Record<number, Game>,
   sortKey: SortKey | null,
   achievementMap: Record<number, AchievementInfo | null>,
+  genreTaste: Record<string, { affinity: number; games: number }>,
 ): Item[] {
   if (!sortKey) return items;
-  return [...items].sort((a, b) => compareByKey(sortKey, a, b, games, achievementMap));
+  return [...items].sort((a, b) => compareByKey(sortKey, a, b, games, achievementMap, genreTaste));
 }
 // Steam's achievement endpoint has no batch call and hard rate-limits after ~160 requests
 // regardless of pacing, so a big library can't be fully checked in one pass. Rather than burn
@@ -231,7 +337,7 @@ function prioritizeAchievementOrder(
   // it just falls back to library order for the games being prioritized.
   const ordered =
     sortKey && sortKey !== "achievement-desc"
-      ? [...matched].sort((a, b) => compareByKey(sortKey, a, b, loaded, {}))
+      ? [...matched].sort((a, b) => compareByKey(sortKey, a, b, loaded, {}, {}))
       : matched;
   return [...ordered, ...rest].map((item) => item.appid);
 }
@@ -479,6 +585,9 @@ function GameRow({
   rowHeight,
   manualPlatform,
   onRemoveManual,
+  onSetManualPlaytime,
+  genreTasteMap,
+  sortKey,
   steamId,
 }: RowComponentProps<{
   items: Item[];
@@ -497,6 +606,9 @@ function GameRow({
   manualPlatform: Record<number, ManualPlatform>;
   steamId: string;
   onRemoveManual: (appid: number) => void;
+  onSetManualPlaytime: (appid: number, hours: number | null) => void;
+  genreTasteMap: Record<string, { affinity: number; games: number }>;
+  sortKey: SortKey | null;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -504,8 +616,13 @@ function GameRow({
   const rating = ratingMap[item.appid];
   const star = starMap[item.appid];
   const starPopoverRef = useRef<HTMLDivElement>(null);
+  const [editingPlaytime, setEditingPlaytime] = useState(false);
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
+  const recommend =
+    GENRE_LEVELING_ENABLED && view === "wishlist" && sortKey === "recommend-desc"
+      ? recommendScore(g?.genres, genreTasteMap)
+      : null;
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
   // to - everything else about a manual entry behaves the same either way.
   const manual = manualPlatform[item.appid];
@@ -516,21 +633,6 @@ function GameRow({
   const tryLibrary = view === "library" && !manual;
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
-      {manual && (
-        <div className="rowBadges">
-          <span className="rowBadge manual">
-            {MANUAL_PLATFORM_LABELS[manual]}
-            <button
-              type="button"
-              className="manualRemoveBtn"
-              onClick={() => onRemoveManual(item.appid)}
-              title="목록에서 제거"
-            >
-              ×
-            </button>
-          </span>
-        </div>
-      )}
       <div className="coverWrap">
         {linkable ? (
           <a
@@ -645,6 +747,60 @@ function GameRow({
         </div>
         <p className="meta">{g?.genres.slice(0, 3).join(" · ") || "게임 정보 불러오는 중"}</p>
         <div className="badges">
+          {manual ? (
+            editingPlaytime ? (
+              <span className="chip playtimeEdit">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  autoFocus
+                  defaultValue={item.playtimeMinutes ? item.playtimeMinutes / 60 : ""}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const v = parseFloat(e.currentTarget.value);
+                      onSetManualPlaytime(item.appid, Number.isFinite(v) ? v : null);
+                      setEditingPlaytime(false);
+                    } else if (e.key === "Escape") {
+                      setEditingPlaytime(false);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const v = parseFloat(e.currentTarget.value);
+                    onSetManualPlaytime(item.appid, Number.isFinite(v) ? v : null);
+                    setEditingPlaytime(false);
+                  }}
+                />
+                시간
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="chip playtimeChip"
+                onClick={() => setEditingPlaytime(true)}
+                title="직접 입력한 플레이타임 - 장르 레벨/선호도 계산에 반영됩니다"
+              >
+                {item.playtimeMinutes != null
+                  ? `플레이타임 ${(item.playtimeMinutes / 60).toFixed(1)}시간 (수정)`
+                  : "플레이타임 입력"}
+              </button>
+            )
+          ) : item.playtimeMinutes != null ? (
+            <span className="chip">플레이타임 {(item.playtimeMinutes / 60).toFixed(1)}시간</span>
+          ) : null}
+          {manual && (
+            <span className="chip manual">
+              {MANUAL_PLATFORM_LABELS[manual]}
+              <button
+                type="button"
+                className="manualRemoveBtn"
+                onClick={() => onRemoveManual(item.appid)}
+                title="목록에서 제거"
+              >
+                ×
+              </button>
+            </span>
+          )}
           {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
           {view === "wishlist" && g?.discountPercent ? (
             <a
@@ -676,15 +832,21 @@ function GameRow({
               메타 {g.metacritic}
             </span>
           ) : null}
-          {view === "wishlist" && g?.reviewPositive != null ? (
+          {view === "wishlist" && g?.reviewPositive ? (
             <span className={"chip " + scoreClass(g.reviewPositive)} title="Steam 리뷰 긍정 비율">
               리뷰 {g.reviewPositive}%
             </span>
           ) : null}
-          {item.playtimeMinutes != null ? (
-            <span className="chip">플레이타임 {(item.playtimeMinutes / 60).toFixed(1)}시간</span>
+          {recommend != null ? (
+            <span
+              className={"chip " + (recommend >= 1 ? "good" : "bad")}
+              title="이 게임의 장르와 내 장르 선호도를 비교한 점수 (실험적 기능)"
+            >
+              추천 {recommend >= 1 ? "+" : ""}
+              {Math.round((recommend - 1) * 100)}%
+            </span>
           ) : null}
-          {achievement != null ? (
+          {achievement != null && achievement.achieved > 0 ? (
             <a
               className={"chip " + scoreClass(achievement.percent)}
               href={`https://steamcommunity.com/profiles/${steamId}/stats/${item.appid}/achievements`}
@@ -807,12 +969,12 @@ function CardCell({
         ) : (
           <div className="loadingCover">{linkable ? "LOADING" : "이미지 없음"}</div>
         )}
-        {view === "wishlist" && (g?.metacritic != null || g?.reviewPositive != null) ? (
+        {view === "wishlist" && (g?.metacritic != null || g?.reviewPositive) ? (
           <div className="cardBadges cardBadgesBottomRight">
             {g.metacritic != null ? (
               <span className={"cardBadge " + scoreClass(g.metacritic)}>메타 {g.metacritic}</span>
             ) : null}
-            {g.reviewPositive != null ? (
+            {g.reviewPositive ? (
               <span className={"cardBadge " + scoreClass(g.reviewPositive)}>
                 리뷰 {g.reviewPositive}%
               </span>
@@ -1187,6 +1349,7 @@ export default function Wishlist() {
   const [libFetchedOnce, setLibFetchedOnce] = useState(false);
   const [manualPlatform, setManualPlatform] = useState<Record<number, ManualPlatform>>({});
   const [manualGames, setManualGames] = useState<Record<number, Game>>({});
+  const [manualPlaytime, setManualPlaytime] = useState<Record<number, number>>({});
   function persistManual(
     platformValue: Record<number, ManualPlatform>,
     gamesValue: Record<number, Game>,
@@ -1195,18 +1358,51 @@ export default function Wishlist() {
       localStorage.setItem(MANUAL_PLATFORM_STORAGE_KEY, JSON.stringify(platformValue));
       localStorage.setItem(MANUAL_GAMES_STORAGE_KEY, JSON.stringify(gamesValue));
     } catch {}
+    pushSync({ manualPlatform: platformValue, manualGames: gamesValue });
+  }
+  function setManualPlaytimeHours(appid: number, hours: number | null) {
+    const next = { ...manualPlaytime };
+    if (hours == null || !(hours > 0)) delete next[appid];
+    else next[appid] = Math.round(hours * 60);
+    setManualPlaytime(next);
+    try {
+      localStorage.setItem(MANUAL_PLAYTIME_STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+    pushSync({ manualPlaytime: next });
   }
   // A library refresh only ever touches libItems/libGames (the Steam-fetched half), so merging
   // manual entries in here - rather than mixing them into libItems itself - means they survive
   // every "라이브러리 가져오기" click instead of being wiped by it.
   const combinedLibItems: Item[] = useMemo(
-    () => [...libItems, ...Object.keys(manualPlatform).map((id) => ({ appid: Number(id) }))],
-    [libItems, manualPlatform],
+    () => [
+      ...libItems,
+      ...Object.keys(manualPlatform).map((id) => ({
+        appid: Number(id),
+        playtimeMinutes: manualPlaytime[Number(id)],
+      })),
+    ],
+    [libItems, manualPlatform, manualPlaytime],
   );
   const combinedLibGames = useMemo(
     () => ({ ...libGames, ...manualGames }),
     [libGames, manualGames],
   );
+  // Uses GENRE_LEVEL_ALLOWLIST, not the filter's broader GENRE_ALLOWLIST - see the comment on that
+  // constant. Manual entries have no playtimeMinutes (never actually tracked by Steam), so they
+  // silently contribute nothing - only real owned-and-played games level up a genre.
+  const genreXp = useMemo(() => {
+    const xp: Record<string, number> = {};
+    for (const item of combinedLibItems) {
+      const minutes = item.playtimeMinutes;
+      if (!minutes) continue;
+      const g = combinedLibGames[item.appid];
+      for (const genre of g?.genres ?? []) {
+        if (!GENRE_LEVEL_ALLOWLIST.has(genre)) continue;
+        xp[genre] = (xp[genre] ?? 0) + minutes / 60;
+      }
+    }
+    return xp;
+  }, [combinedLibItems, combinedLibGames]);
   const [manualFormOpen, setManualFormOpen] = useState(false);
 
   const items = view === "wishlist" ? wlItems : combinedLibItems;
@@ -1407,6 +1603,9 @@ export default function Wishlist() {
     ratingMap?: Record<number, Rating>;
     starMap?: Record<number, StarRating>;
     achievementMap?: Record<number, AchievementInfo | null>;
+    manualPlatform?: Record<number, ManualPlatform>;
+    manualGames?: Record<number, Game>;
+    manualPlaytime?: Record<number, number>;
   }) {
     const id = libSteamId.trim();
     if (!/^\d{17}$/.test(id)) return;
@@ -1419,6 +1618,9 @@ export default function Wishlist() {
         ratingMap: overrides.ratingMap ?? ratingMap,
         starMap: overrides.starMap ?? starMap,
         achievementMap: overrides.achievementMap ?? achievementMap,
+        manualPlatform: overrides.manualPlatform ?? manualPlatform,
+        manualGames: overrides.manualGames ?? manualGames,
+        manualPlaytime: overrides.manualPlaytime ?? manualPlaytime,
       }),
     }).catch(() => {});
   }
@@ -1462,6 +1664,33 @@ export default function Wishlist() {
           setAchievementMap(d.achievementMap);
           try {
             localStorage.setItem(ACHIEVEMENT_STORAGE_KEY, JSON.stringify(d.achievementMap));
+          } catch {}
+        }
+        if (
+          d.manualPlatform &&
+          (Object.keys(d.manualPlatform).length > 0 || Object.keys(manualPlatform).length === 0)
+        ) {
+          setManualPlatform(d.manualPlatform);
+          try {
+            localStorage.setItem(MANUAL_PLATFORM_STORAGE_KEY, JSON.stringify(d.manualPlatform));
+          } catch {}
+        }
+        if (
+          d.manualGames &&
+          (Object.keys(d.manualGames).length > 0 || Object.keys(manualGames).length === 0)
+        ) {
+          setManualGames(d.manualGames);
+          try {
+            localStorage.setItem(MANUAL_GAMES_STORAGE_KEY, JSON.stringify(d.manualGames));
+          } catch {}
+        }
+        if (
+          d.manualPlaytime &&
+          (Object.keys(d.manualPlaytime).length > 0 || Object.keys(manualPlaytime).length === 0)
+        ) {
+          setManualPlaytime(d.manualPlaytime);
+          try {
+            localStorage.setItem(MANUAL_PLAYTIME_STORAGE_KEY, JSON.stringify(d.manualPlaytime));
           } catch {}
         }
       })
@@ -1514,6 +1743,63 @@ export default function Wishlist() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, GENRE_FILTER_LIMIT);
   }, [items, games]);
+  const genreLevels = useMemo(
+    () =>
+      Object.entries(genreXp)
+        .map(([genre, hours]) => ({ genre, hours, ...genreLevelInfo(hours) }))
+        .sort((a, b) => b.hours - a.hours),
+    [genreXp],
+  );
+  // Genre levels are always computed from the library, regardless of which tab is open - so show
+  // them on the wishlist tab too, but only when it's tracking the same account as the library.
+  // Otherwise the badge would show *your* library's genre level next to a friend's wishlist
+  // profile (wishlist and library intentionally support different steamIds - see their comment).
+  const showGenreLevels =
+    GENRE_LEVELING_ENABLED &&
+    genreLevels.length > 0 &&
+    (view === "library" || wlSteamId === libSteamId);
+  // Fine-grained GENRE_ALLOWLIST, not the coarse GENRE_LEVEL_ALLOWLIST - subgenre distinctions
+  // like JRPG vs CRPG vs 액션 RPG matter here, unlike for the level badge where they'd just dilute
+  // one bucket. A genre only surfaces once it's crossed TASTE_MIN_GAMES games, so a couple of
+  // flukes (one dropped game, one over-generous 5-star) can't swing a tiny-sample average.
+  const genreTaste = useMemo(() => {
+    const gameCounts: Record<string, number> = {};
+    const hoursByGenre: Record<string, number> = {};
+    const weightedByGenre: Record<string, number> = {};
+    for (const item of combinedLibItems) {
+      const hours = (item.playtimeMinutes ?? 0) / 60;
+      if (!hours) continue;
+      const g = combinedLibGames[item.appid];
+      const affinity = gameAffinity(
+        statusMap[item.appid],
+        ratingMap[item.appid],
+        starMap[item.appid],
+        achievementMap[item.appid],
+      );
+      for (const genre of g?.genres ?? []) {
+        if (!GENRE_ALLOWLIST.has(genre)) continue;
+        gameCounts[genre] = (gameCounts[genre] ?? 0) + 1;
+        hoursByGenre[genre] = (hoursByGenre[genre] ?? 0) + hours;
+        weightedByGenre[genre] = (weightedByGenre[genre] ?? 0) + hours * affinity;
+      }
+    }
+    return Object.entries(gameCounts)
+      .filter(([, count]) => count >= TASTE_MIN_GAMES)
+      .map(([genre, count]) => ({
+        genre,
+        games: count,
+        affinity: weightedByGenre[genre] / hoursByGenre[genre],
+      }))
+      .sort((a, b) => b.affinity - a.affinity);
+  }, [combinedLibItems, combinedLibGames, statusMap, ratingMap, starMap, achievementMap]);
+  // Keyed by genre for O(1) lookup from recommendScore, rather than re-scanning the array per
+  // wishlist game on every sort comparison.
+  const genreTasteMap = useMemo(() => {
+    const map: Record<string, { affinity: number; games: number }> = {};
+    for (const { genre, affinity, games } of genreTaste) map[genre] = { affinity, games };
+    return map;
+  }, [genreTaste]);
+  const [genreTab, setGenreTab] = useState<"level" | "taste">("level");
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
     return items.filter((item) => {
@@ -1570,8 +1856,8 @@ export default function Wishlist() {
     manualPlatform,
   ]);
   const sortedItems = useMemo(
-    () => sortItems(filteredItems, games, sortKey, achievementMap),
-    [filteredItems, games, sortKey, achievementMap],
+    () => sortItems(filteredItems, games, sortKey, achievementMap, genreTasteMap),
+    [filteredItems, games, sortKey, achievementMap, genreTasteMap],
   );
   // Drives the mobile filter button's active state - the drawer hides the checkboxes themselves,
   // so this is the only visible sign a filter (or sort, which lives in the same drawer) is
@@ -1623,6 +1909,11 @@ export default function Wishlist() {
       const manualGamesSaved = JSON.parse(localStorage.getItem(MANUAL_GAMES_STORAGE_KEY) ?? "null");
       if (manualGamesSaved && typeof manualGamesSaved === "object")
         setManualGames(manualGamesSaved);
+      const manualPlaytimeSaved = JSON.parse(
+        localStorage.getItem(MANUAL_PLAYTIME_STORAGE_KEY) ?? "null",
+      );
+      if (manualPlaytimeSaved && typeof manualPlaytimeSaved === "object")
+        setManualPlaytime(manualPlaytimeSaved);
       const status = JSON.parse(localStorage.getItem(STATUS_STORAGE_KEY) ?? "null");
       if (status && typeof status === "object") setStatusMap(status);
       const rating = JSON.parse(localStorage.getItem(RATING_STORAGE_KEY) ?? "null");
@@ -1708,6 +1999,7 @@ export default function Wishlist() {
     setManualPlatform(nextPlatform);
     setManualGames(nextGames);
     persistManual(nextPlatform, nextGames);
+    setManualPlaytimeHours(appid, null);
     setGameStatus(appid, null);
     setGameRating(appid, null);
   }
@@ -1879,23 +2171,148 @@ export default function Wishlist() {
           {(profile || !formVisible) && (
             <div className="profileRow">
               {profile && (
-                <a
-                  className="profileCard"
-                  href={profile.profileUrl ?? undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Steam 프로필 열기"
-                >
+                <div className="profileCard">
                   {profile.avatarUrl && (
-                    <img className="profileAvatar" src={profile.avatarUrl} alt="" />
+                    <a
+                      className="profileAvatarLink"
+                      href={profile.profileUrl ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Steam 프로필 열기"
+                    >
+                      <img className="profileAvatar" src={profile.avatarUrl} alt="" />
+                    </a>
                   )}
-                  <span className="profileName">{profile.personaName}</span>
-                </a>
+                  <div className="profileCardText">
+                    {showGenreLevels && (
+                      <div className="profileTopGenre">
+                        <button
+                          type="button"
+                          className="genreLevelBadge"
+                          popoverTarget="genre-level-popover"
+                          title={
+                            genreTaste[0]
+                              ? `선호 1위: ${genreTaste[0].genre} (${
+                                  Math.round((genreTaste[0].affinity - 1) * 100) >= 0 ? "+" : ""
+                                }${Math.round((genreTaste[0].affinity - 1) * 100)}%)`
+                              : undefined
+                          }
+                        >
+                          {genreLevels[0].genre} <b>Lv.{genreLevels[0].level}</b>
+                        </button>
+                      </div>
+                    )}
+                    <span className="profileName">{profile.personaName}</span>
+                  </div>
+                </div>
               )}
               {!formVisible && (
-                <button type="button" className="smallBtn" onClick={openCredsForm}>
-                  계정 변경
+                <button
+                  type="button"
+                  className="smallBtn iconOnly"
+                  onClick={openCredsForm}
+                  title="계정 변경"
+                  aria-label="계정 변경"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="17 1 21 5 17 9" />
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                    <polyline points="7 23 3 19 7 15" />
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                  </svg>
                 </button>
+              )}
+            </div>
+          )}
+          {showGenreLevels && (
+            <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
+              <div className="genreTabRow">
+                <button
+                  type="button"
+                  className={"genreTab " + (genreTab === "level" ? "active" : "")}
+                  onClick={() => setGenreTab("level")}
+                >
+                  장르 레벨
+                </button>
+                {genreTaste.length > 0 && (
+                  <button
+                    type="button"
+                    className={"genreTab " + (genreTab === "taste" ? "active" : "")}
+                    onClick={() => setGenreTab("taste")}
+                  >
+                    장르 선호도
+                  </button>
+                )}
+              </div>
+              {genreTab === "level" && (
+                <div className="genreChartScroll">
+                  {(() => {
+                    const maxHours = genreLevels[0]?.hours || 1;
+                    return genreLevels.map(({ genre, hours, level }) => (
+                      <div
+                        key={genre}
+                        className="chartRow"
+                        title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
+                      >
+                        <span className="chartLabel">{genre}</span>
+                        <div className="chartTrack">
+                          <i
+                            className="chartBar"
+                            style={{ width: `${(hours / maxHours) * 100}%` }}
+                          />
+                        </div>
+                        <span className="chartValue">Lv.{level}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+              {genreTab === "taste" && genreTaste.length > 0 && (
+                <>
+                  <div className="genreTasteHint">실험적 기능 - 위시리스트 추천에 활용 예정</div>
+                  <div className="genreChartScroll">
+                    {genreTaste.map(({ genre, games, affinity }) => {
+                      const pct = Math.round((affinity - 1) * 100);
+                      const barPct =
+                        (Math.min(Math.abs(pct), TASTE_PCT_DOMAIN) / TASTE_PCT_DOMAIN) * 100;
+                      return (
+                        <div
+                          key={genre}
+                          className="divergeRow"
+                          title={`${genre} · ${games}개 게임 · ${pct >= 0 ? "+" : ""}${pct}%`}
+                        >
+                          <span className="chartLabel">{genre}</span>
+                          <div className="divergeTrack">
+                            <div className="divergeHalf bad">
+                              {pct < 0 && (
+                                <i className="divergeBar bad" style={{ width: `${barPct}%` }} />
+                              )}
+                            </div>
+                            <div className="divergeCenter" />
+                            <div className="divergeHalf good">
+                              {pct >= 0 && (
+                                <i className="divergeBar good" style={{ width: `${barPct}%` }} />
+                              )}
+                            </div>
+                          </div>
+                          <span className={"chartValue " + (pct >= 0 ? "good" : "bad")}>
+                            {pct >= 0 ? "+" : ""}
+                            {pct}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -2085,7 +2502,14 @@ export default function Wishlist() {
             collapsed={collapsedGroups.has("sort")}
             onToggle={() => toggleGroup("sort")}
           >
-            {(view === "wishlist" ? WISHLIST_SORT_OPTIONS : LIBRARY_SORT_OPTIONS).map((opt) => (
+            {(view === "wishlist"
+              ? WISHLIST_SORT_OPTIONS.filter(
+                  (opt) =>
+                    opt.value !== "recommend-desc" ||
+                    (GENRE_LEVELING_ENABLED && genreTaste.length > 0 && wlSteamId === libSteamId),
+                )
+              : LIBRARY_SORT_OPTIONS
+            ).map((opt) => (
               <label key={opt.value} className="sortCheck">
                 <input
                   type="radio"
@@ -2374,6 +2798,9 @@ export default function Wishlist() {
                 rowHeight: isMobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT,
                 manualPlatform,
                 onRemoveManual: removeManualGame,
+                onSetManualPlaytime: setManualPlaytimeHours,
+                genreTasteMap,
+                sortKey,
                 steamId,
               }}
               style={{ height: listSize.height, width: "100%" }}
