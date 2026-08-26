@@ -1021,13 +1021,22 @@ button:disabled {
   color: var(--accent);
 }
 .chip.playtimeEdit input {
-  width: 40px;
+  width: 32px;
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--muted);
   color: inherit;
   font: inherit;
   padding: 0;
+  /* Kills the native up/down spinner - it clashes with the pill shape (see the chip.manual
+     screenshot this was flagged from), and a stepper adds nothing for a "type it once" field. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.chip.playtimeEdit input::-webkit-outer-spin-button,
+.chip.playtimeEdit input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .chip.playtimeEdit input:focus {
   outline: none;
