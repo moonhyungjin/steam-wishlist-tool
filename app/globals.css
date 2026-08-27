@@ -1071,6 +1071,9 @@ button:disabled {
   appearance: none;
   -moz-appearance: textfield;
 }
+.chip.recommendTag {
+  flex: none;
+}
 .chip.playtimeEdit input::-webkit-outer-spin-button,
 .chip.playtimeEdit input::-webkit-inner-spin-button {
   -webkit-appearance: none;

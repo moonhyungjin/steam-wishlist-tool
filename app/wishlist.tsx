@@ -770,15 +770,6 @@ function GameRow({
               </span>
             )}
           </h3>
-          {recommend != null ? (
-            <span
-              className={"chip recommendTag " + (recommend >= 1 ? "good" : "bad")}
-              title="이 게임의 장르와 내 장르 선호도를 비교한 점수 (실험적 기능)"
-            >
-              추천 {recommend >= 1 ? "+" : ""}
-              {Math.round((recommend - 1) * 100)}%
-            </span>
-          ) : null}
           {view === "library" && status !== "excluded" && (
             <>
               <button
@@ -1018,6 +1009,16 @@ function GameRow({
                 ))}
               </span>
             )}
+          </div>
+        ) : recommend != null ? (
+          <div className="statusRow">
+            <span
+              className={"chip recommendTag " + (recommend >= 1 ? "good" : "bad")}
+              title="이 게임의 장르와 내 장르 선호도를 비교한 점수 (실험적 기능)"
+            >
+              추천 {recommend >= 1 ? "+" : ""}
+              {Math.round((recommend - 1) * 100)}%
+            </span>
           </div>
         ) : null}
       </div>
