@@ -91,6 +91,16 @@ const STATUS_LABELS: Record<PlayStatus, string> = {
   excluded: "제외",
 };
 const STATUS_ORDER: PlayStatus[] = ["playing", "completed", "incomplete", "dropped", "excluded"];
+// Same tokens as the app's existing good/mid/bad score coloring (scoreClass) - a completed game
+// reads as "good" the same way a high review score does, dropped as "bad", etc. '제외' stays
+// muted since it isn't a judgment on the game, just an opt-out.
+const STATUS_COLORS: Record<PlayStatus, string> = {
+  playing: "#66c0f4",
+  completed: "#6bd68a",
+  incomplete: "#f5d06e",
+  dropped: "#ef7a86",
+  excluded: "#91a0b4",
+};
 const STATUS_STORAGE_KEY = "library:status";
 type Rating = "like" | "dislike";
 const RATING_LABELS: Record<Rating, string> = { like: "추천", dislike: "비추천" };
@@ -494,20 +504,47 @@ function openLibraryOrStore(appid: number) {
 // everything else instead of relying on 👍/👎.
 function ThumbGlyph({ down }: { down?: boolean }) {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
       {down ? (
         <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
       ) : (
         <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+      )}
+    </svg>
+  );
+}
+function StatusGlyph({ status }: { status: PlayStatus }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill={status === "playing" || status === "incomplete" ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {status === "playing" && <polygon points="6,4 20,12 6,20" />}
+      {status === "completed" && <path d="M20 6L9 17l-5-5" />}
+      {status === "incomplete" && (
+        <>
+          <rect x="6" y="4" width="4" height="16" stroke="none" />
+          <rect x="14" y="4" width="4" height="16" stroke="none" />
+        </>
+      )}
+      {status === "dropped" && (
+        <>
+          <line x1="5" y1="5" x2="19" y2="19" />
+          <line x1="19" y1="5" x2="5" y2="19" />
+        </>
+      )}
+      {status === "excluded" && (
+        <>
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+          <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+          <line x1="1" y1="1" x2="23" y2="23" />
+        </>
       )}
     </svg>
   );
@@ -935,7 +972,9 @@ function GameRow({
               className={"statusPicker" + (status == null ? " unset" : "")}
               popoverTarget={`status-popover-${item.appid}`}
               title="진행 상태"
+              style={status ? { color: STATUS_COLORS[status] } : undefined}
             >
+              {status && <StatusGlyph status={status} />}
               {status ? STATUS_LABELS[status] : "상태 없음"}
             </button>
             <div
@@ -949,11 +988,19 @@ function GameRow({
                   key={s}
                   type="button"
                   className={"statusOption " + (status === s ? "active" : "")}
+                  style={
+                    status === s
+                      ? { background: STATUS_COLORS[s], borderColor: STATUS_COLORS[s] }
+                      : undefined
+                  }
                   onClick={() => {
                     onSetStatus(item.appid, status === s ? null : s);
                     statusPopoverRef.current?.hidePopover();
                   }}
                 >
+                  <span style={{ color: status === s ? "white" : STATUS_COLORS[s] }}>
+                    <StatusGlyph status={s} />
+                  </span>
                   {STATUS_LABELS[s]}
                 </button>
               ))}
@@ -1054,7 +1101,12 @@ function CardCell({
         ) : null}
         {view === "library" && (status || star || rating) ? (
           <div className="cardBadges cardBadgesBottomRight">
-            {status && <span className="cardBadge status">{STATUS_LABELS[status]}</span>}
+            {status && (
+              <span className="cardBadge status" style={{ color: STATUS_COLORS[status] }}>
+                <StatusGlyph status={status} />
+                {STATUS_LABELS[status]}
+              </span>
+            )}
             {status !== "excluded" && star && (
               <span className="cardBadge stars">
                 <StarGlyph />
