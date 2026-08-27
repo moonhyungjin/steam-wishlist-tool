@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grid, List, type CellComponentProps, type RowComponentProps } from "react-window";
-type Item = { appid: number; playtimeMinutes?: number };
+type Item = { appid: number; playtimeMinutes?: number; lastPlayedTimestamp?: number | null };
 type View = "wishlist" | "library";
 type Profile = { personaName: string | null; avatarUrl: string | null; profileUrl: string | null };
 type Game = {
@@ -61,7 +61,8 @@ type SortKey =
   | "playtime-desc"
   | "achievement-desc"
   | "name-asc"
-  | "recommend-desc";
+  | "recommend-desc"
+  | "last-played-desc";
 const WISHLIST_SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "recommend-desc", label: "추천도 높은순" },
   { value: "price-asc", label: "가격 낮은순" },
@@ -75,6 +76,7 @@ const WISHLIST_SORT_OPTIONS: { value: SortKey; label: string }[] = [
 // can't actually see - achievement % and playtime are what's visible in this view.
 const LIBRARY_SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "playtime-desc", label: "플레이타임 높은순" },
+  { value: "last-played-desc", label: "최근 플레이한순" },
   { value: "achievement-desc", label: "업적 비율 높은순(미완성)" },
   { value: "name-asc", label: "이름순" },
 ];
@@ -247,6 +249,8 @@ function compareByKey(
   if (key === "review") return (gb?.reviewPositive ?? -1) - (ga?.reviewPositive ?? -1);
   if (key === "metacritic") return (gb?.metacritic ?? -1) - (ga?.metacritic ?? -1);
   if (key === "playtime-desc") return (b.playtimeMinutes ?? 0) - (a.playtimeMinutes ?? 0);
+  if (key === "last-played-desc")
+    return (b.lastPlayedTimestamp ?? 0) - (a.lastPlayedTimestamp ?? 0);
   if (key === "achievement-desc")
     return (achievementMap[b.appid]?.percent ?? -1) - (achievementMap[a.appid]?.percent ?? -1);
   if (key === "name-asc") return (ga?.name ?? "").localeCompare(gb?.name ?? "", "ko");
@@ -2146,10 +2150,13 @@ export default function Wishlist() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
       if (d.error) throw new Error(d.error);
-      const list: Item[] = (d.items ?? []).map((x: { appid: number; playtimeMinutes: number }) => ({
-        appid: x.appid,
-        playtimeMinutes: x.playtimeMinutes,
-      }));
+      const list: Item[] = (d.items ?? []).map(
+        (x: { appid: number; playtimeMinutes: number; lastPlayedTimestamp: number | null }) => ({
+          appid: x.appid,
+          playtimeMinutes: x.playtimeMinutes,
+          lastPlayedTimestamp: x.lastPlayedTimestamp,
+        }),
+      );
       setLibItems(list);
       setLibFetchedOnce(true);
       setLibEditingCreds(false);

@@ -36,7 +36,14 @@ export async function GET(request: NextRequest) {
     }
     const items = games
       .filter((g: any) => typeof g.appid === "number")
-      .map((g: any) => ({ appid: g.appid, playtimeMinutes: g.playtime_forever ?? 0 }));
+      .map((g: any) => ({
+        appid: g.appid,
+        playtimeMinutes: g.playtime_forever ?? 0,
+        // Unix seconds of the last play session's end - Valve doesn't expose purchase/acquisition
+        // date via any public API, but this comes back on every GetOwnedGames item for free, so it
+        // stands in as the closest thing to a "recency" sort library data actually supports.
+        lastPlayedTimestamp: g.rtime_last_played ? g.rtime_last_played * 1000 : null,
+      }));
     return NextResponse.json({ count: items.length, items });
   } catch (error) {
     return NextResponse.json(
