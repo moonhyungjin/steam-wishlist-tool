@@ -82,14 +82,15 @@ const LIBRARY_SORT_OPTIONS: { value: SortKey; label: string }[] = [
 ];
 // "planned" (미플레이) was dropped as a status: as a chip choice it means the same thing as no
 // status at all (미분류), so it added a redundant button without adding information.
-type PlayStatus = "playing" | "completed" | "incomplete" | "dropped";
+type PlayStatus = "playing" | "completed" | "incomplete" | "dropped" | "excluded";
 const STATUS_LABELS: Record<PlayStatus, string> = {
   playing: "플레이중",
   completed: "완료",
   incomplete: "보류",
   dropped: "하차",
+  excluded: "제외",
 };
-const STATUS_ORDER: PlayStatus[] = ["playing", "completed", "incomplete", "dropped"];
+const STATUS_ORDER: PlayStatus[] = ["playing", "completed", "incomplete", "dropped", "excluded"];
 const STATUS_STORAGE_KEY = "library:status";
 type Rating = "like" | "dislike";
 const RATING_LABELS: Record<Rating, string> = { like: "추천", dislike: "비추천" };
@@ -315,9 +316,10 @@ function prioritizeAchievementOrder(
       !filters.genreFilter.some((genre) => g?.genres.includes(genre))
     )
       return false;
-    if (filters.statusFilter.length) {
+    {
       const s = filters.statusMap[item.appid] ?? "none";
-      if (!filters.statusFilter.includes(s)) return false;
+      if (s === "excluded" && !filters.statusFilter.includes("excluded")) return false;
+      if (filters.statusFilter.length && !filters.statusFilter.includes(s)) return false;
     }
     if (filters.ratingFilter.length) {
       const r = filters.ratingMap[item.appid] ?? "none";
@@ -642,6 +644,7 @@ function GameRow({
   const rating = ratingMap[item.appid];
   const star = starMap[item.appid];
   const starPopoverRef = useRef<HTMLDivElement>(null);
+  const statusPopoverRef = useRef<HTMLDivElement>(null);
   const [editingPlaytime, setEditingPlaytime] = useState(false);
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
@@ -730,7 +733,16 @@ function GameRow({
               </span>
             )}
           </h3>
-          {view === "library" && (
+          {recommend != null ? (
+            <span
+              className={"chip recommendTag " + (recommend >= 1 ? "good" : "bad")}
+              title="이 게임의 장르와 내 장르 선호도를 비교한 점수 (실험적 기능)"
+            >
+              추천 {recommend >= 1 ? "+" : ""}
+              {Math.round((recommend - 1) * 100)}%
+            </span>
+          ) : null}
+          {view === "library" && status !== "excluded" && (
             <>
               <button
                 type="button"
@@ -863,15 +875,6 @@ function GameRow({
               리뷰 {g.reviewPositive}%
             </span>
           ) : null}
-          {recommend != null ? (
-            <span
-              className={"chip " + (recommend >= 1 ? "good" : "bad")}
-              title="이 게임의 장르와 내 장르 선호도를 비교한 점수 (실험적 기능)"
-            >
-              추천 {recommend >= 1 ? "+" : ""}
-              {Math.round((recommend - 1) * 100)}%
-            </span>
-          ) : null}
           {achievement != null && achievement.achieved > 0 ? (
             <a
               className={"chip " + scoreClass(achievement.percent)}
@@ -927,27 +930,48 @@ function GameRow({
         ) : null}
         {view === "library" ? (
           <div className="statusRow">
-            {STATUS_ORDER.map((s) => (
-              <button
-                key={s}
-                className={"statusChip " + (status === s ? "active" : "")}
-                onClick={() => onSetStatus(item.appid, status === s ? null : s)}
-              >
-                {STATUS_LABELS[s]}
-              </button>
-            ))}
-            <span className="ratingChips">
-              {(["like", "dislike"] as const).map((r) => (
+            <button
+              type="button"
+              className={"statusPicker" + (status == null ? " unset" : "")}
+              popoverTarget={`status-popover-${item.appid}`}
+              title="진행 상태"
+            >
+              {status ? STATUS_LABELS[status] : "상태 없음"}
+            </button>
+            <div
+              popover="auto"
+              id={`status-popover-${item.appid}`}
+              className="statusPopover"
+              ref={statusPopoverRef}
+            >
+              {STATUS_ORDER.map((s) => (
                 <button
-                  key={r}
-                  className={"ratingChip " + (rating === r ? "active" : "")}
-                  title={RATING_LABELS[r]}
-                  onClick={() => onSetRating(item.appid, rating === r ? null : r)}
+                  key={s}
+                  type="button"
+                  className={"statusOption " + (status === s ? "active" : "")}
+                  onClick={() => {
+                    onSetStatus(item.appid, status === s ? null : s);
+                    statusPopoverRef.current?.hidePopover();
+                  }}
                 >
-                  <ThumbGlyph down={r === "dislike"} />
+                  {STATUS_LABELS[s]}
                 </button>
               ))}
-            </span>
+            </div>
+            {status !== "excluded" && (
+              <span className="ratingChips">
+                {(["like", "dislike"] as const).map((r) => (
+                  <button
+                    key={r}
+                    className={"ratingChip " + (rating === r ? "active" : "")}
+                    title={RATING_LABELS[r]}
+                    onClick={() => onSetRating(item.appid, rating === r ? null : r)}
+                  >
+                    <ThumbGlyph down={r === "dislike"} />
+                  </button>
+                ))}
+              </span>
+            )}
           </div>
         ) : null}
       </div>
@@ -1031,13 +1055,13 @@ function CardCell({
         {view === "library" && (status || star || rating) ? (
           <div className="cardBadges cardBadgesBottomRight">
             {status && <span className="cardBadge status">{STATUS_LABELS[status]}</span>}
-            {star && (
+            {status !== "excluded" && star && (
               <span className="cardBadge stars">
                 <StarGlyph />
                 {star}
               </span>
             )}
-            {rating && (
+            {status !== "excluded" && rating && (
               <span className="cardBadge">
                 <ThumbGlyph down={rating === "dislike"} />
               </span>
@@ -1426,22 +1450,6 @@ export default function Wishlist() {
     () => ({ ...libGames, ...manualGames }),
     [libGames, manualGames],
   );
-  // Uses GENRE_LEVEL_ALLOWLIST, not the filter's broader GENRE_ALLOWLIST - see the comment on that
-  // constant. Manual entries have no playtimeMinutes (never actually tracked by Steam), so they
-  // silently contribute nothing - only real owned-and-played games level up a genre.
-  const genreXp = useMemo(() => {
-    const xp: Record<string, number> = {};
-    for (const item of combinedLibItems) {
-      const minutes = item.playtimeMinutes;
-      if (!minutes) continue;
-      const g = combinedLibGames[item.appid];
-      for (const genre of g?.genres ?? []) {
-        if (!GENRE_LEVEL_ALLOWLIST.has(genre)) continue;
-        xp[genre] = (xp[genre] ?? 0) + minutes / 60;
-      }
-    }
-    return xp;
-  }, [combinedLibItems, combinedLibGames]);
   const [manualFormOpen, setManualFormOpen] = useState(false);
 
   const items = view === "wishlist" ? wlItems : combinedLibItems;
@@ -1551,6 +1559,7 @@ export default function Wishlist() {
       completed: 0,
       incomplete: 0,
       dropped: 0,
+      excluded: 0,
       none: 0,
     };
     for (const item of combinedLibItems) {
@@ -1782,6 +1791,24 @@ export default function Wishlist() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, GENRE_FILTER_LIMIT);
   }, [items, games]);
+  // Uses GENRE_LEVEL_ALLOWLIST, not the filter's broader GENRE_ALLOWLIST - see the comment on that
+  // constant. Manual entries have no playtimeMinutes (never actually tracked by Steam), and '제외'
+  // (excluded) games don't count either - both silently contribute nothing, so only real
+  // owned-and-played, non-excluded games level up a genre.
+  const genreXp = useMemo(() => {
+    const xp: Record<string, number> = {};
+    for (const item of combinedLibItems) {
+      const minutes = item.playtimeMinutes;
+      if (!minutes) continue;
+      if (statusMap[item.appid] === "excluded") continue;
+      const g = combinedLibGames[item.appid];
+      for (const genre of g?.genres ?? []) {
+        if (!GENRE_LEVEL_ALLOWLIST.has(genre)) continue;
+        xp[genre] = (xp[genre] ?? 0) + minutes / 60;
+      }
+    }
+    return xp;
+  }, [combinedLibItems, combinedLibGames, statusMap]);
   const genreLevels = useMemo(
     () =>
       Object.entries(genreXp)
@@ -1808,6 +1835,7 @@ export default function Wishlist() {
     for (const item of combinedLibItems) {
       const hours = (item.playtimeMinutes ?? 0) / 60;
       if (!hours) continue;
+      if (statusMap[item.appid] === "excluded") continue;
       const g = combinedLibGames[item.appid];
       const affinity = gameAffinity(
         statusMap[item.appid],
@@ -1855,9 +1883,12 @@ export default function Wishlist() {
       if (view === "library" && excludeDemo && g?.isDemo) return false;
       if (genreFilter.length && !genreFilter.some((genre) => g?.genres.includes(genre)))
         return false;
-      if (view === "library" && statusFilter.length) {
+      if (view === "library") {
         const s = statusMap[item.appid] ?? "none";
-        if (!statusFilter.includes(s)) return false;
+        // '제외' hides by default regardless of other filters - it's an opt-in view, not just
+        // one more option in the whitelist below (which only kicks in once something's checked).
+        if (s === "excluded" && !statusFilter.includes("excluded")) return false;
+        if (statusFilter.length && !statusFilter.includes(s)) return false;
       }
       if (view === "library" && ratingFilter.length) {
         const r = ratingMap[item.appid] ?? "none";

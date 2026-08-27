@@ -876,22 +876,56 @@ button:disabled {
 }
 .statusRow {
   display: flex;
+  align-items: center;
   gap: 6px;
 }
-.statusChip {
+.statusPicker {
   background: #0c1420;
   border: 1px solid var(--line);
-  color: var(--muted);
+  color: var(--text);
   font-size: 11px;
   padding: 4px 10px;
   border-radius: 999px;
   cursor: pointer;
 }
-.statusChip:hover {
+.statusPicker:hover {
+  border-color: var(--accent);
+}
+.statusPicker.unset {
+  color: var(--muted);
+}
+/* display must stay off the bare selector - same reason as .starPopover, see its comment. */
+.statusPopover {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.statusPopover:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.statusPopover::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.statusOption {
+  background: #0c1420;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-align: left;
+}
+.statusOption:hover {
   border-color: var(--accent);
   color: var(--text);
 }
-.statusChip.active {
+.statusOption.active {
   background: #1b6d9b;
   border-color: var(--accent);
   color: white;
@@ -1281,17 +1315,12 @@ button:disabled {
   }
   /* The blanket button{height:44px} above (for tap targets on primary buttons) also caught these
      small pill chips, since they only set height via padding - pin it back down explicitly. */
-  .statusChip,
+  .statusPicker,
   .ratingChip {
     height: 26px;
   }
   .starBtn {
     height: 22px;
-  }
-  /* The 5 status chips + rating chips were ~2px too wide to share a line at phone width, wrapping
-     the rating chips onto their own second line - trimming chip padding buys back just enough. */
-  .statusChip {
-    padding: 4px 8px;
   }
   .ratingChips {
     gap: 4px;
