@@ -939,26 +939,23 @@ button:disabled {
   gap: 6px;
 }
 .ratingChip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
   background: #0c1420;
   border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0;
-  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
   cursor: pointer;
+  opacity: 0.55;
 }
 .ratingChip:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  opacity: 0.85;
 }
 .ratingChip.active {
-  background: rgba(102, 192, 244, 0.16);
   border-color: var(--accent);
-  color: var(--accent);
+  background: rgba(102, 192, 244, 0.14);
+  opacity: 1;
 }
 .starPicker {
   display: inline-flex;
@@ -1320,9 +1317,10 @@ button:disabled {
     margin-top: 0;
     gap: 4px;
   }
-  /* The blanket button{height:44px} above (for tap targets on primary buttons) also caught this
-     small pill chip, since it only sets height via padding - pin it back down explicitly. */
-  .statusPicker {
+  /* The blanket button{height:44px} above (for tap targets on primary buttons) also caught these
+     small pill chips, since they only set height via padding - pin it back down explicitly. */
+  .statusPicker,
+  .ratingChip {
     height: 26px;
   }
   .starBtn {
