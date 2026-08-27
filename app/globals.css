@@ -944,16 +944,20 @@ button:disabled {
   justify-content: center;
   width: 26px;
   height: 26px;
-  background: transparent;
-  border: none;
+  background: #0c1420;
+  border: 1px solid var(--line);
+  border-radius: 0;
   padding: 0;
   color: var(--muted);
   cursor: pointer;
 }
 .ratingChip:hover {
+  border-color: var(--accent);
   color: var(--accent);
 }
 .ratingChip.active {
+  background: rgba(102, 192, 244, 0.16);
+  border-color: var(--accent);
   color: var(--accent);
 }
 .starPicker {
