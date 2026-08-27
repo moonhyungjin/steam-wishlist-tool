@@ -946,7 +946,7 @@ button:disabled {
   height: 26px;
   background: #0c1420;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 4px;
   padding: 0;
   color: var(--muted);
   cursor: pointer;
