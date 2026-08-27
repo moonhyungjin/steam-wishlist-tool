@@ -1230,6 +1230,12 @@ async function enrichGames(
   appids: number[],
   existingGames: Record<number, Game>,
   onProgress: (loaded: Record<number, Game>) => void,
+  // A plain page load only needs to fill in whatever's missing from the cache - but an explicit
+  // "새로고침"/"가져오기" is the user asking for current data, so it has to re-fetch appids that
+  // are already cached too. Without this, price/discount/review fields (which do change over
+  // time, unlike name/genres) would never update past their first fetch no matter how many times
+  // the user refreshes.
+  forceRefresh = false,
 ): Promise<Record<number, Game>> {
   // Build a new object per update instead of mutating in place - callers pass this straight into
   // setState, and mutating the same reference across calls means React (and any useMemo keyed on
@@ -1240,7 +1246,7 @@ async function enrichGames(
     const d = await r.json();
     return r.ok ? (d.games ?? {}) : null;
   }
-  const missingInitial = appids.filter((id) => !(id in loaded));
+  const missingInitial = appids.filter((id) => forceRefresh || !(id in loaded));
   for (let i = 0; i < missingInitial.length; i += CHUNK) {
     const newGames = await fetchChunk(missingInitial.slice(i, i + CHUNK));
     if (!newGames) continue;
@@ -1249,7 +1255,9 @@ async function enrichGames(
   }
   // Only one short retry: some appids (delisted, tools, soundtracks, redirected listings) never
   // resolve no matter how many times you ask, and IStoreBrowseService hasn't shown any sign of
-  // being rate-limited in practice - so there's nothing to gain from hammering it further.
+  // being rate-limited in practice - so there's nothing to gain from hammering it further. Uses
+  // the same "not yet loaded" check regardless of forceRefresh - the first pass already covered
+  // every appid when forcing, so this retry is only ever for genuinely failed fetches.
   for (let attempt = 0; attempt < 1; attempt++) {
     const missing = appids.filter((id) => !(id in loaded));
     if (!missing.length) break;
@@ -2041,11 +2049,16 @@ export default function Wishlist() {
       setWlProgress({ done: Object.keys(existing).length, total: list.length });
       persistTo(WISHLIST_CACHE_KEY, id, list, existing);
       const appids = list.map((x) => x.appid);
-      const loaded = await enrichGames(appids, existing, (cur) => {
-        setWlGames(cur);
-        setWlProgress({ done: Object.keys(cur).length, total: list.length });
-        persistWishlistThrottled(list, cur);
-      });
+      const loaded = await enrichGames(
+        appids,
+        existing,
+        (cur) => {
+          setWlGames(cur);
+          setWlProgress({ done: Object.keys(cur).length, total: list.length });
+          persistWishlistThrottled(list, cur);
+        },
+        true,
+      );
       persistTo(WISHLIST_CACHE_KEY, id, list, loaded);
       enrichMetacritic(appids, loaded, (cur) => {
         setWlGames(cur);
@@ -2122,11 +2135,16 @@ export default function Wishlist() {
       setLibProgress({ done: Object.keys(existing).length, total: list.length });
       persistTo(LIBRARY_CACHE_KEY, id, list, existing);
       const appids = list.map((x) => x.appid);
-      const loaded = await enrichGames(appids, existing, (cur) => {
-        setLibGames(cur);
-        setLibProgress({ done: Object.keys(cur).length, total: list.length });
-        persistLibraryThrottled(list, cur);
-      });
+      const loaded = await enrichGames(
+        appids,
+        existing,
+        (cur) => {
+          setLibGames(cur);
+          setLibProgress({ done: Object.keys(cur).length, total: list.length });
+          persistLibraryThrottled(list, cur);
+        },
+        true,
+      );
       persistTo(LIBRARY_CACHE_KEY, id, list, loaded);
       // Library doesn't show or sort by metacritic/review anywhere, so there's nothing to spend
       // that rate-limited endpoint's budget on here - only the wishlist view enriches it.
