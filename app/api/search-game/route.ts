@@ -17,12 +17,13 @@ export async function GET(request: NextRequest) {
   const data = await response.json();
 
   const items = (data.items ?? [])
-    .filter((it: { type: string }) => it.type === "app")
+    .filter((it: { type: string }) => it.type === "app" || it.type === "dlc")
     .slice(0, 8)
-    .map((it: { id: number; name: string; tiny_image?: string }) => ({
+    .map((it: { id: number; name: string; tiny_image?: string; type: string }) => ({
       appid: it.id,
       name: it.name,
       image: it.tiny_image ?? null,
+      isDlc: it.type === "dlc",
     }));
   return NextResponse.json({ items });
 }

@@ -1110,7 +1110,7 @@ function ManualAddPanel({
   const [manualQuery, setManualQuery] = useState("");
   const [manualPlatformChoice, setManualPlatformChoice] = useState<ManualPlatform>("epic");
   const [manualResults, setManualResults] = useState<
-    { appid: number; name: string; image: string | null }[]
+    { appid: number; name: string; image: string | null; isDlc?: boolean }[]
   >([]);
   const [manualSearching, setManualSearching] = useState(false);
   const [manualAdding, setManualAdding] = useState(false);
@@ -1241,6 +1241,7 @@ function ManualAddPanel({
               >
                 {r.image && <img src={r.image} alt="" />}
                 <span>{r.name}</span>
+                {r.isDlc && <span className="dlcTag">DLC</span>}
               </button>
             </li>
           ))}
