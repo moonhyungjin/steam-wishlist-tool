@@ -2839,7 +2839,7 @@ export default function Wishlist() {
               disabled={loading}
               title={view === "wishlist" ? "찜목록 새로고침" : "라이브러리 새로고침"}
             >
-              ⟳
+              <span className={loading ? "spinning" : ""}>⟳</span>
             </button>
             <div className="layoutToggle">
               <button

@@ -417,6 +417,18 @@ button:disabled {
   border-color: var(--accent);
   color: var(--accent);
 }
+.refreshBtn .spinning {
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 .cardCellOuter {
   box-sizing: border-box;
   padding: 7px;
