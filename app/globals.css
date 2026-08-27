@@ -937,7 +937,6 @@ button:disabled {
 .ratingChips {
   display: flex;
   gap: 6px;
-  margin-left: auto;
 }
 .ratingChip {
   display: inline-flex;
