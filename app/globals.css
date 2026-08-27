@@ -932,9 +932,7 @@ button:disabled {
   color: var(--text);
 }
 .statusOption.active {
-  background: #1b6d9b;
   border-color: var(--accent);
-  color: white;
 }
 .ratingChips {
   display: flex;
@@ -947,21 +945,17 @@ button:disabled {
   justify-content: center;
   width: 26px;
   height: 26px;
-  background: #0c1420;
-  border: 1px solid var(--line);
-  border-radius: 0;
+  background: transparent;
+  border: none;
   padding: 0;
   color: var(--muted);
   cursor: pointer;
 }
 .ratingChip:hover {
-  border-color: var(--accent);
   color: var(--accent);
 }
 .ratingChip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
+  color: var(--accent);
 }
 .starPicker {
   display: inline-flex;

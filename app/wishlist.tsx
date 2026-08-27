@@ -988,19 +988,18 @@ function GameRow({
                   key={s}
                   type="button"
                   className={"statusOption " + (status === s ? "active" : "")}
-                  style={
-                    status === s
-                      ? { background: STATUS_COLORS[s], borderColor: STATUS_COLORS[s] }
-                      : undefined
-                  }
+                  style={{
+                    color: STATUS_COLORS[s],
+                    ...(status === s
+                      ? { background: STATUS_COLORS[s] + "29", borderColor: STATUS_COLORS[s] }
+                      : {}),
+                  }}
                   onClick={() => {
                     onSetStatus(item.appid, status === s ? null : s);
                     statusPopoverRef.current?.hidePopover();
                   }}
                 >
-                  <span style={{ color: status === s ? "white" : STATUS_COLORS[s] }}>
-                    <StatusGlyph status={s} />
-                  </span>
+                  <StatusGlyph status={s} />
                   {STATUS_LABELS[s]}
                 </button>
               ))}
