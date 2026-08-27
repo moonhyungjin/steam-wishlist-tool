@@ -90,7 +90,6 @@ const STATUS_LABELS: Record<PlayStatus, string> = {
 const STATUS_ORDER: PlayStatus[] = ["playing", "completed", "incomplete", "dropped"];
 const STATUS_STORAGE_KEY = "library:status";
 type Rating = "like" | "dislike";
-const RATING_EMOJI: Record<Rating, string> = { like: "👍", dislike: "👎" };
 const RATING_LABELS: Record<Rating, string> = { like: "추천", dislike: "비추천" };
 const RATING_STORAGE_KEY = "library:rating";
 // "별점" - purely personal enjoyment, separate from whether I'd recommend it to someone else.
@@ -483,6 +482,29 @@ function openLibraryOrStore(appid: number) {
   };
   window.addEventListener("blur", onBlur);
   window.location.href = `steam://nav/games/details/${appid}`;
+}
+// Emoji glyphs render inconsistently across OS/font (and can't be recolored to match the theme
+// like every other icon in this app), so 추천/비추천 gets the same inline-SVG treatment as
+// everything else instead of relying on 👍/👎.
+function ThumbGlyph({ down }: { down?: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {down ? (
+        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+      ) : (
+        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+      )}
+    </svg>
+  );
 }
 // A plumper star polygon (inner/outer radius ratio ~0.5, vs. the classic ~0.38) traced with a
 // round-joined stroke in the same color as the fill - that combination is what rounds off both the
@@ -918,7 +940,7 @@ function GameRow({
                   title={RATING_LABELS[r]}
                   onClick={() => onSetRating(item.appid, rating === r ? null : r)}
                 >
-                  {RATING_EMOJI[r]}
+                  <ThumbGlyph down={r === "dislike"} />
                 </button>
               ))}
             </span>
@@ -1011,7 +1033,11 @@ function CardCell({
                 {star}
               </span>
             )}
-            {rating && <span className="cardBadge">{RATING_EMOJI[rating]}</span>}
+            {rating && (
+              <span className="cardBadge">
+                <ThumbGlyph down={rating === "dislike"} />
+              </span>
+            )}
           </div>
         ) : null}
       </div>
@@ -2656,7 +2682,7 @@ export default function Wishlist() {
                     checked={ratingFilter.includes(r)}
                     onChange={() => toggleRatingFilter(r)}
                   />
-                  {RATING_EMOJI[r]} {RATING_LABELS[r]} ({ratingCounts[r]})
+                  <ThumbGlyph down={r === "dislike"} /> {RATING_LABELS[r]} ({ratingCounts[r]})
                 </label>
               ))}
               <label className="sortCheck">

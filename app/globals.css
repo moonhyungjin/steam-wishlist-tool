@@ -902,9 +902,11 @@ button:disabled {
   margin-left: auto;
 }
 .ratingChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #0c1420;
   border: 1px solid var(--line);
-  font-size: 13px;
   line-height: 1;
   padding: 4px 8px;
   border-radius: 999px;
