@@ -242,6 +242,20 @@ h1 {
 .sortLabel .fieldChevron {
   margin-right: 6px;
 }
+.filterActiveBadge {
+  flex: none;
+  margin-left: 6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0c1420;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 16px;
+  text-align: center;
+}
 .helpIcon {
   display: inline-flex;
   align-items: center;
@@ -573,13 +587,27 @@ button:disabled {
 }
 /* Shared row anatomy for both chart rows below - label, then the mark, then the value. */
 .chartLabel {
-  flex: 0 0 64px;
+  flex: 0 0 108px;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
   color: var(--muted);
+}
+.genreGlyph {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+.genreLevelBadge .genreGlyph {
+  width: 13px;
+  height: 13px;
+  color: var(--accent);
 }
 .chartValue {
   flex: none;
@@ -590,7 +618,7 @@ button:disabled {
 /* Fixed to roughly 8 rows tall - past that, scroll rather than truncate, so every genre stays
    reachable instead of silently dropping behind a "+N more" count. */
 .genreChartScroll {
-  max-height: 216px;
+  max-height: min(60vh, 480px);
   overflow-y: auto;
   padding-right: 10px;
   scrollbar-width: thin;
@@ -624,11 +652,52 @@ button:disabled {
   background: #4b5b74;
   overflow: hidden;
 }
+/* width reads from a custom property (set inline) rather than being set as inline width itself -
+   an inline `style="width: ..."` would always outrank the @starting-style block below (inline
+   beats any stylesheet rule regardless of origin), so the bar would already be at its final width
+   on first paint with nothing to transition from. Routing the dynamic value through a custom
+   property keeps the actual `width` declaration - both its normal and @starting-style value - in
+   the same stylesheet, so the transition has something to animate between. */
 .chartBar {
   display: block;
   height: 100%;
   border-radius: 4px;
   background: var(--accent);
+  width: var(--bar-pct, 0%);
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  @starting-style {
+    width: 0%;
+  }
+}
+.genreRadar {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  margin: 4px auto 12px;
+  flex: none;
+}
+.radarRing {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.radarSpoke {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.radarShape {
+  fill: rgba(102, 192, 244, 0.25);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  transition: opacity 0.4s ease;
+  @starting-style {
+    opacity: 0;
+  }
+}
+.radarLabel {
+  font-size: 9px;
+  fill: var(--muted);
 }
 /* Diverging bar - centered on the 0% baseline, growing left (bad) or right (good) from it. */
 .divergeRow {
@@ -664,6 +733,11 @@ button:disabled {
 .divergeBar {
   display: block;
   height: 100%;
+  width: var(--bar-pct, 0%);
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  @starting-style {
+    width: 0%;
+  }
 }
 .divergeBar.bad {
   background: #ef7a86;
@@ -692,22 +766,54 @@ button:disabled {
 .genreLevelBadge b {
   color: var(--accent);
 }
-/* display must stay off the bare selector, same reason as .starPopover - see its comment. */
+/* display must stay off the bare selector, same reason as .starPopover - see its comment.
+   No position/top/left is set anywhere here - the native Popover API's UA default
+   (position: fixed; inset: 0; margin: auto) already viewport-centers it, so growing this into
+   a "dedicated screen" is a pure sizing change with no positioning logic to add. */
 .genreLevelPopover {
-  width: 300px;
+  width: min(720px, 94vw);
+  max-height: min(640px, 86vh);
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 16px;
+  padding: 18px 20px;
   color: var(--text);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    display 0.2s allow-discrete,
+    overlay 0.2s allow-discrete;
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
 }
 .genreLevelPopover:popover-open {
   display: flex;
   flex-direction: column;
+  opacity: 1;
+  transform: none;
 }
 .genreLevelPopover::backdrop {
   background: rgba(0, 0, 0, 0.4);
+  transition: background-color 0.2s ease;
+  @starting-style {
+    background-color: transparent;
+  }
+}
+.genreLevelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.genreLevelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: bold;
 }
 .genreTabRow {
   display: flex;
@@ -951,23 +1057,25 @@ button:disabled {
   gap: 6px;
 }
 .ratingChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #0c1420;
   border: 1px solid var(--line);
-  font-size: 13px;
   line-height: 1;
   padding: 4px 8px;
   border-radius: 999px;
   cursor: pointer;
-  opacity: 0.55;
+  color: var(--muted);
 }
 .ratingChip:hover {
   border-color: var(--accent);
-  opacity: 0.85;
+  color: var(--accent);
 }
 .ratingChip.active {
   border-color: var(--accent);
   background: rgba(102, 192, 244, 0.14);
-  opacity: 1;
+  color: var(--accent);
 }
 .starPicker {
   display: inline-flex;
@@ -1085,6 +1193,10 @@ button:disabled {
 }
 .chip.recommendTag {
   flex: none;
+  margin-left: auto;
+  background: rgba(245, 208, 110, 0.16);
+  color: #f5d06e;
+  border: 1px solid #f5d06e;
 }
 .chip.playtimeEdit input::-webkit-outer-spin-button,
 .chip.playtimeEdit input::-webkit-inner-spin-button {
@@ -1335,6 +1447,13 @@ button:disabled {
   .ratingChip {
     height: 26px;
   }
+  .filterCloseBtn {
+    height: 24px;
+  }
+  .genreLevelBadge,
+  .genreTab {
+    height: auto;
+  }
   .starBtn {
     height: 22px;
   }
@@ -1381,5 +1500,15 @@ button:disabled {
     border-radius: 0;
     overflow-y: auto;
     background: var(--bg);
+  }
+  .genreLevelPopover:popover-open {
+    width: 100vw;
+    max-height: 100vh;
+    height: 100vh;
+    margin: 0;
+    border-radius: 0;
+  }
+  .genreChartScroll {
+    max-height: none;
   }
 }

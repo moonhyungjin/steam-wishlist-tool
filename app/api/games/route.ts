@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { STEAM_TAG_NAMES } from "../../steamTags";
 
-let tagMapCache: Record<number, string> | null = null;
-async function getTagMap(): Promise<Record<number, string>> {
-  if (tagMapCache) return tagMapCache;
+// Seeded from the static snapshot so the common case never needs a network round-trip; only
+// grows at runtime if a request hits a tagid the snapshot doesn't have (Valve added it since).
+let tagMapCache: Record<number, string> = { ...STEAM_TAG_NAMES };
+async function resolveTagNames(ids: number[]): Promise<Record<number, string>> {
+  if (ids.every((id) => id in tagMapCache)) return tagMapCache;
   try {
     const r = await fetch(
       "https://api.steampowered.com/IStoreService/GetTagList/v1/?language=koreana",
@@ -11,13 +14,12 @@ async function getTagMap(): Promise<Record<number, string>> {
       },
     );
     const data = await r.json();
-    const map: Record<number, string> = {};
-    for (const t of data.response?.tags ?? []) map[t.tagid] = t.name;
-    if (Object.keys(map).length) tagMapCache = map;
-    return map;
+    for (const t of data.response?.tags ?? []) tagMapCache[t.tagid] = t.name;
   } catch {
-    return {};
+    // Keep going with whatever the snapshot already covers - a handful of unnamed tags just
+    // won't show up in genres/genreIds below, not worth failing the whole request over.
   }
+  return tagMapCache;
 }
 
 export async function GET(request: NextRequest) {
@@ -36,7 +38,6 @@ export async function GET(request: NextRequest) {
   if (!appids.length || appids.length > 200)
     return NextResponse.json({ error: "appids는 1~200개까지입니다." }, { status: 400 });
 
-  const tagMap = await getTagMap();
   const inputJson = JSON.stringify({
     ids: appids.map((appid) => ({ appid })),
     context: { language: "koreana", country_code: "KR" },
@@ -56,9 +57,12 @@ export async function GET(request: NextRequest) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) return NextResponse.json({ games: {} });
   const data = await response.json();
+  const storeItems = data.response?.store_items ?? [];
+  const allTagIds = [...new Set(storeItems.flatMap((item: any) => item.tagids ?? []))] as number[];
+  const tagMap = await resolveTagNames(allTagIds);
 
   const result: Record<string, unknown> = {};
-  for (const item of data.response?.store_items ?? []) {
+  for (const item of storeItems) {
     if (!item?.success) continue;
     const appid = item.appid;
     const opt = item.best_purchase_option;
@@ -78,10 +82,11 @@ export async function GET(request: NextRequest) {
         ? "https://shared.akamai.steamstatic.com/store_item_assets/" +
           item.assets.asset_url_format.replace("${FILENAME}", headerFile)
         : null;
-    const genres = (item.tagids ?? [])
-      .map((id: number) => tagMap[id])
-      .filter(Boolean)
-      .slice(0, 15);
+    // Parallel arrays, same order/length - genres is names (display), genreIds is the raw tagids
+    // (used for allowlist matching client-side, since tag names alone are one Valve rename away
+    // from silently breaking the string-based GENRE_ALLOWLIST/GENRE_LEVEL_ALLOWLIST matches).
+    const tagIds: number[] = (item.tagids ?? []).filter((id: number) => tagMap[id]).slice(0, 15);
+    const genres = tagIds.map((id: number) => tagMap[id]);
     const finalPrice = opt ? Number(opt.final_price_in_cents) : null;
     const discountEndTimestamp = opt?.active_discounts?.[0]?.discount_end_date
       ? opt.active_discounts[0].discount_end_date * 1000
@@ -106,6 +111,7 @@ export async function GET(request: NextRequest) {
       name: item.name ?? `Steam App ${appid}`,
       headerImage,
       genres,
+      genreIds: tagIds,
       releaseDate: releaseTimestamp
         ? new Date(releaseTimestamp).toLocaleDateString("ko-KR", {
             year: "numeric",
