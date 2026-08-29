@@ -8,8 +8,13 @@ export async function GET(request: NextRequest) {
   const term = request.nextUrl.searchParams.get("term")?.trim();
   if (!term || term.length < 2) return NextResponse.json({ items: [] });
 
+  // Steam's storesearch treats a literal "-" as an exclusion operator (searching the exact,
+  // dash-including title of a DLC/expansion - e.g. "Songs of Conquest - Yulan" - returns zero
+  // results, since it reads as "exclude Yulan"), so a naive search for a game's real display
+  // name can silently come back empty. Swapping it for a space keeps the surrounding words intact
+  // for fuzzy matching without triggering the operator.
   const url = new URL("https://store.steampowered.com/api/storesearch/");
-  url.searchParams.set("term", term);
+  url.searchParams.set("term", term.replace(/-/g, " "));
   url.searchParams.set("cc", "kr");
   url.searchParams.set("l", "koreana");
   const response = await fetch(url, { cache: "no-store" });

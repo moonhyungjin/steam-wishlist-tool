@@ -25,6 +25,11 @@ type SyncData = {
   manualPlatform?: Record<number, string>;
   manualGames?: Record<number, unknown>;
   manualPlaytime?: Record<number, number>;
+  // Appids deleted on some device - see the client-side comment on MANUAL_REMOVED_STORAGE_KEY.
+  // Plain full-replace like everything else here - the client is responsible for unioning this
+  // with whatever it last pulled before pushing again (see syncFromServer), so a device that
+  // hasn't pulled a deletion made elsewhere yet doesn't overwrite it with a shorter list.
+  manualRemovedIds?: number[];
 };
 
 export async function GET(request: NextRequest) {
@@ -52,6 +57,7 @@ export async function POST(request: NextRequest) {
     manualPlatform,
     manualGames,
     manualPlaytime,
+    manualRemovedIds,
   }: SyncData = body;
   await client.set(`sync:${steamId}`, {
     statusMap,
@@ -61,6 +67,7 @@ export async function POST(request: NextRequest) {
     manualPlatform,
     manualGames,
     manualPlaytime,
+    manualRemovedIds,
   });
   return NextResponse.json({ ok: true });
 }

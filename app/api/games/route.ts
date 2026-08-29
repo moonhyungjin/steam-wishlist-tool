@@ -147,6 +147,10 @@ export async function GET(request: NextRequest) {
       koreanSupported,
       adultContent,
       isDemo,
+      // This store-page lookup has no reliable DLC signal (unlike the manual-add search route,
+      // which gets an explicit "dlc" type straight from Steam's public search) - always false
+      // here; real detection only happens at the point a DLC search result gets added.
+      isDlc: false,
     };
   }
   return NextResponse.json({ games: result });

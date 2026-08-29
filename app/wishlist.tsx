@@ -36,6 +36,10 @@ type Game = {
   koreanSupported: boolean;
   adultContent: boolean;
   isDemo: boolean;
+  // Only ever known true via the manual-add search flow (Steam's public storesearch tells DLC
+  // apart from base games directly) - /api/games (the store-page lookup used for owned/wishlist
+  // games) has no reliable way to tell, so it always reports false there.
+  isDlc: boolean;
 };
 // Placeholder for a manually-added game with no Steam match - every other field just means "no
 // data available" rather than "really zero/false", since none of it was actually looked up.
@@ -62,6 +66,7 @@ function blankGame(appid: number, name: string): Game {
     koreanSupported: false,
     adultContent: false,
     isDemo: false,
+    isDlc: false,
   };
 }
 type SortKey =
@@ -76,10 +81,10 @@ type SortKey =
   | "recommend-desc"
   | "last-played-desc";
 const WISHLIST_SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "recommend-desc", label: "추천도 높은순" },
   { value: "price-asc", label: "가격 낮은순" },
   { value: "review", label: "긍정 비율 높은순" },
   { value: "metacritic", label: "메타크리틱 높은순" },
+  { value: "recommend-desc", label: "추천도 높은순" },
   { value: "release-desc", label: "출시일 최신순" },
   { value: "discount-end-asc", label: "할인 종료 임박순" },
 ];
@@ -216,8 +221,15 @@ const LIB_STEAM_ID_STORAGE_KEY = "library:steamid";
 // by name against Steam's public search purely for metadata (image/genres/metacritic), completely
 // unrelated to whether this Steam account actually owns them. Kept in their own storage key, apart
 // from the Steam-fetched library cache, so a library refresh never wipes them.
-type ManualPlatform = "epic" | "stove" | "other";
+// "steam" here means a Steam-owned appid (usually DLC) that didn't come through the normal
+// GetOwnedGames sync and has to be tracked by hand instead - distinct from the *absence* of a
+// manualPlatform entry, which implicitly means "steam" too (a genuinely-synced library item).
+// Both resolve to the same "steam" bucket everywhere platform is counted/filtered (see
+// platformCounts's `manualPlatform[item.appid] ?? "steam"` pattern) - the two states are only
+// ever different in whether there's a remove (×) button and whether it's manually tracked at all.
+type ManualPlatform = "steam" | "epic" | "stove" | "other";
 const MANUAL_PLATFORM_LABELS: Record<ManualPlatform, string> = {
+  steam: "Steam",
   epic: "Epic",
   stove: "STOVE",
   other: "기타",
@@ -227,6 +239,14 @@ const MANUAL_GAMES_STORAGE_KEY = "library:manualGames";
 // Manual entries have no Steam-tracked playtime, so without this they silently contribute
 // nothing to genre levels/taste - letting the user type a rough estimate lets them opt in.
 const MANUAL_PLAYTIME_STORAGE_KEY = "library:manualPlaytime";
+// syncFromServer's "prefer local over stale/empty server data" check only ever protects against
+// a fully-empty server response - if the server still has a manual entry you just deleted (its
+// pushSync hadn't landed, or silently failed), the server's manualGames/manualPlatform is still
+// non-empty and unconditionally overwrites local, resurrecting the deletion. Tracks appids
+// deleted on this device so any still-stale entry gets filtered back out of whatever the server
+// returns, rather than trusting a plain non-empty-wins merge. Cleared for an appid the moment
+// it's re-added locally, so re-adding the same game later isn't permanently blocked.
+const MANUAL_REMOVED_STORAGE_KEY = "library:manualRemoved";
 // Bump this whenever the Game shape changes - otherwise old cached entries silently keep
 // missing the new fields forever, since "resume from cache" treats them as already loaded.
 const CACHE_VERSION = 12;
@@ -334,6 +354,7 @@ function prioritizeAchievementOrder(
     platformFilter: ("steam" | ManualPlatform)[];
     excludeAdult: boolean;
     excludeDemo: boolean;
+    dlcOnly: boolean;
     statusMap: Record<number, PlayStatus>;
     ratingMap: Record<number, Rating>;
     starMap: Record<number, StarRating>;
@@ -346,6 +367,7 @@ function prioritizeAchievementOrder(
     if (q && !(g?.name ?? "").toLowerCase().includes(q)) return false;
     if (filters.excludeAdult && g?.adultContent) return false;
     if (filters.excludeDemo && g?.isDemo) return false;
+    if (filters.dlcOnly && !g?.isDlc) return false;
     if (
       filters.genreFilter.length &&
       !filters.genreFilter.some((id) => (g?.genreIds ?? []).includes(id))
@@ -1166,8 +1188,10 @@ function GameRow({
   const linkable = item.appid > 0;
   // A manual entry is never actually owned in this account's library even when it matched a real
   // Steam appid, so the steam:// launch-the-installed-client attempt would just burn its timeout
-  // for nothing - go straight to the store page instead.
-  const tryLibrary = view === "library" && !manual;
+  // for nothing - go straight to the store page instead. Except manual === "steam": that one
+  // really is Steam-owned (just added by hand because it didn't come through the normal sync), so
+  // the client launch is worth attempting the same as a genuinely-synced item.
+  const tryLibrary = view === "library" && (!manual || manual === "steam");
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
       <div className="coverWrap">
@@ -1346,6 +1370,7 @@ function GameRow({
               </button>
             </span>
           )}
+          {g?.isDlc && <span className="dlcTag">DLC</span>}
           {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
           {view === "wishlist" && g?.discountPercent ? (
             <a
@@ -1405,7 +1430,7 @@ function GameRow({
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
             </a>
-          ) : view === "library" && achievement === undefined && !manual ? (
+          ) : view === "library" && achievement === undefined && (!manual || manual === "steam") ? (
             <button
               type="button"
               className="chip pending"
@@ -1549,25 +1574,28 @@ function CardCell({
             ) : null}
           </div>
         ) : null}
-        {view === "library" && manual ? (
+        {(view === "library" && manual) || g?.isDlc ? (
           <div className="cardBadges">
-            <span className="cardBadge manual">
-              {/* The only clickable thing in this overlay - stopped from bubbling up into the
-                  whole-card link, which would otherwise also navigate away on click. */}
-              {MANUAL_PLATFORM_LABELS[manual]}
-              <button
-                type="button"
-                className="manualRemoveBtn"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onRemoveManual(item.appid);
-                }}
-                title="목록에서 제거"
-              >
-                ×
-              </button>
-            </span>
+            {view === "library" && manual && (
+              <span className="cardBadge manual">
+                {/* The only clickable thing in this overlay - stopped from bubbling up into the
+                    whole-card link, which would otherwise also navigate away on click. */}
+                {MANUAL_PLATFORM_LABELS[manual]}
+                <button
+                  type="button"
+                  className="manualRemoveBtn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveManual(item.appid);
+                  }}
+                  title="목록에서 제거"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {g?.isDlc && <span className="cardBadge dlcTag">DLC</span>}
           </div>
         ) : null}
         {view === "library" && (status || star || rating) ? (
@@ -1663,6 +1691,12 @@ function ManualAddPanel({
 }) {
   const [manualQuery, setManualQuery] = useState("");
   const [manualPlatformChoice, setManualPlatformChoice] = useState<ManualPlatform>("epic");
+  // Steam's public search "type" field is unreliable for real DLC - e.g. "Songs of Conquest -
+  // Yulan" (a genuine DLC pack) comes back as type "app", not "dlc", so isDlc from the search
+  // result alone misses real cases. This is a manual override the user can check before adding,
+  // OR'd with whatever the search result itself reported (so a result Steam does correctly flag
+  // still shows DLC even if this happens to be unchecked).
+  const [manualIsDlcChoice, setManualIsDlcChoice] = useState(false);
   const [manualResults, setManualResults] = useState<
     { appid: number; name: string; image: string | null; isDlc?: boolean }[]
   >([]);
@@ -1707,11 +1741,13 @@ function ManualAddPanel({
     setLastAddedName(name);
     setTimeout(() => setLastAddedName((cur) => (cur === name ? null : cur)), 2000);
   }
-  async function addManualMatched(appid: number, name: string) {
+  async function addManualMatched(appid: number, name: string, isDlc: boolean) {
     setManualAdding(true);
     try {
       const loaded = await enrichGames([appid], {}, () => {});
-      const game = loaded[appid] ?? blankGame(appid, name);
+      // /api/games (the store-page lookup enrichGames uses) has no DLC signal of its own - only
+      // the search step that found this result knows, so carry it over explicitly here.
+      const game = { ...(loaded[appid] ?? blankGame(appid, name)), isDlc };
       onAdd(appid, manualPlatformChoice, game);
       confirmManualAdd(name);
     } finally {
@@ -1723,7 +1759,7 @@ function ManualAddPanel({
     if (!name) return;
     // Negative so it can never collide with a real Steam appid.
     const appid = -Date.now();
-    onAdd(appid, manualPlatformChoice, blankGame(appid, name));
+    onAdd(appid, manualPlatformChoice, { ...blankGame(appid, name), isDlc: manualIsDlcChoice });
     confirmManualAdd(name);
   }
   return (
@@ -1770,6 +1806,17 @@ function ManualAddPanel({
               </option>
             ))}
           </select>
+          <label
+            className="manualDlcCheck"
+            title="Steam 검색이 DLC로 인식하지 못하는 경우가 있어서(예: 확장팩이 일반 게임으로 분류됨) 직접 표시할 수 있습니다"
+          >
+            <input
+              type="checkbox"
+              checked={manualIsDlcChoice}
+              onChange={() => setManualIsDlcChoice((v) => !v)}
+            />
+            DLC
+          </label>
           <button
             type="button"
             className="smallBtn"
@@ -1790,7 +1837,7 @@ function ManualAddPanel({
               <button
                 type="button"
                 className="manualResultBtn"
-                onClick={() => addManualMatched(r.appid, r.name)}
+                onClick={() => addManualMatched(r.appid, r.name, !!r.isDlc || manualIsDlcChoice)}
                 disabled={manualAdding}
               >
                 {r.image && <img src={r.image} alt="" />}
@@ -1939,6 +1986,12 @@ export default function Wishlist() {
   const [manualPlatform, setManualPlatform] = useState<Record<number, ManualPlatform>>({});
   const [manualGames, setManualGames] = useState<Record<number, Game>>({});
   const [manualPlaytime, setManualPlaytime] = useState<Record<number, number>>({});
+  const [manualRemovedIds, setManualRemovedIds] = useState<number[]>([]);
+  function persistManualRemoved(ids: number[]) {
+    try {
+      localStorage.setItem(MANUAL_REMOVED_STORAGE_KEY, JSON.stringify(ids));
+    } catch {}
+  }
   function persistManual(
     platformValue: Record<number, ManualPlatform>,
     gamesValue: Record<number, Game>,
@@ -2020,6 +2073,7 @@ export default function Wishlist() {
   }
   const [excludeAdult, setExcludeAdult] = useState(false);
   const [excludeDemo, setExcludeDemo] = useState(false);
+  const [dlcOnly, setDlcOnly] = useState(false);
   // Only 필터/정렬/장르 start open - the rest (한국어/플랫폼/진행 상태/별점/추천) default collapsed
   // so the sidebar doesn't open on a wall of expanded checkbox lists.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
@@ -2173,6 +2227,32 @@ export default function Wishlist() {
     return count;
   }, [wlItems, wlGames]);
   const [achievementMap, setAchievementMap] = useState<Record<number, AchievementInfo | null>>({});
+  // syncFromServer (below) is called once from the mount-only hydration effect, whose closure is
+  // frozen at whatever these seven maps were at the moment that effect's callback was created -
+  // the empty initial state, before localStorage hydration even runs. Reading the closed-over
+  // state directly there would make the "prefer local over stale/empty server data" check always
+  // see length===0 and let the server unconditionally win - e.g. resurrecting a manual game you
+  // just deleted, if the delete's fire-and-forget pushSync hadn't reached the server yet by the
+  // time you reloaded. These refs always hold the latest value regardless of when the closure
+  // reading them was created, so syncFromServer reads from them instead of the state directly.
+  const statusMapRef = useRef(statusMap);
+  const ratingMapRef = useRef(ratingMap);
+  const starMapRef = useRef(starMap);
+  const achievementMapRef = useRef(achievementMap);
+  const manualPlatformRef = useRef(manualPlatform);
+  const manualGamesRef = useRef(manualGames);
+  const manualPlaytimeRef = useRef(manualPlaytime);
+  const manualRemovedIdsRef = useRef(manualRemovedIds);
+  useEffect(() => {
+    statusMapRef.current = statusMap;
+    ratingMapRef.current = ratingMap;
+    starMapRef.current = starMap;
+    achievementMapRef.current = achievementMap;
+    manualPlatformRef.current = manualPlatform;
+    manualGamesRef.current = manualGames;
+    manualPlaytimeRef.current = manualPlaytime;
+    manualRemovedIdsRef.current = manualRemovedIds;
+  });
   // Cross-device sync for the data that can't be re-fetched from Steam (play status, rating,
   // achievements) - localStorage stays the instant local write, this is a best-effort mirror to
   // /api/sync on top of it. No-ops safely if the server has no DB configured.
@@ -2184,6 +2264,7 @@ export default function Wishlist() {
     manualPlatform?: Record<number, ManualPlatform>;
     manualGames?: Record<number, Game>;
     manualPlaytime?: Record<number, number>;
+    manualRemovedIds?: number[];
   }) {
     const id = libSteamId.trim();
     if (!/^\d{17}$/.test(id)) return;
@@ -2199,6 +2280,7 @@ export default function Wishlist() {
         manualPlatform: overrides.manualPlatform ?? manualPlatform,
         manualGames: overrides.manualGames ?? manualGames,
         manualPlaytime: overrides.manualPlaytime ?? manualPlaytime,
+        manualRemovedIds: overrides.manualRemovedIds ?? manualRemovedIds,
       }),
     }).catch(() => {});
   }
@@ -2213,7 +2295,7 @@ export default function Wishlist() {
         // hadn't loaded its own data yet) can otherwise silently erase everything on next load.
         if (
           d.statusMap &&
-          (Object.keys(d.statusMap).length > 0 || Object.keys(statusMap).length === 0)
+          (Object.keys(d.statusMap).length > 0 || Object.keys(statusMapRef.current).length === 0)
         ) {
           setStatusMap(d.statusMap);
           try {
@@ -2222,14 +2304,17 @@ export default function Wishlist() {
         }
         if (
           d.ratingMap &&
-          (Object.keys(d.ratingMap).length > 0 || Object.keys(ratingMap).length === 0)
+          (Object.keys(d.ratingMap).length > 0 || Object.keys(ratingMapRef.current).length === 0)
         ) {
           setRatingMap(d.ratingMap);
           try {
             localStorage.setItem(RATING_STORAGE_KEY, JSON.stringify(d.ratingMap));
           } catch {}
         }
-        if (d.starMap && (Object.keys(d.starMap).length > 0 || Object.keys(starMap).length === 0)) {
+        if (
+          d.starMap &&
+          (Object.keys(d.starMap).length > 0 || Object.keys(starMapRef.current).length === 0)
+        ) {
           setStarMap(d.starMap);
           try {
             localStorage.setItem(STAR_STORAGE_KEY, JSON.stringify(d.starMap));
@@ -2237,38 +2322,81 @@ export default function Wishlist() {
         }
         if (
           d.achievementMap &&
-          (Object.keys(d.achievementMap).length > 0 || Object.keys(achievementMap).length === 0)
+          (Object.keys(d.achievementMap).length > 0 ||
+            Object.keys(achievementMapRef.current).length === 0)
         ) {
           setAchievementMap(d.achievementMap);
           try {
             localStorage.setItem(ACHIEVEMENT_STORAGE_KEY, JSON.stringify(d.achievementMap));
           } catch {}
         }
+        // Union server's tombstone into local rather than picking one side - a deletion made on
+        // another device (only visible via d.manualRemovedIds) must still apply here even though
+        // it never happened locally, and a deletion made only here must survive a pull that
+        // hasn't seen it yet either. Persisted and pushed back so this device's now-more-complete
+        // list can propagate onward the next time some other device loads.
+        const unionedRemovedIds = [
+          ...new Set([...manualRemovedIdsRef.current, ...(d.manualRemovedIds ?? [])]),
+        ];
+        if (unionedRemovedIds.length !== manualRemovedIdsRef.current.length) {
+          setManualRemovedIds(unionedRemovedIds);
+          persistManualRemoved(unionedRemovedIds);
+          pushSync({ manualRemovedIds: unionedRemovedIds });
+        }
+        // Filter out anything tombstoned (by this device or any other) before it's even
+        // considered - otherwise a still-stale (but non-empty) server snapshot would resurrect a
+        // deletion, since the length-based "prefer local" check below only ever catches a
+        // fully-empty server response.
+        const removedIds = new Set(unionedRemovedIds);
+        const filteredManualPlatform = d.manualPlatform
+          ? Object.fromEntries(
+              Object.entries(d.manualPlatform).filter(([id]) => !removedIds.has(Number(id))),
+            )
+          : d.manualPlatform;
+        const filteredManualGames = d.manualGames
+          ? Object.fromEntries(
+              Object.entries(d.manualGames).filter(([id]) => !removedIds.has(Number(id))),
+            )
+          : d.manualGames;
         if (
-          d.manualPlatform &&
-          (Object.keys(d.manualPlatform).length > 0 || Object.keys(manualPlatform).length === 0)
+          filteredManualPlatform &&
+          (Object.keys(filteredManualPlatform).length > 0 ||
+            Object.keys(manualPlatformRef.current).length === 0)
         ) {
-          setManualPlatform(d.manualPlatform);
+          setManualPlatform(filteredManualPlatform);
           try {
-            localStorage.setItem(MANUAL_PLATFORM_STORAGE_KEY, JSON.stringify(d.manualPlatform));
+            localStorage.setItem(
+              MANUAL_PLATFORM_STORAGE_KEY,
+              JSON.stringify(filteredManualPlatform),
+            );
           } catch {}
         }
         if (
-          d.manualGames &&
-          (Object.keys(d.manualGames).length > 0 || Object.keys(manualGames).length === 0)
+          filteredManualGames &&
+          (Object.keys(filteredManualGames).length > 0 ||
+            Object.keys(manualGamesRef.current).length === 0)
         ) {
-          setManualGames(d.manualGames);
+          setManualGames(filteredManualGames);
           try {
-            localStorage.setItem(MANUAL_GAMES_STORAGE_KEY, JSON.stringify(d.manualGames));
+            localStorage.setItem(MANUAL_GAMES_STORAGE_KEY, JSON.stringify(filteredManualGames));
           } catch {}
         }
+        const filteredManualPlaytime = d.manualPlaytime
+          ? Object.fromEntries(
+              Object.entries(d.manualPlaytime).filter(([id]) => !removedIds.has(Number(id))),
+            )
+          : d.manualPlaytime;
         if (
-          d.manualPlaytime &&
-          (Object.keys(d.manualPlaytime).length > 0 || Object.keys(manualPlaytime).length === 0)
+          filteredManualPlaytime &&
+          (Object.keys(filteredManualPlaytime).length > 0 ||
+            Object.keys(manualPlaytimeRef.current).length === 0)
         ) {
-          setManualPlaytime(d.manualPlaytime);
+          setManualPlaytime(filteredManualPlaytime);
           try {
-            localStorage.setItem(MANUAL_PLAYTIME_STORAGE_KEY, JSON.stringify(d.manualPlaytime));
+            localStorage.setItem(
+              MANUAL_PLAYTIME_STORAGE_KEY,
+              JSON.stringify(filteredManualPlaytime),
+            );
           } catch {}
         }
       })
@@ -2486,6 +2614,7 @@ export default function Wishlist() {
       }
       if (view === "library" && excludeAdult && g?.adultContent) return false;
       if (view === "library" && excludeDemo && g?.isDemo) return false;
+      if (view === "library" && dlcOnly && !g?.isDlc) return false;
       if (genreFilter.length && !genreFilter.some((id) => (g?.genreIds ?? []).includes(id)))
         return false;
       if (view === "library") {
@@ -2519,6 +2648,7 @@ export default function Wishlist() {
     koreanFilter,
     excludeAdult,
     excludeDemo,
+    dlcOnly,
     genreFilter,
     view,
     statusFilter,
@@ -2544,6 +2674,7 @@ export default function Wishlist() {
       ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter !== null
       : excludeAdult ||
         excludeDemo ||
+        dlcOnly ||
         statusFilter.length > 0 ||
         ratingFilter.length > 0 ||
         starFilter.length > 0 ||
@@ -2589,6 +2720,10 @@ export default function Wishlist() {
       );
       if (manualPlaytimeSaved && typeof manualPlaytimeSaved === "object")
         setManualPlaytime(manualPlaytimeSaved);
+      const manualRemovedSaved = JSON.parse(
+        localStorage.getItem(MANUAL_REMOVED_STORAGE_KEY) ?? "null",
+      );
+      if (Array.isArray(manualRemovedSaved)) setManualRemovedIds(manualRemovedSaved);
       const status = JSON.parse(localStorage.getItem(STATUS_STORAGE_KEY) ?? "null");
       if (status && typeof status === "object") setStatusMap(status);
       const rating = JSON.parse(localStorage.getItem(RATING_STORAGE_KEY) ?? "null");
@@ -2624,8 +2759,10 @@ export default function Wishlist() {
         syncFromServer(savedLibId);
       }
     } catch {}
-    // Intentionally mount-only (see comment above the effect) - syncFromServer is recreated every
-    // render, but only the version captured here, at mount, is ever meant to run.
+    // Intentionally mount-only (see comment above the effect) - syncFromServer itself is
+    // recreated every render, but the maps it reads for the "prefer local over stale server
+    // data" check now come from refs (see their comment) rather than this closure, so it's safe
+    // for only the version captured here, at mount, to ever run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -2677,6 +2814,15 @@ export default function Wishlist() {
     setManualPlaytimeHours(appid, null);
     setGameStatus(appid, null);
     setGameRating(appid, null);
+    // Tombstone the deletion so a stale (still-non-empty) server pull can't resurrect it - see
+    // MANUAL_REMOVED_STORAGE_KEY's comment. Pushed to the server too, so other devices pick it up
+    // next time they load (see syncFromServer's union logic).
+    const nextRemoved = manualRemovedIds.includes(appid)
+      ? manualRemovedIds
+      : [...manualRemovedIds, appid];
+    setManualRemovedIds(nextRemoved);
+    persistManualRemoved(nextRemoved);
+    pushSync({ manualRemovedIds: nextRemoved });
   }
   async function loadWishlist() {
     const id = wlSteamId.trim();
@@ -2827,6 +2973,7 @@ export default function Wishlist() {
         platformFilter,
         excludeAdult,
         excludeDemo,
+        dlcOnly,
         statusMap,
         ratingMap,
         starMap,
@@ -3229,7 +3376,7 @@ export default function Wishlist() {
               title="필터"
               collapsed={collapsedGroups.has("libraryFilter")}
               onToggle={() => toggleGroup("libraryFilter")}
-              activeCount={excludeDemo ? 1 : 0}
+              activeCount={(excludeDemo ? 1 : 0) + (dlcOnly ? 1 : 0)}
             >
               {/* <label className="sortCheck">
                 <input
@@ -3246,6 +3393,10 @@ export default function Wishlist() {
                   onChange={() => setExcludeDemo((v) => !v)}
                 />
                 데모 제외
+              </label>
+              <label className="sortCheck">
+                <input type="checkbox" checked={dlcOnly} onChange={() => setDlcOnly((v) => !v)} />
+                DLC만 보기
               </label>
             </FilterGroup>
           )}
@@ -3515,6 +3666,16 @@ export default function Wishlist() {
               setManualPlatform(nextPlatform);
               setManualGames(nextGames);
               persistManual(nextPlatform, nextGames);
+              // Re-adding a previously-deleted appid should un-tombstone it, or a stale server
+              // sync could never bring a genuinely-re-added game back. A device that's still
+              // offline at this moment won't find out until it separately re-adds the same appid
+              // itself - the server union only ever grows, it doesn't propagate removals.
+              if (manualRemovedIds.includes(appid)) {
+                const nextRemoved = manualRemovedIds.filter((id) => id !== appid);
+                setManualRemovedIds(nextRemoved);
+                persistManualRemoved(nextRemoved);
+                pushSync({ manualRemovedIds: nextRemoved });
+              }
             }}
             onClose={() => setManualFormOpen(false)}
           />
