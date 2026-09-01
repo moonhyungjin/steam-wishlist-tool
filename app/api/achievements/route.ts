@@ -4,7 +4,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function GET(request: NextRequest) {
   const steamId = request.nextUrl.searchParams.get("steamid");
-  const key = request.nextUrl.searchParams.get("key");
+  // Same fallback as /api/library and /api/profile - GetPlayerAchievements just needs *a* valid
+  // key, not one belonging to the profile being looked up.
+  const key = request.nextUrl.searchParams.get("key") || process.env.STEAM_API_KEY;
   const raw = request.nextUrl.searchParams.get("appids");
   if (!steamId || !key || !raw)
     return NextResponse.json({ error: "steamid, key, appids가 필요합니다." }, { status: 400 });

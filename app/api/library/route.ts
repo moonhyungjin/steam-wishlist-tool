@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const steamId = request.nextUrl.searchParams.get("steamid");
-  const key = request.nextUrl.searchParams.get("key");
+  // GetOwnedGames just needs *a* valid key for Valve's own rate limiting - it doesn't have to
+  // belong to the profile being looked up - so a visitor with no key of their own can still load
+  // any public library by falling back to a server-side key from env (see /api/profile).
+  const key = request.nextUrl.searchParams.get("key") || process.env.STEAM_API_KEY;
   if (!steamId) return NextResponse.json({ error: "steamid가 필요합니다." }, { status: 400 });
   if (!/^\d{17}$/.test(steamId))
     return NextResponse.json({ error: "Steam ID64는 17자리 숫자여야 합니다." }, { status: 400 });

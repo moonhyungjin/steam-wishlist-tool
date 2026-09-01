@@ -212,11 +212,9 @@ const CHUNK = 200;
 const META_CHUNK = 20;
 const WISHLIST_CACHE_KEY = "wishlist:cache";
 const LIBRARY_CACHE_KEY = "library:cache";
-const API_KEY_STORAGE_KEY = "steam:apikey";
-// Wishlist and library are independent identities (someone might track a friend's wishlist
-// alongside their own library), so each tab keeps its own ID64 rather than sharing one.
-const WL_STEAM_ID_STORAGE_KEY = "wishlist:steamid";
-const LIB_STEAM_ID_STORAGE_KEY = "library:steamid";
+// One shared identity across both tabs - switching between 찜목록/라이브러리 stays on the same
+// account instead of prompting for a separate ID64 per tab.
+const STEAM_ID_STORAGE_KEY = "steamid";
 // Games bought outside Steam (Epic, STOVE, ...) with no API to pull from - added by hand, matched
 // by name against Steam's public search purely for metadata (image/genres/metacritic), completely
 // unrelated to whether this Steam account actually owns them. Kept in their own storage key, apart
@@ -1042,6 +1040,37 @@ function GenreRadar({ entries }: { entries: { genreId: number; genre: string; va
     </svg>
   );
 }
+function NoImageGlyph() {
+  return (
+    <svg
+      className="noImageIcon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="M21 15l-5-5-9 9" />
+      <line x1="3" y1="21" x2="21" y2="3" />
+    </svg>
+  );
+}
+// Distinguishes "g hasn't loaded yet" (still fetching store data) from "g loaded, but this game
+// genuinely has no header image" - both used to render the same "LOADING" text forever once g
+// was undefined vs. g.headerImage being null looked identical from the outside.
+function CoverPlaceholder({ loaded }: { loaded: boolean }) {
+  return loaded ? (
+    <div className="loadingCover noImage">
+      <NoImageGlyph />
+      이미지 없음
+    </div>
+  ) : (
+    <div className="loadingCover">LOADING</div>
+  );
+}
 // A plumper star polygon (inner/outer radius ratio ~0.5, vs. the classic ~0.38) traced with a
 // round-joined stroke in the same color as the fill - that combination is what rounds off both the
 // outer points and the inner notches, instead of the sharp glyph a plain "★" character gives.
@@ -1215,12 +1244,12 @@ function GameRow({
             {g?.headerImage ? (
               <img src={g.headerImage} alt="" loading="lazy" decoding="async" />
             ) : (
-              <div className="loadingCover">LOADING</div>
+              <CoverPlaceholder loaded={!!g} />
             )}
           </a>
         ) : (
           <div className="cover">
-            <div className="loadingCover">이미지 없음</div>
+            <CoverPlaceholder loaded />
           </div>
         )}
       </div>
@@ -1408,28 +1437,41 @@ function GameRow({
             </span>
           ) : null}
           {achievement != null && achievement.achieved > 0 ? (
-            <a
-              className={"chip " + scoreClass(achievement.percent)}
-              href={`https://steamcommunity.com/profiles/${steamId}/stats/${item.appid}/achievements`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Steam에서 업적 목록 보기"
-            >
-              업적 {achievement.percent}% ({achievement.achieved}/{achievement.total})
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <>
+              <a
+                className={"chip " + scoreClass(achievement.percent)}
+                href={`https://steamcommunity.com/profiles/${steamId}/stats/${item.appid}/achievements`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Steam에서 업적 목록 보기"
               >
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-            </a>
+                업적 {achievement.percent}% ({achievement.achieved}/{achievement.total})
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
+              </a>
+              {view === "library" && (!manual || manual === "steam") && (
+                <button
+                  type="button"
+                  className="achievementRefreshBtn"
+                  disabled={checkingAchievement}
+                  onClick={() => onCheckAchievement(item.appid)}
+                  title="업적 다시 확인 (이 게임만)"
+                >
+                  <span className={checkingAchievement ? "spinning" : ""}>⟳</span>
+                </button>
+              )}
+            </>
           ) : view === "library" && achievement === undefined && (!manual || manual === "steam") ? (
             <button
               type="button"
@@ -1532,8 +1574,6 @@ function CardCell({
   statusMap,
   ratingMap,
   starMap,
-  manualPlatform,
-  onRemoveManual,
 }: CellComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -1542,8 +1582,6 @@ function CardCell({
   statusMap: Record<number, PlayStatus>;
   ratingMap: Record<number, Rating>;
   starMap: Record<number, StarRating>;
-  manualPlatform: Record<number, ManualPlatform>;
-  onRemoveManual: (appid: number) => void;
 }>) {
   const index = rowIndex * columnCount + columnIndex;
   const item = items[index];
@@ -1552,7 +1590,6 @@ function CardCell({
   const status = statusMap[item.appid];
   const rating = ratingMap[item.appid];
   const star = starMap[item.appid];
-  const manual = manualPlatform[item.appid];
   const linkable = item.appid > 0;
   const cardContent = (
     <>
@@ -1560,7 +1597,7 @@ function CardCell({
         {g?.headerImage ? (
           <img src={g.headerImage} alt="" loading="lazy" decoding="async" />
         ) : (
-          <div className="loadingCover">{linkable ? "LOADING" : "이미지 없음"}</div>
+          <CoverPlaceholder loaded={!!g} />
         )}
         {view === "wishlist" && (g?.metacritic != null || g?.reviewPositive) ? (
           <div className="cardBadges cardBadgesBottomRight">
@@ -1574,28 +1611,12 @@ function CardCell({
             ) : null}
           </div>
         ) : null}
-        {(view === "library" && manual) || g?.isDlc ? (
+        {/* Platform/DLC badges are hidden in the library tab's card layout specifically - card
+            view is meant to stay visually light, and both are still visible/actionable (including
+            the manual-remove button) from the list layout. Wishlist card view is unaffected. */}
+        {view !== "library" && g?.isDlc ? (
           <div className="cardBadges">
-            {view === "library" && manual && (
-              <span className="cardBadge manual">
-                {/* The only clickable thing in this overlay - stopped from bubbling up into the
-                    whole-card link, which would otherwise also navigate away on click. */}
-                {MANUAL_PLATFORM_LABELS[manual]}
-                <button
-                  type="button"
-                  className="manualRemoveBtn"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onRemoveManual(item.appid);
-                  }}
-                  title="목록에서 제거"
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {g?.isDlc && <span className="cardBadge dlcTag">DLC</span>}
+            <span className="cardBadge dlcTag">DLC</span>
           </div>
         ) : null}
         {view === "library" && (status || star || rating) ? (
@@ -1930,7 +1951,6 @@ async function enrichMetacritic(
 async function enrichAchievements(
   appids: number[],
   steamId: string,
-  apiKey: string,
   initial: Record<number, AchievementInfo | null>,
   onUpdate: (map: Record<number, AchievementInfo | null>) => void,
 ) {
@@ -1939,7 +1959,7 @@ async function enrichAchievements(
   for (let i = 0; i < missing.length; i += ACHIEVEMENT_CHUNK) {
     const chunk = missing.slice(i, i + ACHIEVEMENT_CHUNK);
     const r = await fetch(
-      `/api/achievements?steamid=${encodeURIComponent(steamId)}&key=${encodeURIComponent(apiKey)}&appids=${chunk.join(",")}`,
+      `/api/achievements?steamid=${encodeURIComponent(steamId)}&appids=${chunk.join(",")}`,
     );
     const d = await r.json();
     if (!r.ok) return;
@@ -1954,18 +1974,17 @@ async function enrichAchievements(
 }
 export default function Wishlist() {
   const [view, setView] = useState<View>("wishlist");
-  const [wlSteamId, setWlSteamId] = useState("");
-  const [libSteamId, setLibSteamId] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [wlProfile, setWlProfile] = useState<Profile | null>(null);
-  const [wlProfileError, setWlProfileError] = useState("");
-  const [libProfile, setLibProfile] = useState<Profile | null>(null);
-  const [libProfileError, setLibProfileError] = useState("");
+  // Shared across both tabs - one Steam account, viewed two ways.
+  const [steamId, setSteamId] = useState("");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileError, setProfileError] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   // Reopens the credential form after data's already loaded for this tab (it auto-hides on
   // success) so the user can switch accounts or re-enter a key without a dedicated logout step.
-  const [wlEditingCreds, setWlEditingCreds] = useState(false);
-  const [libEditingCreds, setLibEditingCreds] = useState(false);
+  const [editingCreds, setEditingCreds] = useState(false);
+  function openCredsForm() {
+    setEditingCreds(true);
+  }
 
   const [wlItems, setWlItems] = useState<Item[]>([]);
   const [wlGames, setWlGames] = useState<Record<number, Game>>({});
@@ -2015,19 +2034,28 @@ export default function Wishlist() {
   // A library refresh only ever touches libItems/libGames (the Steam-fetched half), so merging
   // manual entries in here - rather than mixing them into libItems itself - means they survive
   // every "라이브러리 가져오기" click instead of being wiped by it.
+  // Manual entries (library:manualGames etc.) aren't scoped to any particular steamId - they're
+  // one global browser-wide list, unlike everything else here which is keyed by whichever account
+  // is actually active. Without a steamId at all there's no "library" to attach them to, so
+  // they'd otherwise show up even with no id/key ever entered (looks like being logged in without
+  // being logged in). Gating the merge on a non-empty id, rather than a successful fetch, still
+  // lets manual entries show once an id is typed even before "가져오기" is clicked.
+  const hasLibIdentity = steamId.trim() !== "";
   const combinedLibItems: Item[] = useMemo(
     () => [
       ...libItems,
-      ...Object.keys(manualPlatform).map((id) => ({
-        appid: Number(id),
-        playtimeMinutes: manualPlaytime[Number(id)],
-      })),
+      ...(hasLibIdentity
+        ? Object.keys(manualPlatform).map((id) => ({
+            appid: Number(id),
+            playtimeMinutes: manualPlaytime[Number(id)],
+          }))
+        : []),
     ],
-    [libItems, manualPlatform, manualPlaytime],
+    [libItems, manualPlatform, manualPlaytime, hasLibIdentity],
   );
   const combinedLibGames = useMemo(
-    () => ({ ...libGames, ...manualGames }),
-    [libGames, manualGames],
+    () => ({ ...libGames, ...(hasLibIdentity ? manualGames : {}) }),
+    [libGames, manualGames, hasLibIdentity],
   );
   const [manualFormOpen, setManualFormOpen] = useState(false);
 
@@ -2037,15 +2065,6 @@ export default function Wishlist() {
   const progress = view === "wishlist" ? wlProgress : libProgress;
   const error = view === "wishlist" ? wlError : libError;
   const fetchedOnce = view === "wishlist" ? wlFetchedOnce : libFetchedOnce;
-  const steamId = view === "wishlist" ? wlSteamId : libSteamId;
-  const setSteamId = view === "wishlist" ? setWlSteamId : setLibSteamId;
-  const profile = view === "wishlist" ? wlProfile : libProfile;
-  const profileError = view === "wishlist" ? wlProfileError : libProfileError;
-  const editingCreds = view === "wishlist" ? wlEditingCreds : libEditingCreds;
-  function openCredsForm() {
-    if (view === "wishlist") setWlEditingCreds(true);
-    else setLibEditingCreds(true);
-  }
   const dataLoadedForView = view === "wishlist" ? wlItems.length > 0 : libItems.length > 0;
   const formVisible = editingCreds || !dataLoadedForView;
 
@@ -2056,12 +2075,6 @@ export default function Wishlist() {
   function switchView(next: View) {
     setView(next);
     setSortKey(null);
-    // Convenience default, not a hard link between the two - same person uses both tabs far more
-    // often than not, so prefill from whatever's already on the wishlist tab, but only if the
-    // library tab hasn't been given its own value yet (never overwrites something already typed).
-    if (next === "library" && !libSteamId && wlSteamId) {
-      setLibSteamId(wlSteamId);
-    }
   }
   const [nameQuery, setNameQuery] = useState("");
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
@@ -2266,7 +2279,7 @@ export default function Wishlist() {
     manualPlaytime?: Record<number, number>;
     manualRemovedIds?: number[];
   }) {
-    const id = libSteamId.trim();
+    const id = steamId.trim();
     if (!/^\d{17}$/.test(id)) return;
     fetch("/api/sync", {
       method: "POST",
@@ -2412,11 +2425,11 @@ export default function Wishlist() {
   const [checkingAchievements, setCheckingAchievements] = useState<Set<number>>(() => new Set());
   // Lets a single row jump the queue instead of waiting for its turn in the slow background pass.
   async function checkOneAchievement(appid: number) {
-    if (checkingAchievements.has(appid) || !libSteamId.trim() || !apiKey.trim()) return;
+    if (checkingAchievements.has(appid) || !steamId.trim()) return;
     setCheckingAchievements((prev) => new Set(prev).add(appid));
     try {
       const r = await fetch(
-        `/api/achievements?steamid=${encodeURIComponent(libSteamId.trim())}&key=${encodeURIComponent(apiKey.trim())}&appids=${appid}`,
+        `/api/achievements?steamid=${encodeURIComponent(steamId.trim())}&appids=${appid}`,
       );
       const d = await r.json();
       if (r.ok && d.achievements) {
@@ -2501,15 +2514,13 @@ export default function Wishlist() {
     [genreXp],
   );
   // Genre levels are always computed from the library, regardless of which tab is open - so show
-  // them on the wishlist tab too, but only when it's tracking the same account as the library.
-  // Otherwise the badge would show *your* library's genre level next to a friend's wishlist
-  // profile (wishlist and library intentionally support different steamIds - see their comment).
+  // them on the wishlist tab too (both tabs share one identity now, so it's always the same
+  // account's library).
   const showGenreLevels =
     GENRE_LEVELING_ENABLED &&
     genreLevels.length > 0 &&
     genreXp.gameCount >= GENRE_LEVELS_MIN_GAMES &&
-    genreXp.totalHours >= GENRE_LEVELS_MIN_HOURS &&
-    (view === "library" || wlSteamId === libSteamId);
+    genreXp.totalHours >= GENRE_LEVELS_MIN_HOURS;
   // Fine-grained GENRE_ALLOWLIST, not the coarse GENRE_LEVEL_ALLOWLIST - subgenre distinctions
   // like JRPG vs CRPG vs 액션 RPG matter here, unlike for the level badge where they'd just dilute
   // one bucket. A genre only surfaces once it's crossed TASTE_MIN_GAMES games, so a couple of
@@ -2532,14 +2543,19 @@ export default function Wishlist() {
     for (const item of combinedLibItems) {
       const hours = (item.playtimeMinutes ?? 0) / 60;
       if (!hours) continue;
-      if (statusMap[item.appid] === "excluded") continue;
+      const status = statusMap[item.appid];
+      if (status === "excluded") continue;
+      const rating = ratingMap[item.appid];
+      const star = starMap[item.appid];
+      // Only count games with a deliberate, fully-recorded opinion (진행 상태 + 추천 + 별점 all
+      // set) - hours alone with none of those set is just "was open at some point," not a signal
+      // of whether the player actually liked it. 하차 (dropped) is the one exception: dropping a
+      // game is already an unambiguous negative signal by itself, so it counts even without a
+      // rating/star also being recorded.
+      const fullyRated = status != null && rating != null && star != null;
+      if (!fullyRated && status !== "dropped") continue;
       const g = combinedLibGames[item.appid];
-      const affinity = gameAffinity(
-        statusMap[item.appid],
-        ratingMap[item.appid],
-        starMap[item.appid],
-        achievementMap[item.appid],
-      );
+      const affinity = gameAffinity(status, rating, star, achievementMap[item.appid]);
       totalHoursAll += hours;
       totalWeightedAll += hours * affinity;
       const matches = (g?.genreIds ?? [])
@@ -2687,21 +2703,17 @@ export default function Wishlist() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useLayoutEffect(() => {
     try {
-      const savedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
-      setApiKey(savedApiKey);
-      const savedWlId = localStorage.getItem(WL_STEAM_ID_STORAGE_KEY);
-      if (savedWlId) setWlSteamId(savedWlId);
-      const savedLibId = localStorage.getItem(LIB_STEAM_ID_STORAGE_KEY);
-      if (savedLibId) setLibSteamId(savedLibId);
+      const savedId = localStorage.getItem(STEAM_ID_STORAGE_KEY);
+      if (savedId) setSteamId(savedId);
       const wl = JSON.parse(localStorage.getItem(WISHLIST_CACHE_KEY) ?? "null");
-      if (!savedWlId && wl?.steamId) setWlSteamId(wl.steamId);
+      if (!savedId && wl?.steamId) setSteamId(wl.steamId);
       if (wl?.version === CACHE_VERSION && Array.isArray(wl?.items)) {
         setWlItems(wl.items);
         setWlProgress({ done: wl.items.length, total: wl.items.length });
         if (wl.games) setWlGames(wl.games);
       }
       const lib = JSON.parse(localStorage.getItem(LIBRARY_CACHE_KEY) ?? "null");
-      if (!savedLibId && lib?.steamId) setLibSteamId(lib.steamId);
+      if (!savedId && !wl?.steamId && lib?.steamId) setSteamId(lib.steamId);
       if (lib?.version === CACHE_VERSION && Array.isArray(lib?.items)) {
         setLibItems(lib.items);
         setLibProgress({ done: lib.items.length, total: lib.items.length });
@@ -2732,31 +2744,20 @@ export default function Wishlist() {
       if (stars && typeof stars === "object") setStarMap(stars);
       const achievements = JSON.parse(localStorage.getItem(ACHIEVEMENT_STORAGE_KEY) ?? "null");
       if (achievements && typeof achievements === "object") setAchievementMap(achievements);
-      // Item/game caches are already restored above; only the profiles still need a fresh fetch to
-      // show the profile card again. Wishlist and library are independent identities, so each gets
-      // its own restore - the wishlist one never had a key to begin with (server falls back to its
-      // own STEAM_API_KEY env var), while the library one reuses a saved key if there is one.
-      if (savedWlId) {
-        fetch(`/api/profile?steamid=${encodeURIComponent(savedWlId)}`)
+      // Item/game caches are already restored above; only the profile still needs a fresh fetch to
+      // show the profile card again. Falls back to the server's own STEAM_API_KEY env var, no
+      // client key involved.
+      const restoredId = savedId || wl?.steamId || lib?.steamId;
+      if (restoredId) {
+        fetch(`/api/profile?steamid=${encodeURIComponent(restoredId)}`)
           .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
           .then(({ ok, d }) => {
-            if (ok && d.profile) setWlProfile(d.profile);
-          })
-          .catch(() => {});
-      }
-      if (savedLibId) {
-        const url = savedApiKey
-          ? `/api/profile?steamid=${encodeURIComponent(savedLibId)}&key=${encodeURIComponent(savedApiKey)}`
-          : `/api/profile?steamid=${encodeURIComponent(savedLibId)}`;
-        fetch(url)
-          .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
-          .then(({ ok, d }) => {
-            if (ok && d.profile) setLibProfile(d.profile);
+            if (ok && d.profile) setProfile(d.profile);
           })
           .catch(() => {});
         // Pulls in whatever another device already synced, on top of the localStorage restore
         // above - lets status/rating/achievements show up here without re-fetching the library.
-        syncFromServer(savedLibId);
+        syncFromServer(restoredId);
       }
     } catch {}
     // Intentionally mount-only (see comment above the effect) - syncFromServer itself is
@@ -2772,6 +2773,14 @@ export default function Wishlist() {
     itemsValue: Item[],
     gamesValue: Record<number, Game>,
   ) {
+    // Unchecking "이 정보 저장" removes STEAM_ID_STORAGE_KEY (see loadWishlist/loadLibrary), but
+    // this cache blob was a second, unguarded way for both the id and the actual list contents to
+    // survive a reload regardless - the mount hydration effect reads it unconditionally, silently
+    // undoing the opt-out (you'd see your library again next time with a blank id field, which
+    // defeats the point). Skip writing it at all when not remembering, rather than trying to
+    // persist a partially-scrubbed version - "don't remember me" should leave nothing behind, not
+    // just hide the id digits specifically.
+    if (!rememberMe) return;
     try {
       localStorage.setItem(
         cacheKey,
@@ -2790,18 +2799,18 @@ export default function Wishlist() {
     const now = Date.now();
     if (now - lastWlPersistAt.current < 1500) return;
     lastWlPersistAt.current = now;
-    persistTo(WISHLIST_CACHE_KEY, wlSteamId, itemsValue, gamesValue);
+    persistTo(WISHLIST_CACHE_KEY, steamId, itemsValue, gamesValue);
   }
   function persistLibraryThrottled(itemsValue: Item[], gamesValue: Record<number, Game>) {
     // Event-handler-only helper, never called during render - the compiler's reachability
-    // analysis mis-flags it once enough other code is added to this component (not reproducible
-    // in isolation, and reactCompiler isn't even enabled in next.config, so no build/runtime
-    // effect either way).
-    // eslint-disable-next-line react-hooks/purity
+    // analysis has previously mis-flagged this once enough other code is added to this component
+    // (not reproducible in isolation, and reactCompiler isn't even enabled in next.config, so no
+    // build/runtime effect either way) - re-add an eslint-disable-next-line react-hooks/purity
+    // here if it resurfaces.
     const now = Date.now();
     if (now - lastLibPersistAt.current < 1500) return;
     lastLibPersistAt.current = now;
-    persistTo(LIBRARY_CACHE_KEY, libSteamId, itemsValue, gamesValue);
+    persistTo(LIBRARY_CACHE_KEY, steamId, itemsValue, gamesValue);
   }
   function removeManualGame(appid: number) {
     const nextPlatform = { ...manualPlatform };
@@ -2825,22 +2834,27 @@ export default function Wishlist() {
     pushSync({ manualRemovedIds: nextRemoved });
   }
   async function loadWishlist() {
-    const id = wlSteamId.trim();
+    const id = steamId.trim();
     if (!/^\d{17}$/.test(id)) {
       setWlError("17자리 Steam ID64를 입력하세요.");
       return;
     }
     try {
-      if (rememberMe) localStorage.setItem(WL_STEAM_ID_STORAGE_KEY, id);
-      else localStorage.removeItem(WL_STEAM_ID_STORAGE_KEY);
+      if (rememberMe) localStorage.setItem(STEAM_ID_STORAGE_KEY, id);
+      else {
+        localStorage.removeItem(STEAM_ID_STORAGE_KEY);
+        // Also drop any cache blob left over from a previous session where remember-me was on -
+        // persistTo skips writing a new one while off, but doesn't retroactively clear an old one.
+        localStorage.removeItem(WISHLIST_CACHE_KEY);
+      }
     } catch {}
     // Fire-and-forget, same as the library tab's profile fetch - no user-entered key needed here,
     // the server falls back to its own STEAM_API_KEY env var for this lookup.
-    setWlProfileError("");
+    setProfileError("");
     fetch(`/api/profile?steamid=${encodeURIComponent(id)}`)
       .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
       .then(({ ok, d }) => {
-        if (ok && d.profile) setWlProfile(d.profile);
+        if (ok && d.profile) setProfile(d.profile);
       })
       .catch(() => {});
     setWlLoading(true);
@@ -2852,7 +2866,7 @@ export default function Wishlist() {
       const list: Item[] = (d.items ?? []).map((x: { appid: number }) => ({ appid: x.appid }));
       setWlItems(list);
       setWlFetchedOnce(true);
-      setWlEditingCreds(false);
+      setEditingCreds(false);
       const listAppids = new Set(list.map((x) => x.appid));
       const existing: Record<number, Game> = {};
       for (const [id, g] of Object.entries(wlGames)) {
@@ -2884,51 +2898,43 @@ export default function Wishlist() {
     }
   }
   async function loadLibrary() {
-    const id = libSteamId.trim();
-    const key = apiKey.trim();
+    const id = steamId.trim();
     if (!/^\d{17}$/.test(id)) {
       setLibError("17자리 Steam ID64를 입력하세요.");
       return;
     }
-    if (!key) {
-      setLibError("Steam API 키를 입력하세요.");
-      return;
-    }
     try {
       if (rememberMe) {
-        localStorage.setItem(LIB_STEAM_ID_STORAGE_KEY, id);
-        localStorage.setItem(API_KEY_STORAGE_KEY, key);
+        localStorage.setItem(STEAM_ID_STORAGE_KEY, id);
       } else {
-        localStorage.removeItem(LIB_STEAM_ID_STORAGE_KEY);
-        localStorage.removeItem(API_KEY_STORAGE_KEY);
+        localStorage.removeItem(STEAM_ID_STORAGE_KEY);
+        // Also drop any cache blob left over from a previous session where remember-me was on -
+        // persistTo skips writing a new one while off, but doesn't retroactively clear an old one.
+        localStorage.removeItem(LIBRARY_CACHE_KEY);
       }
     } catch {}
     // Fire-and-forget alongside the library fetch below - the profile card is a nice-to-have,
     // not something the library load should wait on or fail because of.
-    setLibProfileError("");
-    fetch(`/api/profile?steamid=${encodeURIComponent(id)}&key=${encodeURIComponent(key)}`)
+    setProfileError("");
+    fetch(`/api/profile?steamid=${encodeURIComponent(id)}`)
       .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
       .then(({ ok, d }) => {
         if (ok && d.profile) {
-          setLibProfile(d.profile);
+          setProfile(d.profile);
         } else {
-          setLibProfile(null);
-          setLibProfileError(
-            d.error ?? "프로필을 가져오지 못했습니다. Steam ID64/API 키를 확인하세요.",
-          );
+          setProfile(null);
+          setProfileError(d.error ?? "프로필을 가져오지 못했습니다. Steam ID64를 확인하세요.");
         }
       })
       .catch(() => {
-        setLibProfile(null);
-        setLibProfileError("프로필을 가져오지 못했습니다. 네트워크 상태를 확인하세요.");
+        setProfile(null);
+        setProfileError("프로필을 가져오지 못했습니다. 네트워크 상태를 확인하세요.");
       });
     syncFromServer(id);
     setLibLoading(true);
     setLibError("");
     try {
-      const r = await fetch(
-        `/api/library?steamid=${encodeURIComponent(id)}&key=${encodeURIComponent(key)}`,
-      );
+      const r = await fetch(`/api/library?steamid=${encodeURIComponent(id)}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
       if (d.error) throw new Error(d.error);
@@ -2941,7 +2947,7 @@ export default function Wishlist() {
       );
       setLibItems(list);
       setLibFetchedOnce(true);
-      setLibEditingCreds(false);
+      setEditingCreds(false);
       const listAppids = new Set(list.map((x) => x.appid));
       const existing: Record<number, Game> = {};
       for (const [gid, g] of Object.entries(libGames)) {
@@ -2979,9 +2985,7 @@ export default function Wishlist() {
         starMap,
         manualPlatform,
       });
-      enrichAchievements(achievementOrder, id, key, achievementMap, updateAchievements).catch(
-        () => {},
-      );
+      enrichAchievements(achievementOrder, id, achievementMap, updateAchievements).catch(() => {});
     } catch (e) {
       setLibError(e instanceof Error ? e.message : "알 수 없는 오류");
     } finally {
@@ -3003,7 +3007,7 @@ export default function Wishlist() {
         <header>
           <p className="eyebrow">PERSONAL STEAM TOOL</p>
           <h1>{view === "wishlist" ? "My Steam Wishlist" : "My Steam Library"}</h1>
-          {(profile || !formVisible) && (
+          {!formVisible && (
             <div className="profileRow">
               {profile && (
                 <div className="profileCard">
@@ -3042,32 +3046,72 @@ export default function Wishlist() {
                   </div>
                 </div>
               )}
-              {!formVisible && (
-                <button
-                  type="button"
-                  className="smallBtn iconOnly"
-                  onClick={openCredsForm}
-                  title="계정 변경"
-                  aria-label="계정 변경"
+              <button
+                type="button"
+                className="smallBtn iconOnly"
+                onClick={openCredsForm}
+                title="계정 변경"
+                aria-label="계정 변경"
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="17 1 21 5 17 9" />
-                    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                    <polyline points="7 23 3 19 7 15" />
-                    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                  </svg>
-                </button>
-              )}
+                  <polyline points="17 1 21 5 17 9" />
+                  <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                  <polyline points="7 23 3 19 7 15" />
+                  <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg>
+              </button>
             </div>
+          )}
+          {formVisible && (
+            <section className="panel form">
+              <div className="row">
+                <div className="field">
+                  <label>
+                    Steam ID64
+                    <span
+                      className="helpIcon"
+                      title={
+                        view === "wishlist"
+                          ? "프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요."
+                          : "프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요. 찜목록 탭과는 별개의 값이라, 라이브러리를 보고 싶은 계정의 ID64를 여기에 따로 입력하세요. 개인정보 설정에서 '게임 세부정보'가 공개여야 라이브러리를 가져올 수 있습니다."
+                      }
+                    >
+                      ?
+                    </span>
+                  </label>
+                  <input
+                    value={steamId}
+                    onChange={(e) => setSteamId(e.target.value)}
+                    placeholder="Steam ID64"
+                    onKeyDown={(e) => e.key === "Enter" && loadActive()}
+                  />
+                </div>
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  이 정보 저장
+                </label>
+                <button type="button" onClick={loadActive} disabled={loading}>
+                  {loading
+                    ? "가져오는 중..."
+                    : view === "wishlist"
+                      ? "찜목록 가져오기"
+                      : "라이브러리 가져오기"}
+                </button>
+              </div>
+            </section>
           )}
           {showGenreLevels && (
             <div popover="auto" id="genre-level-popover" className="genreLevelPopover">
@@ -3224,84 +3268,6 @@ export default function Wishlist() {
             라이브러리
           </button>
         </div>
-        {formVisible && (
-          <section className="panel form">
-            <div className="row">
-              {view === "wishlist" ? (
-                <div className="field">
-                  <label>
-                    Steam ID64
-                    <span
-                      className="helpIcon"
-                      title="프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요."
-                    >
-                      ?
-                    </span>
-                  </label>
-                  <input
-                    value={steamId}
-                    onChange={(e) => setSteamId(e.target.value)}
-                    placeholder="Steam ID64"
-                    onKeyDown={(e) => e.key === "Enter" && loadWishlist()}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="field">
-                    <label>
-                      Steam ID64
-                      <span
-                        className="helpIcon"
-                        title="프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요. 찜목록 탭과는 별개의 값이라, 라이브러리를 보고 싶은 계정의 ID64를 여기에 따로 입력하세요."
-                      >
-                        ?
-                      </span>
-                    </label>
-                    <input
-                      value={steamId}
-                      onChange={(e) => setSteamId(e.target.value)}
-                      placeholder="Steam ID64"
-                      onKeyDown={(e) => e.key === "Enter" && loadLibrary()}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>
-                      Steam API 키
-                      <span
-                        className="helpIcon"
-                        title="steamcommunity.com/dev/apikey 에서 발급받으세요 (Domain Name엔 아무거나 입력, 예: localhost). 개인정보 설정에서 '게임 세부정보'가 공개여야 라이브러리를 가져올 수 있습니다."
-                      >
-                        ?
-                      </span>
-                    </label>
-                    <input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="Steam API 키"
-                      onKeyDown={(e) => e.key === "Enter" && loadLibrary()}
-                    />
-                  </div>
-                </>
-              )}
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                이 정보 저장
-              </label>
-              <button type="button" onClick={loadActive} disabled={loading}>
-                {loading
-                  ? "가져오는 중..."
-                  : view === "wishlist"
-                    ? "찜목록 가져오기"
-                    : "라이브러리 가져오기"}
-              </button>
-            </div>
-          </section>
-        )}
         {profileError && <section className="error">{profileError}</section>}
         {error && (
           <section className="error">
@@ -3410,7 +3376,7 @@ export default function Wishlist() {
               ? WISHLIST_SORT_OPTIONS.filter(
                   (opt) =>
                     opt.value !== "recommend-desc" ||
-                    (GENRE_LEVELING_ENABLED && genreTaste.length > 0 && wlSteamId === libSteamId),
+                    (GENRE_LEVELING_ENABLED && genreTaste.length > 0),
                 )
               : LIBRARY_SORT_OPTIONS
             ).map((opt) => (
@@ -3689,7 +3655,7 @@ export default function Wishlist() {
                   "이 비공개이거나 실제로 비어있을 수 있어요 (Steam은 둘을 구분해서 알려주지 않아요)."
                 : view === "wishlist"
                   ? "Steam ID64를 입력하면 실제 찜목록을 가져옵니다."
-                  : "Steam ID64와 API 키를 입력하면 보유 게임 목록을 가져옵니다."}
+                  : "Steam ID64를 입력하면 보유 게임 목록을 가져옵니다."}
             </div>
           ) : !sortedItems.length ? (
             <div className="empty">조건에 맞는 게임이 없습니다.</div>
@@ -3741,8 +3707,6 @@ export default function Wishlist() {
                     statusMap,
                     ratingMap,
                     starMap,
-                    manualPlatform,
-                    onRemoveManual: removeManualGame,
                   }}
                   style={{ height: listSize.height, width: "100%" }}
                 />
