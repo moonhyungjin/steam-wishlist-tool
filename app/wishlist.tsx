@@ -25,6 +25,7 @@ type Game = {
   comingSoon: boolean;
   releaseUnannounced: boolean;
   earlyAccess: boolean;
+  isFree: boolean;
   price: string;
   initialPrice: string | null;
   priceValue: number | null;
@@ -55,6 +56,7 @@ function blankGame(appid: number, name: string): Game {
     comingSoon: false,
     releaseUnannounced: false,
     earlyAccess: false,
+    isFree: false,
     price: "정보 없음",
     initialPrice: null,
     priceValue: null,
@@ -208,6 +210,9 @@ function gameAffinity(
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
 const ACHIEVEMENT_CHUNK = 40;
+// How many of the most-recently-played games get force-refreshed on "새로고침" - see the call
+// site in loadLibrary for why the rest only fill gaps instead of a full re-check.
+const ACHIEVEMENT_REFRESH_RECENT_COUNT = 20;
 const CHUNK = 200;
 const META_CHUNK = 20;
 const WISHLIST_CACHE_KEY = "wishlist:cache";
@@ -352,7 +357,7 @@ function prioritizeAchievementOrder(
     platformFilter: ("steam" | ManualPlatform)[];
     excludeAdult: boolean;
     excludeDemo: boolean;
-    dlcOnly: boolean;
+    excludeFree: boolean;
     statusMap: Record<number, PlayStatus>;
     ratingMap: Record<number, Rating>;
     starMap: Record<number, StarRating>;
@@ -365,7 +370,7 @@ function prioritizeAchievementOrder(
     if (q && !(g?.name ?? "").toLowerCase().includes(q)) return false;
     if (filters.excludeAdult && g?.adultContent) return false;
     if (filters.excludeDemo && g?.isDemo) return false;
-    if (filters.dlcOnly && !g?.isDlc) return false;
+    if (filters.excludeFree && g?.isFree) return false;
     if (
       filters.genreFilter.length &&
       !filters.genreFilter.some((id) => (g?.genreIds ?? []).includes(id))
@@ -1437,41 +1442,28 @@ function GameRow({
             </span>
           ) : null}
           {achievement != null && achievement.achieved > 0 ? (
-            <>
-              <a
-                className={"chip " + scoreClass(achievement.percent)}
-                href={`https://steamcommunity.com/profiles/${steamId}/stats/${item.appid}/achievements`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Steam에서 업적 목록 보기"
+            <a
+              className={"chip " + scoreClass(achievement.percent)}
+              href={`https://steamcommunity.com/profiles/${steamId}/stats/${item.appid}/achievements`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Steam에서 업적 목록 보기"
+            >
+              업적 {achievement.percent}% ({achievement.achieved}/{achievement.total})
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                업적 {achievement.percent}% ({achievement.achieved}/{achievement.total})
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-              </a>
-              {view === "library" && (!manual || manual === "steam") && (
-                <button
-                  type="button"
-                  className="achievementRefreshBtn"
-                  disabled={checkingAchievement}
-                  onClick={() => onCheckAchievement(item.appid)}
-                  title="업적 다시 확인 (이 게임만)"
-                >
-                  <span className={checkingAchievement ? "spinning" : ""}>⟳</span>
-                </button>
-              )}
-            </>
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </a>
           ) : view === "library" && achievement === undefined && (!manual || manual === "steam") ? (
             <button
               type="button"
@@ -1953,11 +1945,17 @@ async function enrichAchievements(
   steamId: string,
   initial: Record<number, AchievementInfo | null>,
   onUpdate: (map: Record<number, AchievementInfo | null>) => void,
+  // Ids in this set get re-fetched even if already in `initial` - everything else only fills in
+  // gaps. Achievement % can only change for games actually played since the last check, so
+  // "새로고침" only forces the handful of most-recently-played games instead of the whole library -
+  // re-checking 500 unplayed-since-last-time games would cost 500 individual Steam API calls
+  // (no batch endpoint for this one) for data that almost certainly didn't move.
+  forceIds: Set<number> = new Set(),
 ) {
   let current = initial;
-  const missing = appids.filter((id) => !(id in current));
-  for (let i = 0; i < missing.length; i += ACHIEVEMENT_CHUNK) {
-    const chunk = missing.slice(i, i + ACHIEVEMENT_CHUNK);
+  const targets = appids.filter((id) => forceIds.has(id) || !(id in current));
+  for (let i = 0; i < targets.length; i += ACHIEVEMENT_CHUNK) {
+    const chunk = targets.slice(i, i + ACHIEVEMENT_CHUNK);
     const r = await fetch(
       `/api/achievements?steamid=${encodeURIComponent(steamId)}&appids=${chunk.join(",")}`,
     );
@@ -1983,6 +1981,10 @@ export default function Wishlist() {
   // success) so the user can switch accounts or re-enter a key without a dedicated logout step.
   const [editingCreds, setEditingCreds] = useState(false);
   function openCredsForm() {
+    // "이 정보 저장" being off at the last fetch means the id was a one-time thing, not something
+    // to keep showing back - clear the field so reopening the form to switch accounts starts blank
+    // instead of silently re-offering the id that was just told not to be remembered.
+    if (!rememberMe) setSteamId("");
     setEditingCreds(true);
   }
 
@@ -2036,11 +2038,12 @@ export default function Wishlist() {
   // every "라이브러리 가져오기" click instead of being wiped by it.
   // Manual entries (library:manualGames etc.) aren't scoped to any particular steamId - they're
   // one global browser-wide list, unlike everything else here which is keyed by whichever account
-  // is actually active. Without a steamId at all there's no "library" to attach them to, so
-  // they'd otherwise show up even with no id/key ever entered (looks like being logged in without
-  // being logged in). Gating the merge on a non-empty id, rather than a successful fetch, still
-  // lets manual entries show once an id is typed even before "가져오기" is clicked.
-  const hasLibIdentity = steamId.trim() !== "";
+  // is actually active. Gating on the Steam-sourced library actually having data (or having been
+  // fetched at least once, even to zero) - rather than just steamId being non-empty - matters now
+  // that identity is shared with the wishlist tab: typing/loading a wishlist id alone would
+  // otherwise make manual entries appear on the library tab before it's ever been loaded, looking
+  // like "게임 3개" when it's actually "no library yet, plus 3 manually-added games".
+  const hasLibIdentity = libItems.length > 0 || libFetchedOnce;
   const combinedLibItems: Item[] = useMemo(
     () => [
       ...libItems,
@@ -2086,7 +2089,7 @@ export default function Wishlist() {
   }
   const [excludeAdult, setExcludeAdult] = useState(false);
   const [excludeDemo, setExcludeDemo] = useState(false);
-  const [dlcOnly, setDlcOnly] = useState(false);
+  const [excludeFree, setExcludeFree] = useState(false);
   // Only 필터/정렬/장르 start open - the rest (한국어/플랫폼/진행 상태/별점/추천) default collapsed
   // so the sidebar doesn't open on a wall of expanded checkbox lists.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
@@ -2266,6 +2269,49 @@ export default function Wishlist() {
     manualPlaytimeRef.current = manualPlaytime;
     manualRemovedIdsRef.current = manualRemovedIds;
   });
+  // Tracks which steamId these seven maps currently belong to. They used to implicitly belong to
+  // "whichever account is active" back when there was only ever one per session - now that
+  // 계정 변경 lets the same browser tab switch to a different steamId, without this the previous
+  // account's status/rating/stars/achievements/manual games would still be sitting in state and
+  // localStorage when the new account loads. Worse than just a display glitch: if the new account
+  // has never synced anything of its own, syncFromServer's "prefer local over empty server data"
+  // safeguard (see its comment) would keep the old account's data showing, and any edit afterward
+  // would push it straight into the new account's own server record.
+  const activeSyncIdRef = useRef<string | null>(null);
+  function resetPerAccountStateIfIdChanged(id: string) {
+    if (activeSyncIdRef.current !== null && activeSyncIdRef.current !== id) {
+      setStatusMap({});
+      setRatingMap({});
+      setStarMap({});
+      setAchievementMap({});
+      setManualPlatform({});
+      setManualGames({});
+      setManualPlaytime({});
+      setManualRemovedIds([]);
+      // Refs are updated inline (not just via the effect above) because syncFromServer runs
+      // synchronously right after this, in the same call - it needs to see the reset immediately,
+      // not after the next render/commit.
+      statusMapRef.current = {};
+      ratingMapRef.current = {};
+      starMapRef.current = {};
+      achievementMapRef.current = {};
+      manualPlatformRef.current = {};
+      manualGamesRef.current = {};
+      manualPlaytimeRef.current = {};
+      manualRemovedIdsRef.current = [];
+      try {
+        localStorage.removeItem(STATUS_STORAGE_KEY);
+        localStorage.removeItem(RATING_STORAGE_KEY);
+        localStorage.removeItem(STAR_STORAGE_KEY);
+        localStorage.removeItem(ACHIEVEMENT_STORAGE_KEY);
+        localStorage.removeItem(MANUAL_PLATFORM_STORAGE_KEY);
+        localStorage.removeItem(MANUAL_GAMES_STORAGE_KEY);
+        localStorage.removeItem(MANUAL_PLAYTIME_STORAGE_KEY);
+        localStorage.removeItem(MANUAL_REMOVED_STORAGE_KEY);
+      } catch {}
+    }
+    activeSyncIdRef.current = id;
+  }
   // Cross-device sync for the data that can't be re-fetched from Steam (play status, rating,
   // achievements) - localStorage stays the instant local write, this is a best-effort mirror to
   // /api/sync on top of it. No-ops safely if the server has no DB configured.
@@ -2630,7 +2676,7 @@ export default function Wishlist() {
       }
       if (view === "library" && excludeAdult && g?.adultContent) return false;
       if (view === "library" && excludeDemo && g?.isDemo) return false;
-      if (view === "library" && dlcOnly && !g?.isDlc) return false;
+      if (view === "library" && excludeFree && g?.isFree) return false;
       if (genreFilter.length && !genreFilter.some((id) => (g?.genreIds ?? []).includes(id)))
         return false;
       if (view === "library") {
@@ -2664,7 +2710,7 @@ export default function Wishlist() {
     koreanFilter,
     excludeAdult,
     excludeDemo,
-    dlcOnly,
+    excludeFree,
     genreFilter,
     view,
     statusFilter,
@@ -2690,7 +2736,7 @@ export default function Wishlist() {
       ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter !== null
       : excludeAdult ||
         excludeDemo ||
-        dlcOnly ||
+        excludeFree ||
         statusFilter.length > 0 ||
         ratingFilter.length > 0 ||
         starFilter.length > 0 ||
@@ -2748,6 +2794,11 @@ export default function Wishlist() {
       // show the profile card again. Falls back to the server's own STEAM_API_KEY env var, no
       // client key involved.
       const restoredId = savedId || wl?.steamId || lib?.steamId;
+      // Marks these seven maps as already belonging to this id, so if the very first explicit
+      // load this session is a *different* id (switched accounts without ever fetching the
+      // restored one first), resetPerAccountStateIfIdChanged still recognizes it as a change
+      // instead of treating the cached account's leftover data as unowned.
+      if (restoredId) activeSyncIdRef.current = restoredId;
       if (restoredId) {
         fetch(`/api/profile?steamid=${encodeURIComponent(restoredId)}`)
           .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
@@ -2839,6 +2890,7 @@ export default function Wishlist() {
       setWlError("17자리 Steam ID64를 입력하세요.");
       return;
     }
+    resetPerAccountStateIfIdChanged(id);
     try {
       if (rememberMe) localStorage.setItem(STEAM_ID_STORAGE_KEY, id);
       else {
@@ -2903,6 +2955,7 @@ export default function Wishlist() {
       setLibError("17자리 Steam ID64를 입력하세요.");
       return;
     }
+    resetPerAccountStateIfIdChanged(id);
     try {
       if (rememberMe) {
         localStorage.setItem(STEAM_ID_STORAGE_KEY, id);
@@ -2979,13 +3032,26 @@ export default function Wishlist() {
         platformFilter,
         excludeAdult,
         excludeDemo,
-        dlcOnly,
+        excludeFree,
         statusMap,
         ratingMap,
         starMap,
         manualPlatform,
       });
-      enrichAchievements(achievementOrder, id, achievementMap, updateAchievements).catch(() => {});
+      // Force-refresh only the most-recently-played games - achievement % can't have moved for
+      // one that hasn't been played since the last check, so re-checking the whole library on
+      // every "새로고침" would burn ~1 Steam API call per game (no batch endpoint for this) for
+      // almost entirely unchanged data. Everything else still gets filled in if it's never been
+      // checked at all.
+      const recentIds = new Set(
+        [...list]
+          .sort((a, b) => (b.lastPlayedTimestamp ?? 0) - (a.lastPlayedTimestamp ?? 0))
+          .slice(0, ACHIEVEMENT_REFRESH_RECENT_COUNT)
+          .map((x) => x.appid),
+      );
+      enrichAchievements(achievementOrder, id, achievementMap, updateAchievements, recentIds).catch(
+        () => {},
+      );
     } catch (e) {
       setLibError(e instanceof Error ? e.message : "알 수 없는 오류");
     } finally {
@@ -3342,7 +3408,7 @@ export default function Wishlist() {
               title="필터"
               collapsed={collapsedGroups.has("libraryFilter")}
               onToggle={() => toggleGroup("libraryFilter")}
-              activeCount={(excludeDemo ? 1 : 0) + (dlcOnly ? 1 : 0)}
+              activeCount={(excludeDemo ? 1 : 0) + (excludeFree ? 1 : 0)}
             >
               {/* <label className="sortCheck">
                 <input
@@ -3361,8 +3427,12 @@ export default function Wishlist() {
                 데모 제외
               </label>
               <label className="sortCheck">
-                <input type="checkbox" checked={dlcOnly} onChange={() => setDlcOnly((v) => !v)} />
-                DLC만 보기
+                <input
+                  type="checkbox"
+                  checked={excludeFree}
+                  onChange={() => setExcludeFree((v) => !v)}
+                />
+                무료 게임 제외
               </label>
             </FilterGroup>
           )}
@@ -3590,7 +3660,11 @@ export default function Wishlist() {
               className="refreshBtn"
               onClick={loadActive}
               disabled={loading}
-              title={view === "wishlist" ? "찜목록 새로고침" : "라이브러리 새로고침"}
+              title={
+                view === "wishlist"
+                  ? "찜목록 새로고침"
+                  : "라이브러리 새로고침 (최근 플레이한 게임 업적 포함)"
+              }
             >
               <span className={loading ? "spinning" : ""}>⟳</span>
             </button>

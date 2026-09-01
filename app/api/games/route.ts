@@ -88,6 +88,10 @@ export async function GET(request: NextRequest) {
     const tagIds: number[] = (item.tagids ?? []).filter((id: number) => tagMap[id]).slice(0, 15);
     const genres = tagIds.map((id: number) => tagMap[id]);
     const finalPrice = opt ? Number(opt.final_price_in_cents) : null;
+    // Steam's own flag, not inferred from price - a fully free-to-play game (CS2, Dota 2, ...)
+    // has no best_purchase_option at all (nothing to buy), so finalPrice === 0 never even fires
+    // for them; only a paid game temporarily priced at ₩0 would hit that path.
+    const isFree = !!item.is_free;
     const discountEndTimestamp = opt?.active_discounts?.[0]?.discount_end_date
       ? opt.active_discounts[0].discount_end_date * 1000
       : null;
@@ -124,12 +128,14 @@ export async function GET(request: NextRequest) {
       comingSoon,
       releaseUnannounced,
       earlyAccess,
-      isFree: finalPrice === 0,
+      isFree,
       price: opt
         ? finalPrice === 0
           ? "무료 플레이"
           : opt.formatted_final_price
-        : "가격 정보 없음",
+        : isFree
+          ? "무료 플레이"
+          : "가격 정보 없음",
       initialPrice: opt?.formatted_original_price ?? null,
       priceValue: finalPrice,
       discountPercent: opt?.discount_pct ?? 0,
