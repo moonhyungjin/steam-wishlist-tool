@@ -133,6 +133,7 @@ body {
   width: 34px;
   padding: 0;
   justify-content: center;
+  margin-left: auto;
 }
 .filterCloseBtn {
   display: flex;
@@ -169,6 +170,24 @@ body {
 }
 .profileAvatarLink:hover .profileAvatar {
   filter: brightness(1.15);
+}
+.skeletonBlock {
+  background: var(--line);
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.skeletonLine {
+  width: 90px;
+  height: 14px;
+  border-radius: 4px;
 }
 .viewTabs {
   display: flex;

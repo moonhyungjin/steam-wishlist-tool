@@ -1218,7 +1218,11 @@ function GameRow({
       : null;
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
   // to - everything else about a manual entry behaves the same either way.
-  const manual = manualPlatform[item.appid];
+  // manualPlatform isn't scoped by view (see its comment) - an appid added on the library tab
+  // could easily also sit in the wishlist (e.g. wishlisted, then separately hand-added once
+  // bought elsewhere), so without the view check here the wishlist row would pick up the
+  // library-only playtime/platform badges for it too.
+  const manual = view === "library" ? manualPlatform[item.appid] : undefined;
   const linkable = item.appid > 0;
   // A manual entry is never actually owned in this account's library even when it matched a real
   // Steam appid, so the steam:// launch-the-installed-client attempt would just burn its timeout
@@ -1976,6 +1980,7 @@ export default function Wishlist() {
   const [steamId, setSteamId] = useState("");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileError, setProfileError] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   // Reopens the credential form after data's already loaded for this tab (it auto-hides on
   // success) so the user can switch accounts or re-enter a key without a dedicated logout step.
@@ -2280,6 +2285,10 @@ export default function Wishlist() {
   const activeSyncIdRef = useRef<string | null>(null);
   function resetPerAccountStateIfIdChanged(id: string) {
     if (activeSyncIdRef.current !== null && activeSyncIdRef.current !== id) {
+      // Also clear the profile card so the previous account's avatar/name doesn't linger (as a
+      // real one, not a skeleton) while the new account's own profile is still being fetched.
+      setProfile(null);
+      setProfileError("");
       setStatusMap({});
       setRatingMap({});
       setStarMap({});
@@ -2903,12 +2912,14 @@ export default function Wishlist() {
     // Fire-and-forget, same as the library tab's profile fetch - no user-entered key needed here,
     // the server falls back to its own STEAM_API_KEY env var for this lookup.
     setProfileError("");
+    setProfileLoading(true);
     fetch(`/api/profile?steamid=${encodeURIComponent(id)}`)
       .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
       .then(({ ok, d }) => {
         if (ok && d.profile) setProfile(d.profile);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setProfileLoading(false));
     setWlLoading(true);
     setWlError("");
     try {
@@ -2969,6 +2980,7 @@ export default function Wishlist() {
     // Fire-and-forget alongside the library fetch below - the profile card is a nice-to-have,
     // not something the library load should wait on or fail because of.
     setProfileError("");
+    setProfileLoading(true);
     fetch(`/api/profile?steamid=${encodeURIComponent(id)}`)
       .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
       .then(({ ok, d }) => {
@@ -2982,7 +2994,8 @@ export default function Wishlist() {
       .catch(() => {
         setProfile(null);
         setProfileError("프로필을 가져오지 못했습니다. 네트워크 상태를 확인하세요.");
-      });
+      })
+      .finally(() => setProfileLoading(false));
     syncFromServer(id);
     setLibLoading(true);
     setLibError("");
@@ -3109,6 +3122,14 @@ export default function Wishlist() {
                       </div>
                     )}
                     <span className="profileName">{profile.personaName}</span>
+                  </div>
+                </div>
+              )}
+              {!profile && profileLoading && (
+                <div className="profileCard">
+                  <span className="profileAvatar skeletonBlock" />
+                  <div className="profileCardText">
+                    <span className="skeletonBlock skeletonLine" />
                   </div>
                 </div>
               )}
