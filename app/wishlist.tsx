@@ -134,7 +134,7 @@ const STAR_STORAGE_KEY = "library:stars";
 // keeps every entry point (profile badge, popover, wishlist sort option, recommend chip) off in
 // production while the underlying code, data model, and DB sync all ship as-is. Flip to true when
 // ready to launch instead of re-threading these checks individually.
-const GENRE_LEVELING_ENABLED = true;
+const GENRE_LEVELING_ENABLED = false;
 // Deliberately much smaller than the genre *filter*'s GENRE_ALLOWLIST (100+ raw Steam tags) - that
 // list is great for filtering (fine-grained facets are useful there) but terrible for leveling,
 // since near-synonyms ("1인칭 슈팅"/"히어로 슈팅"/"익스트랙션 슈터") would each level up as their
