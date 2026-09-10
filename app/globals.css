@@ -1599,6 +1599,28 @@ button:disabled {
     border-radius: 0;
     overflow-y: auto;
     background: var(--bg);
+    padding: 16px;
+  }
+  /* The filter drawer goes full-screen above, but the group titles/checkboxes inside it still
+     used the desktop sidebar's compact sizing (12-13px text, 5px/2px padding) - fine for a mouse
+     in a 300px-wide column, cramped and hard to tap accurately on a phone. */
+  .filterPanel.mobileOpen .sortLabel {
+    font-size: 15px;
+  }
+  .filterPanel.mobileOpen .sortCheck {
+    padding: 10px 8px;
+    font-size: 15px;
+    gap: 10px;
+  }
+  .filterPanel.mobileOpen .sortCheck input {
+    width: 18px;
+    height: 18px;
+  }
+  .filterPanel.mobileOpen .checkList {
+    gap: 6px;
+  }
+  .filterPanel.mobileOpen .filterGroup + .filterGroup {
+    margin-top: 22px;
   }
   .genreLevelPopover:popover-open {
     width: 100vw;
