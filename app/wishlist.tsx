@@ -77,6 +77,7 @@ type SortKey =
   | "metacritic"
   | "release-desc"
   | "discount-end-asc"
+  | "discount-desc"
   | "playtime-desc"
   | "achievement-desc"
   | "name-asc"
@@ -84,6 +85,7 @@ type SortKey =
   | "last-played-desc";
 const WISHLIST_SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "price-asc", label: "가격 낮은순" },
+  { value: "discount-desc", label: "할인율 높은순" },
   { value: "review", label: "긍정 비율 높은순" },
   { value: "metacritic", label: "메타크리틱 높은순" },
   { value: "recommend-desc", label: "추천도 높은순" },
@@ -315,6 +317,7 @@ function compareByKey(
   if (key === "name-asc") return (ga?.name ?? "").localeCompare(gb?.name ?? "", "ko");
   if (key === "discount-end-asc")
     return (ga?.discountEndTimestamp ?? Infinity) - (gb?.discountEndTimestamp ?? Infinity);
+  if (key === "discount-desc") return (gb?.discountPercent ?? 0) - (ga?.discountPercent ?? 0);
   if (key === "recommend-desc") {
     const sa = recommendScore(ga?.genreIds, genreTaste);
     const sb = recommendScore(gb?.genreIds, genreTaste);
@@ -2085,7 +2088,12 @@ export default function Wishlist() {
     setSortKey(null);
   }
   const [nameQuery, setNameQuery] = useState("");
-  const [onlyDiscounted, setOnlyDiscounted] = useState(false);
+  // 0 = no filter; otherwise the minimum discount percent to show (any/25/50/75), same tiers
+  // Steam's own store sidebar uses.
+  const [minDiscount, setMinDiscount] = useState(0);
+  function selectMinDiscount(v: number) {
+    setMinDiscount((prev) => (prev === v ? 0 : v));
+  }
   const [excludeEarlyAccess, setExcludeEarlyAccess] = useState(false);
   const [excludeComingSoon, setExcludeComingSoon] = useState(false);
   const [koreanFilter, setKoreanFilter] = useState<"supported" | "unsupported" | null>(null);
@@ -2240,12 +2248,19 @@ export default function Wishlist() {
     }
     return counts;
   }, [wlItems, wlGames]);
-  const discountCount = useMemo(() => {
-    let count = 0;
+  // Steam's own store filter groups discounts into these same tiers (any/25%+/50%+/75%+) - each
+  // count is "how many wishlist items clear this threshold", not an exclusive bucket, since
+  // minDiscount is a minimum, not a range.
+  const discountTierCounts = useMemo(() => {
+    const counts = { any: 0, p25: 0, p50: 0, p75: 0 };
     for (const item of wlItems) {
-      if ((wlGames[item.appid]?.discountPercent ?? 0) > 0) count++;
+      const pct = wlGames[item.appid]?.discountPercent ?? 0;
+      if (pct > 0) counts.any++;
+      if (pct >= 25) counts.p25++;
+      if (pct >= 50) counts.p50++;
+      if (pct >= 75) counts.p75++;
     }
-    return count;
+    return counts;
   }, [wlItems, wlGames]);
   const [achievementMap, setAchievementMap] = useState<Record<number, AchievementInfo | null>>({});
   // syncFromServer (below) is called once from the mount-only hydration effect, whose closure is
@@ -2682,7 +2697,8 @@ export default function Wishlist() {
     return items.filter((item) => {
       const g = games[item.appid];
       if (q && !(g?.name ?? "").toLowerCase().includes(q)) return false;
-      if (view === "wishlist" && onlyDiscounted && !(g && g.discountPercent > 0)) return false;
+      if (view === "wishlist" && minDiscount > 0 && !(g && g.discountPercent >= minDiscount))
+        return false;
       if (view === "wishlist" && excludeEarlyAccess && g?.earlyAccess) return false;
       if (view === "wishlist" && excludeComingSoon && g?.comingSoon) return false;
       if (view === "wishlist" && koreanFilter) {
@@ -2719,7 +2735,7 @@ export default function Wishlist() {
     items,
     games,
     nameQuery,
-    onlyDiscounted,
+    minDiscount,
     excludeEarlyAccess,
     excludeComingSoon,
     koreanFilter,
@@ -2748,7 +2764,7 @@ export default function Wishlist() {
     genreFilter.length > 0 ||
     sortKey !== null ||
     (view === "wishlist"
-      ? onlyDiscounted || excludeEarlyAccess || excludeComingSoon || koreanFilter !== null
+      ? minDiscount > 0 || excludeEarlyAccess || excludeComingSoon || koreanFilter !== null
       : excludeAdult ||
         excludeDemo ||
         excludeFree ||
@@ -3412,7 +3428,7 @@ export default function Wishlist() {
               collapsed={collapsedGroups.has("discount")}
               onToggle={() => toggleGroup("discount")}
               activeCount={
-                (onlyDiscounted ? 1 : 0) +
+                (minDiscount > 0 ? 1 : 0) +
                 (excludeEarlyAccess ? 1 : 0) +
                 (excludeComingSoon ? 1 : 0)
               }
@@ -3420,10 +3436,34 @@ export default function Wishlist() {
               <label className="sortCheck">
                 <input
                   type="checkbox"
-                  checked={onlyDiscounted}
-                  onChange={() => setOnlyDiscounted((v) => !v)}
+                  checked={minDiscount === 1}
+                  onChange={() => selectMinDiscount(1)}
                 />
-                할인 중 ({discountCount})
+                할인 중 ({discountTierCounts.any})
+              </label>
+              <label className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={minDiscount === 25}
+                  onChange={() => selectMinDiscount(25)}
+                />
+                25% 이상 ({discountTierCounts.p25})
+              </label>
+              <label className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={minDiscount === 50}
+                  onChange={() => selectMinDiscount(50)}
+                />
+                50% 이상 ({discountTierCounts.p50})
+              </label>
+              <label className="sortCheck">
+                <input
+                  type="checkbox"
+                  checked={minDiscount === 75}
+                  onChange={() => selectMinDiscount(75)}
+                />
+                75% 이상 ({discountTierCounts.p75})
               </label>
               <label className="sortCheck">
                 <input
