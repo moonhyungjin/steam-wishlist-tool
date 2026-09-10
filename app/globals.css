@@ -1623,7 +1623,7 @@ button:disabled {
     font-size: 15px;
   }
   .filterPanel.mobileOpen .sortCheck {
-    padding: 10px 8px;
+    padding: 4px 8px;
     font-size: 15px;
     gap: 10px;
   }
