@@ -2114,25 +2114,15 @@ export default function Wishlist() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   // On mobile the sidebar stacks above the game list instead of sitting beside it, so every
   // filter group expanded by default (especially the ~40-entry genre list) buries the list under
-  // a wall of checkboxes. Collapse everything on first mount there; desktop keeps them all open.
+  // a wall of checkboxes - collapse those on first mount there. 할인/정렬/제외 stay open though,
+  // same baseline as desktop (see the collapsedGroups comment above) - they're short lists and the
+  // whole point of opening the drawer is usually one of those three.
   useLayoutEffect(() => {
     const mq = window.matchMedia("(max-width: 900px)");
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobile(mq.matches);
     if (mq.matches) {
-      setCollapsedGroups(
-        new Set([
-          "discount",
-          "wishlistExclude",
-          "korean",
-          "libraryFilter",
-          "status",
-          "rating",
-          "platform",
-          "sort",
-          "genre",
-        ]),
-      );
+      setCollapsedGroups(new Set(["korean", "status", "star", "rating", "platform", "genre"]));
     }
     const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handleChange);
