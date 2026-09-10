@@ -300,10 +300,10 @@ h1 {
 /* Pure CSS tooltip (not the native title attribute) so it appears on the first frame of hover/
    focus instead of the browser's fixed ~1s title delay - no JS, no popover light-dismiss quirks.
    Speech-bubble style (::before is the little pointer triangle, ::after is the text box). The box
-   is left-anchored to the icon (not centered) rather than following it - centering clipped on the
-   left in real browsers because the Steam ID64 icon sits close to the sidebar's left edge (which
-   has overflow:hidden) with barely any margin to spare; anchoring left:0 means the box only ever
-   grows rightward, where there's comfortably more room, so it can't clip on either side. */
+   is nudged left of the icon by only 30% of its own width (not centered, not left:0) - the Steam
+   ID64 icon sits close to the sidebar's left edge (which has overflow:hidden) with little margin
+   to spare on that side, so this keeps most of the box to the right while still looking centered
+   enough under the "?" instead of visibly starting right at its left edge. */
 .helpIcon::before {
   content: "";
   position: absolute;
@@ -314,7 +314,6 @@ h1 {
   border: 5px solid transparent;
   border-bottom-color: #fff3b8;
   border-top: 0;
-  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.15));
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -324,9 +323,10 @@ h1 {
   position: absolute;
   top: calc(100% + 5px);
   left: 0;
+  transform: translateX(-30%);
   z-index: 20;
-  width: 180px;
-  max-width: 70vw;
+  width: 240px;
+  max-width: 90vw;
   background: #fff3b8;
   border-radius: 9px;
   padding: 8px 10px;
@@ -336,7 +336,6 @@ h1 {
   line-height: 1.4;
   white-space: normal;
   text-align: left;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
