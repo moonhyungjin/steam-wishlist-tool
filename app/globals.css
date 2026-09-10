@@ -283,15 +283,37 @@ h1 {
   height: 15px;
   border-radius: 50%;
   border: 1px solid var(--line);
+  background: none;
   color: var(--muted);
   font-size: 10px;
+  font-family: inherit;
+  padding: 0;
   line-height: 1;
-  cursor: help;
+  cursor: pointer;
   flex: none;
 }
 .helpIcon:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+/* display must stay off the bare selector - [popover] is display:none by default until shown, see
+   .starPopover's comment above for why. */
+.helpPopover {
+  max-width: 320px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.helpPopover:popover-open {
+  display: block;
+}
+.helpPopover::backdrop {
+  background: rgba(0, 0, 0, 0.4);
 }
 .row {
   display: flex;
