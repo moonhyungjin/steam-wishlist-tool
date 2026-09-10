@@ -139,17 +139,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   flex: none;
   padding: 0;
   background: transparent;
-  border: 1px solid var(--line);
+  border: none;
+  border-radius: 50%;
   color: var(--muted);
 }
 .filterCloseBtn:hover {
-  border-color: var(--accent);
   color: var(--accent);
+  background: rgba(255, 255, 255, 0.08);
 }
 .profileAvatar {
   width: 56px;
@@ -1547,7 +1548,8 @@ button:disabled {
     height: 26px;
   }
   .filterCloseBtn {
-    height: 24px;
+    width: 34px;
+    height: 34px;
   }
   .genreLevelBadge,
   .genreTab {
