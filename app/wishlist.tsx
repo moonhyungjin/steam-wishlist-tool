@@ -2249,15 +2249,14 @@ export default function Wishlist() {
     }
     return counts;
   }, [wlItems, wlGames]);
-  // Steam's own store filter groups discounts into these same tiers (any/25%+/50%+/75%+) - each
-  // count is "how many wishlist items clear this threshold", not an exclusive bucket, since
-  // minDiscount is a minimum, not a range.
+  // Steam's own store filter groups discounts into these same tiers (any/50%+/75%+) - each count
+  // is "how many wishlist items clear this threshold", not an exclusive bucket, since minDiscount
+  // is a minimum, not a range.
   const discountTierCounts = useMemo(() => {
-    const counts = { any: 0, p25: 0, p50: 0, p75: 0 };
+    const counts = { any: 0, p50: 0, p75: 0 };
     for (const item of wlItems) {
       const pct = wlGames[item.appid]?.discountPercent ?? 0;
       if (pct > 0) counts.any++;
-      if (pct >= 25) counts.p25++;
       if (pct >= 50) counts.p50++;
       if (pct >= 75) counts.p75++;
     }
@@ -3438,14 +3437,6 @@ export default function Wishlist() {
                     onChange={() => selectMinDiscount(1)}
                   />
                   할인 중 ({discountTierCounts.any})
-                </label>
-                <label className="sortCheck">
-                  <input
-                    type="checkbox"
-                    checked={minDiscount === 25}
-                    onChange={() => selectMinDiscount(25)}
-                  />
-                  25% 이상 ({discountTierCounts.p25})
                 </label>
                 <label className="sortCheck">
                   <input
