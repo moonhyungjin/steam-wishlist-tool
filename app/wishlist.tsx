@@ -2336,19 +2336,25 @@ export default function Wishlist() {
   }) {
     const id = steamId.trim();
     if (!/^\d{17}$/.test(id)) return;
+    // Reads the *Ref mirrors (not the state variables directly) for the same reason
+    // syncFromServer does - see its comment above the ref declarations. /api/sync's POST fully
+    // overwrites the stored record rather than merging field-by-field, so any un-overridden field
+    // here that fell back to a stale render's closured state (instead of the always-current ref)
+    // would silently wipe out newer data already saved server-side - most dangerously
+    // achievementMap, which gets pushed repeatedly in small chunks during every library load.
     fetch("/api/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         steamId: id,
-        statusMap: overrides.statusMap ?? statusMap,
-        ratingMap: overrides.ratingMap ?? ratingMap,
-        starMap: overrides.starMap ?? starMap,
-        achievementMap: overrides.achievementMap ?? achievementMap,
-        manualPlatform: overrides.manualPlatform ?? manualPlatform,
-        manualGames: overrides.manualGames ?? manualGames,
-        manualPlaytime: overrides.manualPlaytime ?? manualPlaytime,
-        manualRemovedIds: overrides.manualRemovedIds ?? manualRemovedIds,
+        statusMap: overrides.statusMap ?? statusMapRef.current,
+        ratingMap: overrides.ratingMap ?? ratingMapRef.current,
+        starMap: overrides.starMap ?? starMapRef.current,
+        achievementMap: overrides.achievementMap ?? achievementMapRef.current,
+        manualPlatform: overrides.manualPlatform ?? manualPlatformRef.current,
+        manualGames: overrides.manualGames ?? manualGamesRef.current,
+        manualPlaytime: overrides.manualPlaytime ?? manualPlaytimeRef.current,
+        manualRemovedIds: overrides.manualRemovedIds ?? manualRemovedIdsRef.current,
       }),
     }).catch(() => {});
   }
