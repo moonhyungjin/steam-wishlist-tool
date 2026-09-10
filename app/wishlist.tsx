@@ -2103,7 +2103,7 @@ export default function Wishlist() {
   const [excludeAdult, setExcludeAdult] = useState(false);
   const [excludeDemo, setExcludeDemo] = useState(false);
   const [excludeFree, setExcludeFree] = useState(false);
-  // Only 필터/정렬/장르 start open - the rest (한국어/플랫폼/진행 상태/별점/추천) default collapsed
+  // Only 할인/정렬/제외/장르 start open - the rest (한국어/플랫폼/진행 상태/별점/추천) default collapsed
   // so the sidebar doesn't open on a wall of expanded checkbox lists.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(["korean", "platform", "status", "star", "rating"]),
@@ -2123,6 +2123,7 @@ export default function Wishlist() {
       setCollapsedGroups(
         new Set([
           "discount",
+          "wishlistExclude",
           "korean",
           "libraryFilter",
           "status",
@@ -3423,74 +3424,141 @@ export default function Wishlist() {
             </button>
           </div>
           {view === "wishlist" && (
-            <FilterGroup
-              title="필터"
-              collapsed={collapsedGroups.has("discount")}
-              onToggle={() => toggleGroup("discount")}
-              activeCount={
-                (minDiscount > 0 ? 1 : 0) +
-                (excludeEarlyAccess ? 1 : 0) +
-                (excludeComingSoon ? 1 : 0)
-              }
-            >
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={minDiscount === 1}
-                  onChange={() => selectMinDiscount(1)}
-                />
-                할인 중 ({discountTierCounts.any})
-              </label>
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={minDiscount === 25}
-                  onChange={() => selectMinDiscount(25)}
-                />
-                25% 이상 ({discountTierCounts.p25})
-              </label>
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={minDiscount === 50}
-                  onChange={() => selectMinDiscount(50)}
-                />
-                50% 이상 ({discountTierCounts.p50})
-              </label>
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={minDiscount === 75}
-                  onChange={() => selectMinDiscount(75)}
-                />
-                75% 이상 ({discountTierCounts.p75})
-              </label>
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={excludeEarlyAccess}
-                  onChange={() => setExcludeEarlyAccess((v) => !v)}
-                />
-                앞서 해보기 제외
-              </label>
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={excludeComingSoon}
-                  onChange={() => setExcludeComingSoon((v) => !v)}
-                />
-                출시 예정 제외
-              </label>
-            </FilterGroup>
+            <>
+              <FilterGroup
+                title="할인"
+                collapsed={collapsedGroups.has("discount")}
+                onToggle={() => toggleGroup("discount")}
+                activeCount={minDiscount > 0 ? 1 : 0}
+              >
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={minDiscount === 1}
+                    onChange={() => selectMinDiscount(1)}
+                  />
+                  할인 중 ({discountTierCounts.any})
+                </label>
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={minDiscount === 25}
+                    onChange={() => selectMinDiscount(25)}
+                  />
+                  25% 이상 ({discountTierCounts.p25})
+                </label>
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={minDiscount === 50}
+                    onChange={() => selectMinDiscount(50)}
+                  />
+                  50% 이상 ({discountTierCounts.p50})
+                </label>
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={minDiscount === 75}
+                    onChange={() => selectMinDiscount(75)}
+                  />
+                  75% 이상 ({discountTierCounts.p75})
+                </label>
+              </FilterGroup>
+              <FilterGroup
+                title="정렬"
+                collapsed={collapsedGroups.has("sort")}
+                onToggle={() => toggleGroup("sort")}
+                activeCount={sortKey ? 1 : 0}
+              >
+                {WISHLIST_SORT_OPTIONS.filter(
+                  (opt) =>
+                    opt.value !== "recommend-desc" ||
+                    (GENRE_LEVELING_ENABLED && genreTaste.length > 0),
+                ).map((opt) => (
+                  <label key={opt.value} className="sortCheck">
+                    <input
+                      type="checkbox"
+                      checked={sortKey === opt.value}
+                      onChange={() => selectSortKey(opt.value)}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </FilterGroup>
+              <FilterGroup
+                title="제외"
+                collapsed={collapsedGroups.has("wishlistExclude")}
+                onToggle={() => toggleGroup("wishlistExclude")}
+                activeCount={(excludeEarlyAccess ? 1 : 0) + (excludeComingSoon ? 1 : 0)}
+              >
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={excludeEarlyAccess}
+                    onChange={() => setExcludeEarlyAccess((v) => !v)}
+                  />
+                  앞서 해보기 제외
+                </label>
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={excludeComingSoon}
+                    onChange={() => setExcludeComingSoon((v) => !v)}
+                  />
+                  출시 예정 제외
+                </label>
+              </FilterGroup>
+              <FilterGroup
+                title="한국어"
+                collapsed={collapsedGroups.has("korean")}
+                onToggle={() => toggleGroup("korean")}
+                activeCount={koreanFilter ? 1 : 0}
+              >
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={koreanFilter === "supported"}
+                    onChange={() => selectKoreanFilter("supported")}
+                  />
+                  한국어 지원 ({koreanCounts.supported})
+                </label>
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={koreanFilter === "unsupported"}
+                    onChange={() => selectKoreanFilter("unsupported")}
+                  />
+                  한국어 미지원 ({koreanCounts.unsupported})
+                </label>
+              </FilterGroup>
+            </>
           )}
           {view === "library" && (
-            <FilterGroup
-              title="필터"
-              collapsed={collapsedGroups.has("libraryFilter")}
-              onToggle={() => toggleGroup("libraryFilter")}
-              activeCount={(excludeDemo ? 1 : 0) + (excludeFree ? 1 : 0)}
-            >
-              {/* <label className="sortCheck">
+            <>
+              <FilterGroup
+                title="정렬"
+                collapsed={collapsedGroups.has("sort")}
+                onToggle={() => toggleGroup("sort")}
+                activeCount={sortKey ? 1 : 0}
+              >
+                {LIBRARY_SORT_OPTIONS.map((opt) => (
+                  <label key={opt.value} className="sortCheck">
+                    <input
+                      type="checkbox"
+                      checked={sortKey === opt.value}
+                      onChange={() => selectSortKey(opt.value)}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </FilterGroup>
+              <FilterGroup
+                title="제외"
+                collapsed={collapsedGroups.has("libraryFilter")}
+                onToggle={() => toggleGroup("libraryFilter")}
+                activeCount={(excludeDemo ? 1 : 0) + (excludeFree ? 1 : 0)}
+              >
+                {/* <label className="sortCheck">
                 <input
                   type="checkbox"
                   checked={excludeAdult}
@@ -3498,72 +3566,24 @@ export default function Wishlist() {
                 />
                 선정적 콘텐츠 제외
               </label> */}
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={excludeDemo}
-                  onChange={() => setExcludeDemo((v) => !v)}
-                />
-                데모 제외
-              </label>
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={excludeFree}
-                  onChange={() => setExcludeFree((v) => !v)}
-                />
-                무료 게임 제외
-              </label>
-            </FilterGroup>
-          )}
-          <FilterGroup
-            title="정렬"
-            collapsed={collapsedGroups.has("sort")}
-            onToggle={() => toggleGroup("sort")}
-            activeCount={sortKey ? 1 : 0}
-          >
-            {(view === "wishlist"
-              ? WISHLIST_SORT_OPTIONS.filter(
-                  (opt) =>
-                    opt.value !== "recommend-desc" ||
-                    (GENRE_LEVELING_ENABLED && genreTaste.length > 0),
-                )
-              : LIBRARY_SORT_OPTIONS
-            ).map((opt) => (
-              <label key={opt.value} className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={sortKey === opt.value}
-                  onChange={() => selectSortKey(opt.value)}
-                />
-                {opt.label}
-              </label>
-            ))}
-          </FilterGroup>
-          {view === "wishlist" && (
-            <FilterGroup
-              title="한국어"
-              collapsed={collapsedGroups.has("korean")}
-              onToggle={() => toggleGroup("korean")}
-              activeCount={koreanFilter ? 1 : 0}
-            >
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={koreanFilter === "supported"}
-                  onChange={() => selectKoreanFilter("supported")}
-                />
-                한국어 지원 ({koreanCounts.supported})
-              </label>
-              <label className="sortCheck">
-                <input
-                  type="checkbox"
-                  checked={koreanFilter === "unsupported"}
-                  onChange={() => selectKoreanFilter("unsupported")}
-                />
-                한국어 미지원 ({koreanCounts.unsupported})
-              </label>
-            </FilterGroup>
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={excludeDemo}
+                    onChange={() => setExcludeDemo((v) => !v)}
+                  />
+                  데모 제외
+                </label>
+                <label className="sortCheck">
+                  <input
+                    type="checkbox"
+                    checked={excludeFree}
+                    onChange={() => setExcludeFree((v) => !v)}
+                  />
+                  무료 게임 제외
+                </label>
+              </FilterGroup>
+            </>
           )}
           {view === "library" && (
             <FilterGroup
