@@ -3186,19 +3186,19 @@ export default function Wishlist() {
                 <div className="field">
                   <label>
                     Steam ID64
-                    <button
-                      type="button"
+                    <span
                       className="helpIcon"
-                      popoverTarget="steamid-help-popover"
+                      tabIndex={0}
+                      role="note"
                       aria-label="Steam ID64 도움말"
+                      data-tooltip={
+                        view === "wishlist"
+                          ? "프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요."
+                          : "프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요. 찜목록 탭과 같은 값을 공유합니다 - 한쪽에서 입력해두면 다른 탭에서도 그대로 쓰입니다. 개인정보 설정에서 '게임 세부정보'가 공개여야 라이브러리를 가져올 수 있습니다."
+                      }
                     >
                       ?
-                    </button>
-                    <div id="steamid-help-popover" popover="auto" className="helpPopover">
-                      {view === "wishlist"
-                        ? "프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요."
-                        : "프로필 페이지 URL의 숫자입니다 (steamcommunity.com/profiles/76561198xxxxxxxxx 형태). 커스텀 URL(steamcommunity.com/id/닉네임)이면 steamid.io 같은 사이트에서 변환하세요. 찜목록 탭과 같은 값을 공유합니다 - 한쪽에서 입력해두면 다른 탭에서도 그대로 쓰입니다. 개인정보 설정에서 '게임 세부정보'가 공개여야 라이브러리를 가져올 수 있습니다."}
-                    </div>
+                    </span>
                   </label>
                   <input
                     value={steamId}
@@ -3230,22 +3230,15 @@ export default function Wishlist() {
               <div className="genreLevelHeader">
                 <span className="genreLevelTitle">
                   장르 프로필
-                  <button
-                    type="button"
+                  <span
                     className="helpIcon"
-                    popoverTarget="genre-profile-help-popover"
+                    tabIndex={0}
+                    role="note"
                     aria-label="장르 프로필 도움말"
+                    data-tooltip="라이브러리에 장르가 매칭되는 게임이 5개 이상, 누적 10시간 이상 쌓여야 이 프로필이 나타납니다. 레벨 = ⌊√(누적시간 ÷ 5)⌋ (Lv.1=5시간, Lv.2=20시간, Lv.3=45시간... 뒤로 갈수록 완만해지는 곡선). 21개 굵은 장르 카테고리로 집계되며, 게임 하나가 여러 장르에 걸치면 시간을 균등 분배합니다. 플레이타임 0시간이거나 '제외' 상태인 게임은 집계에서 빠집니다. 장르 선호도(%)는 절대 기준이 아니라 본인의 전체 평균 대비 상대값이며, 최소 12개 이상 보유한 장르만 표시됩니다."
                   >
                     ?
-                  </button>
-                  <div id="genre-profile-help-popover" popover="auto" className="helpPopover">
-                    라이브러리에 장르가 매칭되는 게임이 5개 이상, 누적 10시간 이상 쌓여야 이 프로필이
-                    나타납니다. 레벨 = ⌊√(누적시간 ÷ 5)⌋ (Lv.1=5시간, Lv.2=20시간, Lv.3=45시간...
-                    뒤로 갈수록 완만해지는 곡선). 21개 굵은 장르 카테고리로 집계되며, 게임 하나가
-                    여러 장르에 걸치면 시간을 균등 분배합니다. 플레이타임 0시간이거나 '제외' 상태인
-                    게임은 집계에서 빠집니다. 장르 선호도(%)는 절대 기준이 아니라 본인의 전체 평균
-                    대비 상대값이며, 최소 12개 이상 보유한 장르만 표시됩니다.
-                  </div>
+                  </span>
                 </span>
                 <button
                   type="button"
