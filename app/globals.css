@@ -1610,7 +1610,7 @@ button:disabled {
     position: sticky;
     top: 0;
     z-index: 1;
-    padding-top: 16px;
+    padding: 16px 0 14px;
     background: var(--bg);
     border-bottom: 1px solid var(--line);
   }
