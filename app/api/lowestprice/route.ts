@@ -92,11 +92,21 @@ export async function GET(request: NextRequest) {
       const lookup: Record<string, string | null> = lookupRes.ok ? await lookupRes.json() : {};
 
       const itadIdToAppid = new Map<string, number>();
+      // Only appids that resolved to null (confirmed "not on ITAD") start here - ones with a real
+      // itadId are added below, but ONLY if the historylow call actually succeeds. A failed call
+      // (bad key, ITAD downtime, network error) must NOT produce a cached entry for those - that
+      // would falsely lock in "no price data" for a full TTL even after the real problem is fixed
+      // (this is exactly what happened testing with an invalid key: the failure got cached as a
+      // negative result, so replacing the key alone didn't surface real data until the bad cache
+      // entries were cleared).
       const freshEntries: Record<number, PriceCacheEntry> = {};
       for (const appid of toRefresh) {
         const itadId = lookup[`app/${appid}`] ?? null;
-        freshEntries[appid] = { appid, itadId, low: null, updatedAt: now };
-        if (itadId) itadIdToAppid.set(itadId, appid);
+        if (!itadId) {
+          freshEntries[appid] = { appid, itadId: null, low: null, updatedAt: now };
+        } else {
+          itadIdToAppid.set(itadId, appid);
+        }
       }
 
       if (itadIdToAppid.size) {
@@ -116,18 +126,27 @@ export async function GET(request: NextRequest) {
               timestamp: string;
             };
           }> = await historyRes.json();
-          for (const entry of history) {
-            const appid = itadIdToAppid.get(entry.id);
-            if (appid == null || !entry.low) continue;
-            freshEntries[appid].low = {
-              amount: entry.low.price.amount,
-              currency: entry.low.price.currency,
-              cut: entry.low.cut,
-              shop: entry.low.shop.name,
-              timestamp: entry.low.timestamp ?? null,
+          const lowById = new Map(history.map((entry) => [entry.id, entry.low]));
+          for (const [itadId, appid] of itadIdToAppid) {
+            const low = lowById.get(itadId);
+            freshEntries[appid] = {
+              appid,
+              itadId,
+              low: low
+                ? {
+                    amount: low.price.amount,
+                    currency: low.price.currency,
+                    cut: low.cut,
+                    shop: low.shop.name,
+                    timestamp: low.timestamp ?? null,
+                  }
+                : null,
+              updatedAt: now,
             };
           }
         }
+        // historyRes not ok: those appids simply get no freshEntries entry, so they're neither
+        // cached nor returned this request - they stay "stale" and get retried next time.
       }
 
       // set() per key (not mset) since each needs its own TTL-bearing JSON value - Upstash's
