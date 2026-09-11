@@ -2009,9 +2009,16 @@ async function enrichLowestPrice(
     const d = await r.json();
     if (!r.ok) return;
     const updates: Record<number, Game> = {};
+    // /api/lowestprice deliberately omits an appid from its response (rather than returning
+    // null) when it's stale/missing but past its own per-request refresh cap - that means "not
+    // resolved yet," not "confirmed no price." Only appids actually present in the response
+    // (`id in prices`, which real `null` results satisfy too) get written here; anything the
+    // server skipped stays undefined so the next wishlist load retries it, instead of getting
+    // permanently marked "no data" by a fallback that couldn't tell the two cases apart.
+    const prices: Record<string, LowestPrice | null> = d.prices ?? {};
     for (const id of chunk) {
-      if (!current[id]) continue;
-      updates[id] = { ...current[id], lowestPrice: d.prices?.[id] ?? null };
+      if (!current[id] || !(id in prices)) continue;
+      updates[id] = { ...current[id], lowestPrice: prices[id] };
     }
     current = { ...current, ...updates };
     onUpdate(current);
