@@ -3050,7 +3050,12 @@ export default function Wishlist() {
           return merged;
         });
       }).catch(() => {});
-      enrichLowestPrice(appids, loaded, (cur) => {
+      // Scoped to currently-discounted games only - a full-price game's historical low isn't
+      // "is this worth buying now" information the way it is for one that's actually on sale, and
+      // checking every wishlist item (not just the ones a discount makes worth checking) was the
+      // main thing driving unnecessary ITAD lookups through the shared cache.
+      const discountedAppids = appids.filter((appid) => (loaded[appid]?.discountPercent ?? 0) > 0);
+      enrichLowestPrice(discountedAppids, loaded, (cur) => {
         setWlGames((prev) => {
           const merged = mergeGamesInto(prev, cur);
           persistWishlistThrottled(list, merged);
