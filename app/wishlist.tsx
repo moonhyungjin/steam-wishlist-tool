@@ -3913,7 +3913,20 @@ export default function Wishlist() {
                   : "라이브러리 새로고침 (최근 플레이한 게임 업적 포함)"
               }
             >
-              <span className={loading ? "spinning" : ""}>⟳</span>
+              <svg
+                className={loading ? "spinning" : ""}
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 12a9 9 0 1 1-3-6.7" />
+                <polyline points="21 3 21 9 15 9" />
+              </svg>
             </button>
             <div className="layoutToggle">
               <button

@@ -506,6 +506,9 @@ button:disabled {
   border-color: var(--accent);
   color: var(--accent);
 }
+/* An SVG icon (not the old "⟳" text glyph) so this actually spins as a clean circle - a font
+   glyph's visual center rarely lines up with its box's transform-origin, which made the old one
+   visibly wobble instead of rotating true. */
 .refreshBtn .spinning {
   display: inline-block;
   animation: spin 0.8s linear infinite;
