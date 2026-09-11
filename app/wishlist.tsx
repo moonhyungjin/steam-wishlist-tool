@@ -2300,9 +2300,13 @@ export default function Wishlist() {
     return counts;
   }, [combinedLibItems, statusMap]);
   const [ratingMap, setRatingMap] = useState<Record<number, Rating>>({});
+  // Kept as an array (rather than a single value) to stay compatible with prioritizeAchievementOrder's
+  // generic filters.ratingFilter shape below - toggleRatingFilter just never lets it hold more than
+  // one entry, since "추천" and "비추천" are mutually exclusive states on any one game, not
+  // independently combinable checkboxes like status/star/platform are.
   const [ratingFilter, setRatingFilter] = useState<(Rating | "none")[]>([]);
   function toggleRatingFilter(r: Rating | "none") {
-    setRatingFilter((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]));
+    setRatingFilter((prev) => (prev.includes(r) ? [] : [r]));
   }
   function setGameRating(appid: number, rating: Rating | null) {
     const next = { ...ratingMap };
