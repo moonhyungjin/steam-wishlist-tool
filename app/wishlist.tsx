@@ -1948,6 +1948,24 @@ async function enrichGames(
   }
   return loaded;
 }
+// enrichMetacritic and enrichLowestPrice both run as independent fire-and-forget background
+// passes after the main wishlist load, each tracking its own "current" snapshot starting from the
+// same `loaded` base. Applying either one's result with a plain setWlGames(cur) would wholesale-
+// replace state with that pass's own (increasingly stale) view - whichever one's update lands
+// last would silently erase whatever field the OTHER pass had already written for a game neither
+// of them just touched. This merges per-game against the latest live state instead, so concurrent
+// passes layer their own field(s) on top of each other instead of stomping.
+function mergeGamesInto(
+  prev: Record<number, Game>,
+  delta: Record<number, Game>,
+): Record<number, Game> {
+  const next = { ...prev };
+  for (const id of Object.keys(delta)) {
+    const appid = Number(id);
+    next[appid] = { ...prev[appid], ...delta[appid] };
+  }
+  return next;
+}
 // Metacritic only comes from the old per-game endpoint that used to rate-limit the whole app, so
 // it's fetched separately, after the fast main load, at a gentle pace - and stops for good the
 // moment the server signals it's blocked, instead of ever retrying into that mess again.
@@ -3019,12 +3037,18 @@ export default function Wishlist() {
       );
       persistTo(WISHLIST_CACHE_KEY, id, list, loaded);
       enrichMetacritic(appids, loaded, (cur) => {
-        setWlGames(cur);
-        persistWishlistThrottled(list, cur);
+        setWlGames((prev) => {
+          const merged = mergeGamesInto(prev, cur);
+          persistWishlistThrottled(list, merged);
+          return merged;
+        });
       }).catch(() => {});
       enrichLowestPrice(appids, loaded, (cur) => {
-        setWlGames(cur);
-        persistWishlistThrottled(list, cur);
+        setWlGames((prev) => {
+          const merged = mergeGamesInto(prev, cur);
+          persistWishlistThrottled(list, merged);
+          return merged;
+        });
       }).catch(() => {});
     } catch (e) {
       setWlError(e instanceof Error ? e.message : "알 수 없는 오류");
