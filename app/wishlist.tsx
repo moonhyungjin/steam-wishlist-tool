@@ -44,6 +44,10 @@ type Game = {
   // All-time low across every shop ITAD tracks (not Steam-only) - undefined means "not checked
   // yet", null means "checked, ITAD has no price history for this game" (see enrichLowestPrice).
   lowestPrice?: LowestPrice | null;
+  // discountEndTimestamp as of the last time lowestPrice was actually fetched - lets
+  // enrichLowestPrice tell "still the same sale I already checked" (skip) from "a new sale
+  // started since" (worth re-checking, since this new sale could itself be a fresh record low).
+  lowestPriceCheckedForEnd?: number | null;
 };
 type LowestPrice = {
   amount: number;
@@ -1425,7 +1429,29 @@ function GameRow({
             </span>
           )}
           {g?.isDlc && <span className="dlcTag">DLC</span>}
-          {view === "wishlist" && g?.price && <span className="chip">{g.price}</span>}
+          {view === "wishlist" && g?.price ? (
+            (() => {
+              // priceValue is Steam's own cents-scaled price (final_price_in_cents) - ITAD's
+              // amount is already plain KRW, so this has to be divided by 100 before comparing or
+              // the "is this the all-time low" check would be off by 100x.
+              const lowestPrice = g.lowestPrice;
+              const atLow =
+                !!lowestPrice && g.priceValue != null && g.priceValue / 100 <= lowestPrice.amount;
+              return (
+                <span
+                  className={"chip" + (atLow ? " lowestPriceChip" : "")}
+                  title={
+                    atLow
+                      ? `${lowestPrice!.shop} 기준 역대 최저가 (IsThereAnyDeal, 스팀 외 스토어 포함)`
+                      : undefined
+                  }
+                >
+                  {atLow ? "🔥 " : ""}
+                  {g.price}
+                </span>
+              );
+            })()
+          ) : null}
           {view === "wishlist" && g?.discountPercent ? (
             <a
               className="chip discount"
@@ -1450,22 +1476,6 @@ function GameRow({
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
             </a>
-          ) : null}
-          {view === "wishlist" && g?.lowestPrice ? (
-            (() => {
-              // priceValue is Steam's own cents-scaled price (final_price_in_cents) - ITAD's
-              // amount is already plain KRW, so this has to be divided by 100 before comparing or
-              // the "is this the all-time low" check would be off by 100x.
-              const atLow = g.priceValue != null && g.priceValue / 100 <= g.lowestPrice.amount;
-              return (
-                <span
-                  className={"chip" + (atLow ? " discount" : "")}
-                  title={`${g.lowestPrice.shop} 기준 역대 최저가 (IsThereAnyDeal, 스팀 외 스토어 포함)`}
-                >
-                  {atLow ? "🔥 " : ""}역대 최저 ₩{Math.round(g.lowestPrice.amount).toLocaleString("ko-KR")}
-                </span>
-              );
-            })()
           ) : null}
           {view === "wishlist" && g?.metacritic != null ? (
             <span className={"chip " + scoreClass(g.metacritic)} title="Metacritic 점수">
@@ -1994,15 +2004,28 @@ async function enrichMetacritic(
 // All-time low price via IsThereAnyDeal - like metacritic, a secondary enrichment pass after the
 // main load, not something the initial wishlist fetch waits on. /api/lowestprice caches results
 // server-side (shared across every visitor, not per-account), so repeated loads across different
-// people mostly hit that cache instead of calling ITAD again - gap-fill only here too, since a
-// historical low essentially never moves back up.
+// people mostly hit that cache instead of calling ITAD again.
+//
+// Client-side, this only re-checks a game when its *discount period* has actually changed - the
+// call site already restricts this to currently-discounted appids, so a game simply drops out on
+// its own once the sale ends (no explicit "stop checking" needed). What still needed handling:
+// a game already checked once during sale A shouldn't get re-checked on every subsequent load for
+// the rest of that same sale (its historical low can't have moved since we last asked), but SHOULD
+// get re-checked once sale A ends and a later, different sale B starts - B could itself be a new
+// record low. lowestPriceCheckedForEnd records which sale's discountEndTimestamp a game's
+// lowestPrice was last fetched for, so a differing one signals "new sale, worth asking again."
 async function enrichLowestPrice(
   appids: number[],
   initialGames: Record<number, Game>,
   onUpdate: (games: Record<number, Game>) => void,
 ) {
   let current = initialGames;
-  const missing = appids.filter((id) => current[id] && current[id].lowestPrice === undefined);
+  const missing = appids.filter((id) => {
+    const g = current[id];
+    if (!g) return false;
+    if (g.lowestPrice === undefined) return true;
+    return g.lowestPriceCheckedForEnd !== g.discountEndTimestamp;
+  });
   for (let i = 0; i < missing.length; i += LOWPRICE_CHUNK) {
     const chunk = missing.slice(i, i + LOWPRICE_CHUNK);
     const r = await fetch(`/api/lowestprice?appids=${chunk.join(",")}`);
@@ -2018,7 +2041,11 @@ async function enrichLowestPrice(
     const prices: Record<string, LowestPrice | null> = d.prices ?? {};
     for (const id of chunk) {
       if (!current[id] || !(id in prices)) continue;
-      updates[id] = { ...current[id], lowestPrice: prices[id] };
+      updates[id] = {
+        ...current[id],
+        lowestPrice: prices[id],
+        lowestPriceCheckedForEnd: current[id].discountEndTimestamp,
+      };
     }
     current = { ...current, ...updates };
     onUpdate(current);

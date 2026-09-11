@@ -1234,6 +1234,13 @@ button:disabled {
   background: #245a3a;
   color: #a5edb4;
 }
+/* Marks the price chip when it's currently at or below the all-time low ITAD has recorded - same
+   gold tone as .chip.recommendTag, this app's existing "highlight" color. */
+.chip.lowestPriceChip {
+  background: rgba(245, 208, 110, 0.16);
+  color: #f5d06e;
+  border: 1px solid #f5d06e;
+}
 .chip.good {
   background: rgba(107, 214, 138, 0.16);
   color: #6bd68a;
