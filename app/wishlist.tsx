@@ -277,7 +277,7 @@ const MANUAL_PLAYTIME_STORAGE_KEY = "library:manualPlaytime";
 const MANUAL_REMOVED_STORAGE_KEY = "library:manualRemoved";
 // Bump this whenever the Game shape changes - otherwise old cached entries silently keep
 // missing the new fields forever, since "resume from cache" treats them as already loaded.
-const CACHE_VERSION = 12;
+const CACHE_VERSION = 13;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Fixed row slot for the virtualized list: the row content renders at ROW_HEIGHT - ROW_GAP,
 // leaving ROW_GAP of empty space below it as the visual gap between rows.
