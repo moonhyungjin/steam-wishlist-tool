@@ -41,6 +41,16 @@ type Game = {
   // apart from base games directly) - /api/games (the store-page lookup used for owned/wishlist
   // games) has no reliable way to tell, so it always reports false there.
   isDlc: boolean;
+  // All-time low across every shop ITAD tracks (not Steam-only) - undefined means "not checked
+  // yet", null means "checked, ITAD has no price history for this game" (see enrichLowestPrice).
+  lowestPrice?: LowestPrice | null;
+};
+type LowestPrice = {
+  amount: number;
+  currency: string;
+  cut: number;
+  shop: string;
+  timestamp: string | null;
 };
 // Placeholder for a manually-added game with no Steam match - every other field just means "no
 // data available" rather than "really zero/false", since none of it was actually looked up.
@@ -217,6 +227,9 @@ const ACHIEVEMENT_CHUNK = 40;
 const ACHIEVEMENT_REFRESH_RECENT_COUNT = 20;
 const CHUNK = 200;
 const META_CHUNK = 20;
+// /api/lowestprice caps at 200 appids/request (its own limit), but a smaller chunk here keeps
+// progress updates from arriving in one giant jump on huge wishlists.
+const LOWPRICE_CHUNK = 100;
 const WISHLIST_CACHE_KEY = "wishlist:cache";
 const LIBRARY_CACHE_KEY = "library:cache";
 // One shared identity across both tabs - switching between 찜목록/라이브러리 stays on the same
@@ -1438,6 +1451,22 @@ function GameRow({
               </svg>
             </a>
           ) : null}
+          {view === "wishlist" && g?.lowestPrice ? (
+            (() => {
+              // priceValue is Steam's own cents-scaled price (final_price_in_cents) - ITAD's
+              // amount is already plain KRW, so this has to be divided by 100 before comparing or
+              // the "is this the all-time low" check would be off by 100x.
+              const atLow = g.priceValue != null && g.priceValue / 100 <= g.lowestPrice.amount;
+              return (
+                <span
+                  className={"chip" + (atLow ? " discount" : "")}
+                  title={`${g.lowestPrice.shop} 기준 역대 최저가 (IsThereAnyDeal, 스팀 외 스토어 포함)`}
+                >
+                  {atLow ? "🔥 " : ""}역대 최저 ₩{Math.round(g.lowestPrice.amount).toLocaleString("ko-KR")}
+                </span>
+              );
+            })()
+          ) : null}
           {view === "wishlist" && g?.metacritic != null ? (
             <span className={"chip " + scoreClass(g.metacritic)} title="Metacritic 점수">
               메타 {g.metacritic}
@@ -1942,6 +1971,33 @@ async function enrichMetacritic(
     current = { ...current, ...updates };
     onUpdate(current);
     if (d.blocked) return;
+  }
+}
+// All-time low price via IsThereAnyDeal - like metacritic, a secondary enrichment pass after the
+// main load, not something the initial wishlist fetch waits on. /api/lowestprice caches results
+// server-side (shared across every visitor, not per-account), so repeated loads across different
+// people mostly hit that cache instead of calling ITAD again - gap-fill only here too, since a
+// historical low essentially never moves back up.
+async function enrichLowestPrice(
+  appids: number[],
+  initialGames: Record<number, Game>,
+  onUpdate: (games: Record<number, Game>) => void,
+) {
+  let current = initialGames;
+  const missing = appids.filter((id) => current[id] && current[id].lowestPrice === undefined);
+  for (let i = 0; i < missing.length; i += LOWPRICE_CHUNK) {
+    const chunk = missing.slice(i, i + LOWPRICE_CHUNK);
+    const r = await fetch(`/api/lowestprice?appids=${chunk.join(",")}`);
+    const d = await r.json();
+    if (!r.ok) return;
+    const updates: Record<number, Game> = {};
+    for (const id of chunk) {
+      if (!current[id]) continue;
+      updates[id] = { ...current[id], lowestPrice: d.prices?.[id] ?? null };
+    }
+    current = { ...current, ...updates };
+    onUpdate(current);
+    if (!d.configured) return;
   }
 }
 // Achievement completion is per-account, per-game data with no batch endpoint on Steam's side,
@@ -2963,6 +3019,10 @@ export default function Wishlist() {
       );
       persistTo(WISHLIST_CACHE_KEY, id, list, loaded);
       enrichMetacritic(appids, loaded, (cur) => {
+        setWlGames(cur);
+        persistWishlistThrottled(list, cur);
+      }).catch(() => {});
+      enrichLowestPrice(appids, loaded, (cur) => {
         setWlGames(cur);
         persistWishlistThrottled(list, cur);
       }).catch(() => {});
