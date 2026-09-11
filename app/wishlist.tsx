@@ -2891,6 +2891,14 @@ export default function Wishlist() {
         platformFilter.length > 0);
   const [listWrapRef, listSize] = useElementSize();
   const [layoutMode, setLayoutMode] = useState<"list" | "card">("list");
+  // Set within the mount-hydration effect below when a remembered account exists but the current
+  // view's item cache got invalidated by a CACHE_VERSION bump (see that constant's comment) -
+  // without this, a returning user with a remembered id would land on an unexpectedly empty
+  // list and have to notice and click 가져오기/새로고침 themselves. loadWishlist/loadLibrary read
+  // the `steamId` state directly, which is still "" inside that same effect (its setSteamId call
+  // hasn't committed yet) - so the actual fetch happens in a separate effect below instead, once
+  // steamId has actually flushed to a real value.
+  const [needsAutoLoad, setNeedsAutoLoad] = useState(false);
   // One-time hydration from localStorage on mount; SSR has no localStorage, so this must run in an
   // effect. Uses useLayoutEffect (not useEffect) so it commits before the browser paints - closes
   // the tiny window where a value typed immediately on load could get stomped by this hydration.
@@ -2901,14 +2909,16 @@ export default function Wishlist() {
       if (savedId) setSteamId(savedId);
       const wl = JSON.parse(localStorage.getItem(WISHLIST_CACHE_KEY) ?? "null");
       if (!savedId && wl?.steamId) setSteamId(wl.steamId);
-      if (wl?.version === CACHE_VERSION && Array.isArray(wl?.items)) {
+      const wlCacheValid = wl?.version === CACHE_VERSION && Array.isArray(wl?.items);
+      if (wlCacheValid) {
         setWlItems(wl.items);
         setWlProgress({ done: wl.items.length, total: wl.items.length });
         if (wl.games) setWlGames(wl.games);
       }
       const lib = JSON.parse(localStorage.getItem(LIBRARY_CACHE_KEY) ?? "null");
       if (!savedId && !wl?.steamId && lib?.steamId) setSteamId(lib.steamId);
-      if (lib?.version === CACHE_VERSION && Array.isArray(lib?.items)) {
+      const libCacheValid = lib?.version === CACHE_VERSION && Array.isArray(lib?.items);
+      if (libCacheValid) {
         setLibItems(lib.items);
         setLibProgress({ done: lib.items.length, total: lib.items.length });
         if (lib.games) setLibGames(lib.games);
@@ -2942,6 +2952,12 @@ export default function Wishlist() {
       // show the profile card again. Falls back to the server's own STEAM_API_KEY env var, no
       // client key involved.
       const restoredId = savedId || wl?.steamId || lib?.steamId;
+      // Has a remembered account, but the item cache for whichever view is currently showing
+      // (always "wishlist" at a true first mount) wasn't restored above - without an explicit
+      // reload, this account would just look empty instead of actually loading their data.
+      if (restoredId && !(view === "wishlist" ? wlCacheValid : libCacheValid)) {
+        setNeedsAutoLoad(true);
+      }
       // Marks these seven maps as already belonging to this id, so if the very first explicit
       // load this session is a *different* id (switched accounts without ever fetching the
       // restored one first), resetPerAccountStateIfIdChanged still recognizes it as a change
@@ -2966,6 +2982,17 @@ export default function Wishlist() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+  // Fires the actual reload the mount effect above flagged as needed (steamId is still "" inside
+  // that effect itself, since its own setSteamId call hasn't committed yet - this runs on the
+  // render after, once steamId has a real value to load with). One-shot: clears the flag
+  // immediately so this never fires again outside of that specific post-cache-invalidation case.
+  useEffect(() => {
+    if (!needsAutoLoad || !steamId) return;
+    setNeedsAutoLoad(false);
+    if (view === "wishlist") loadWishlist();
+    else loadLibrary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsAutoLoad, steamId]);
   function persistTo(
     cacheKey: string,
     steamIdValue: string,
