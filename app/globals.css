@@ -492,6 +492,9 @@ button:disabled {
   color: white;
 }
 .refreshBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   width: 32px;
   height: 32px;

@@ -3915,12 +3915,12 @@ export default function Wishlist() {
             >
               <svg
                 className={loading ? "spinning" : ""}
-                width="16"
-                height="16"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="3"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
