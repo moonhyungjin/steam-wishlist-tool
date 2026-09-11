@@ -1443,16 +1443,21 @@ function GameRow({
               const lowestPrice = g.lowestPrice;
               const atLow =
                 !!lowestPrice && g.priceValue != null && g.priceValue / 100 <= lowestPrice.amount;
+              // lowestPrice === null (not undefined) means it was actually checked and ITAD just
+              // has no Steam price history for this game - distinct from "not checked yet".
+              const noData = lowestPrice === null;
               return (
                 <span
-                  className={"chip" + (atLow ? " lowestPriceChip" : "")}
+                  className={"chip" + (atLow ? " lowestPriceChip" : noData ? " noPriceData" : "")}
                   title={
                     atLow
                       ? "스팀 역대 최저가 (IsThereAnyDeal 기준)"
-                      : undefined
+                      : noData
+                        ? "IsThereAnyDeal에 이 게임의 가격 기록 없음"
+                        : undefined
                   }
                 >
-                  {atLow ? "🔥 " : ""}
+                  {atLow ? "🔥 " : noData ? "❔ " : ""}
                   {g.price}
                 </span>
               );

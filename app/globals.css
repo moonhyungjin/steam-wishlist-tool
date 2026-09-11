@@ -1241,6 +1241,14 @@ button:disabled {
   color: #f5d06e;
   border: 1px solid #f5d06e;
 }
+/* Marks the price chip when ITAD was actually checked and confirmed it has no Steam price
+   history for this game - distinct from simply not being checked yet, but deliberately muted
+   (not an alarm color) since "no data" isn't a problem, just a gap. */
+.chip.noPriceData {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+}
 .chip.good {
   background: rgba(107, 214, 138, 0.16);
   color: #6bd68a;
