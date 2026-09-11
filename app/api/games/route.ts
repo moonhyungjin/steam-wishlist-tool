@@ -149,7 +149,6 @@ export async function GET(request: NextRequest) {
         : null,
       discountEndTimestamp,
       reviewPositive: item.reviews?.summary_filtered?.percent_positive ?? null,
-      metacritic: null,
       koreanSupported,
       adultContent,
       isDemo,

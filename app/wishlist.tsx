@@ -33,7 +33,11 @@ type Game = {
   discountEndDate: string | null;
   discountEndTimestamp: number | null;
   reviewPositive: number | null;
-  metacritic: number | null;
+  // undefined means "not checked yet", null means "checked, this game has no Metacritic score" -
+  // see enrichMetacritic. Was a plain `number | null` with no undefined state, which meant every
+  // scoreless game got silently retried on every single load forever (nothing distinguished
+  // "never checked" from "confirmed none" - both were just null).
+  metacritic?: number | null;
   koreanSupported: boolean;
   adultContent: boolean;
   isDemo: boolean;
@@ -78,7 +82,6 @@ function blankGame(appid: number, name: string): Game {
     discountEndDate: null,
     discountEndTimestamp: null,
     reviewPositive: null,
-    metacritic: null,
     koreanSupported: false,
     adultContent: false,
     isDemo: false,
@@ -230,7 +233,10 @@ const ACHIEVEMENT_CHUNK = 40;
 // site in loadLibrary for why the rest only fill gaps instead of a full re-check.
 const ACHIEVEMENT_REFRESH_RECENT_COUNT = 20;
 const CHUNK = 200;
-const META_CHUNK = 20;
+// /api/metacritic caps at 200 appids/request; a batch this size is fine now that it's cached
+// server-side (most of a chunk resolves from cache instantly - only genuine cache misses hit the
+// slow/fragile live-fetch path, which the route itself caps separately at 20 per request).
+const META_CHUNK = 100;
 // /api/lowestprice caps at 200 appids/request (its own limit), but a smaller chunk here keeps
 // progress updates from arriving in one giant jump on huge wishlists.
 const LOWPRICE_CHUNK = 100;
@@ -1979,13 +1985,20 @@ function mergeGamesInto(
 // Metacritic only comes from the old per-game endpoint that used to rate-limit the whole app, so
 // it's fetched separately, after the fast main load, at a gentle pace - and stops for good the
 // moment the server signals it's blocked, instead of ever retrying into that mess again.
+// /api/metacritic now caches results server-side (shared across every visitor, permanently - a
+// score, or a confirmed absence of one, never changes), so most of this chunk loop resolves from
+// cache instantly; only genuinely-new appids hit the slow/fragile live-fetch path at all.
+// `undefined` means "not checked yet"; an explicit `null` (real ones come back through
+// d.scores, same as a real number - see the route) means "checked, no score" and must not be
+// retried again - that permanent-retry bug is exactly what this field used to have before adding
+// the undefined state.
 async function enrichMetacritic(
   appids: number[],
   initialGames: Record<number, Game>,
   onUpdate: (games: Record<number, Game>) => void,
 ) {
   let current = initialGames;
-  const missing = appids.filter((id) => current[id] && current[id].metacritic == null);
+  const missing = appids.filter((id) => current[id] && current[id].metacritic === undefined);
   for (let i = 0; i < missing.length; i += META_CHUNK) {
     const chunk = missing.slice(i, i + META_CHUNK);
     const r = await fetch(`/api/metacritic?appids=${chunk.join(",")}`);
@@ -1994,7 +2007,8 @@ async function enrichMetacritic(
     const updates: Record<number, Game> = {};
     for (const [id, score] of Object.entries(d.scores ?? {})) {
       const appid = Number(id);
-      if (current[appid]) updates[appid] = { ...current[appid], metacritic: score as number };
+      if (current[appid])
+        updates[appid] = { ...current[appid], metacritic: score as number | null };
     }
     current = { ...current, ...updates };
     onUpdate(current);
