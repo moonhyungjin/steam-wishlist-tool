@@ -1448,7 +1448,7 @@ function GameRow({
                   className={"chip" + (atLow ? " lowestPriceChip" : "")}
                   title={
                     atLow
-                      ? `${lowestPrice!.shop} 기준 역대 최저가 (IsThereAnyDeal, 스팀 외 스토어 포함)`
+                      ? "스팀 역대 최저가 (IsThereAnyDeal 기준)"
                       : undefined
                   }
                 >

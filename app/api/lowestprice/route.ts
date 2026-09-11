@@ -110,23 +110,34 @@ export async function GET(request: NextRequest) {
       }
 
       if (itadIdToAppid.size) {
-        const historyRes = await fetch(`${ITAD_BASE}/games/historylow/v1?country=KR`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "ITAD-API-Key": apiKey },
-          body: JSON.stringify([...itadIdToAppid.keys()]),
-          cache: "no-store",
-        });
+        // storelow (Steam-only, via shops=61) rather than historylow (cheapest across every shop
+        // ITAD tracks, including third-party resellers like GameBillet/GreenManGaming that
+        // routinely undercut Steam itself). This app only ever links to Steam's own purchase page
+        // - comparing Steam's current price against a reseller's price would make the "🔥 역대
+        // 최저가" badge almost never fire even when a game genuinely IS at its lowest price Steam
+        // has ever charged for it (confirmed live: My Time at Sandrock and Inkulinati were both
+        // exactly at their real Steam all-time-low, but historylow's cross-store low was cheaper
+        // elsewhere, so the badge never lit up).
+        const historyRes = await fetch(
+          `${ITAD_BASE}/games/storelow/v2?country=KR&shops=${STEAM_SHOP_ID}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "ITAD-API-Key": apiKey },
+            body: JSON.stringify([...itadIdToAppid.keys()]),
+            cache: "no-store",
+          },
+        );
         if (historyRes.ok) {
           const history: Array<{
             id: string;
-            low?: {
+            lows: Array<{
               shop: { id: number; name: string };
               price: { amount: number; currency: string };
               cut: number;
               timestamp: string;
-            };
+            }>;
           }> = await historyRes.json();
-          const lowById = new Map(history.map((entry) => [entry.id, entry.low]));
+          const lowById = new Map(history.map((entry) => [entry.id, entry.lows[0]]));
           for (const [itadId, appid] of itadIdToAppid) {
             const low = lowById.get(itadId);
             freshEntries[appid] = {
