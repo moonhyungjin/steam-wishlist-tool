@@ -1240,6 +1240,7 @@ button:disabled {
   background: rgba(245, 208, 110, 0.16);
   color: #f5d06e;
   border: 1px solid #f5d06e;
+  padding: 0 7px 0 3px;
 }
 /* Marks the price chip when ITAD was actually checked and confirmed it has no Steam price
    history for this game - distinct from simply not being checked yet, but deliberately muted
@@ -1248,6 +1249,7 @@ button:disabled {
   background: transparent;
   border: 1px dashed var(--line);
   color: var(--muted);
+  padding: 0 7px 0 3px;
 }
 .chip.good {
   background: rgba(107, 214, 138, 0.16);
