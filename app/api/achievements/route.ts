@@ -39,7 +39,24 @@ export async function GET(request: NextRequest) {
           url.searchParams.set("steamid", steamId);
           url.searchParams.set("l", "koreana");
           const response = await fetch(url, { cache: "no-store" });
-          if (response.status === 429 || response.status === 403) {
+          if (response.status === 429) {
+            blocked = true;
+            return;
+          }
+          if (response.status === 403) {
+            // A per-game "Profile is not public" 403 happens when the account owner has hidden
+            // just *this* game's details (Steam lets you toggle that per-title, separately from
+            // the account-wide privacy that already had to be public to reach this game's appid
+            // at all) - it's a permanent fact about this one game, not Steam rate-limiting us, and
+            // treating it the same as 429 was wrongly aborting every other game still left in the
+            // batch/chunk whenever one of these showed up anywhere in the list.
+            try {
+              const body = await response.json();
+              if (body?.playerstats?.error === "Profile is not public") {
+                achievements[String(appid)] = null;
+                return;
+              }
+            } catch {}
             blocked = true;
             return;
           }
