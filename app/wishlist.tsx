@@ -1472,7 +1472,7 @@ function GameRow({
                           : undefined
                   }
                 >
-                  {atLow ? "🏷️ " : noData ? "❔ " : notAtLow ? "📊 " : ""}
+                  {atLow ? "🏷️ " : noData ? "❔ " : notAtLow ? "❌ " : ""}
                   {g.price}
                 </span>
               );
@@ -2238,7 +2238,7 @@ export default function Wishlist() {
   }
   const [excludeEarlyAccess, setExcludeEarlyAccess] = useState(false);
   const [excludeComingSoon, setExcludeComingSoon] = useState(false);
-  // Only excludes the "확인했는데 최저가 아님" state (📊, a real lowestPrice object with atLow
+  // Only excludes the "확인했는데 최저가 아님" state (❌, a real lowestPrice object with atLow
   // false) - games ITAD has no data for (❔, "애매한" - ambiguous, not a confirmed negative) and
   // games not even checked yet are deliberately left alone, per an explicit request to keep those
   // visible rather than filtering out anything that isn't a confirmed "yes, this is the low".
@@ -3692,7 +3692,7 @@ export default function Wishlist() {
                 </label>
                 <label
                   className="sortCheck"
-                  title="ITAD에 가격 기록이 없는(❔) 게임은 남겨두고, 기록은 있지만 지금이 최저가가 아닌(📊) 게임만 제외합니다"
+                  title="ITAD에 가격 기록이 없는(❔) 게임은 남겨두고, 기록은 있지만 지금이 최저가가 아닌(❌) 게임만 제외합니다"
                 >
                   <input
                     type="checkbox"
