@@ -2238,6 +2238,11 @@ export default function Wishlist() {
   }
   const [excludeEarlyAccess, setExcludeEarlyAccess] = useState(false);
   const [excludeComingSoon, setExcludeComingSoon] = useState(false);
+  // Only excludes the "확인했는데 최저가 아님" state (🏷️, a real lowestPrice object with atLow
+  // false) - games ITAD has no data for (❔, "애매한" - ambiguous, not a confirmed negative) and
+  // games not even checked yet are deliberately left alone, per an explicit request to keep those
+  // visible rather than filtering out anything that isn't a confirmed "yes, this is the low".
+  const [excludeNotLowest, setExcludeNotLowest] = useState(false);
   const [koreanFilter, setKoreanFilter] = useState<"supported" | "unsupported" | null>(null);
   function selectKoreanFilter(v: "supported" | "unsupported") {
     setKoreanFilter((prev) => (prev === v ? null : v));
@@ -2837,6 +2842,13 @@ export default function Wishlist() {
         return false;
       if (view === "wishlist" && excludeEarlyAccess && g?.earlyAccess) return false;
       if (view === "wishlist" && excludeComingSoon && g?.comingSoon) return false;
+      if (
+        view === "wishlist" &&
+        excludeNotLowest &&
+        g?.lowestPrice &&
+        !(g.priceValue != null && g.priceValue / 100 <= g.lowestPrice.amount)
+      )
+        return false;
       if (view === "wishlist" && koreanFilter) {
         const k = g?.koreanSupported ? "supported" : "unsupported";
         if (koreanFilter !== k) return false;
@@ -2874,6 +2886,7 @@ export default function Wishlist() {
     minDiscount,
     excludeEarlyAccess,
     excludeComingSoon,
+    excludeNotLowest,
     koreanFilter,
     excludeAdult,
     excludeDemo,
@@ -2900,7 +2913,11 @@ export default function Wishlist() {
     genreFilter.length > 0 ||
     sortKey !== null ||
     (view === "wishlist"
-      ? minDiscount > 0 || excludeEarlyAccess || excludeComingSoon || koreanFilter !== null
+      ? minDiscount > 0 ||
+        excludeEarlyAccess ||
+        excludeComingSoon ||
+        excludeNotLowest ||
+        koreanFilter !== null
       : excludeAdult ||
         excludeDemo ||
         excludeFree ||
@@ -3651,7 +3668,11 @@ export default function Wishlist() {
                 title="제외"
                 collapsed={collapsedGroups.has("wishlistExclude")}
                 onToggle={() => toggleGroup("wishlistExclude")}
-                activeCount={(excludeEarlyAccess ? 1 : 0) + (excludeComingSoon ? 1 : 0)}
+                activeCount={
+                  (excludeEarlyAccess ? 1 : 0) +
+                  (excludeComingSoon ? 1 : 0) +
+                  (excludeNotLowest ? 1 : 0)
+                }
               >
                 <label className="sortCheck">
                   <input
@@ -3668,6 +3689,17 @@ export default function Wishlist() {
                     onChange={() => setExcludeComingSoon((v) => !v)}
                   />
                   출시 예정 제외
+                </label>
+                <label
+                  className="sortCheck"
+                  title="ITAD에 가격 기록이 없는(❔) 게임은 남겨두고, 기록은 있지만 지금이 최저가가 아닌(🏷️) 게임만 제외합니다"
+                >
+                  <input
+                    type="checkbox"
+                    checked={excludeNotLowest}
+                    onChange={() => setExcludeNotLowest((v) => !v)}
+                  />
+                  최저가 아닌 게임 제외
                 </label>
               </FilterGroup>
               <FilterGroup
