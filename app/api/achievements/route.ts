@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
         .filter((x) => Number.isInteger(x) && x > 0),
     ),
   ];
-  if (!appids.length || appids.length > 40)
-    return NextResponse.json({ error: "appids는 1~40개까지입니다." }, { status: 400 });
+  if (!appids.length || appids.length > 100)
+    return NextResponse.json({ error: "appids는 1~100개까지입니다." }, { status: 400 });
 
   const achievements: Record<string, { achieved: number; total: number; percent: number } | null> =
     {};

@@ -228,7 +228,14 @@ function gameAffinity(
 }
 type AchievementInfo = { achieved: number; total: number; percent: number };
 const ACHIEVEMENT_STORAGE_KEY = "library:achievements";
-const ACHIEVEMENT_CHUNK = 40;
+// /api/achievements caps at 100 appids/request now (raised from 40) - this only cuts down on
+// round trips to *our own* server, not the actual pace against Steam's fragile per-game endpoint:
+// the route still processes 5 at a time with a 150ms gap between batches regardless of how many
+// appids arrive in one request, and Steam's own per-session rate limit (roughly ~160 total calls
+// before it starts blocking) is unaffected by how we group requests into it either way. So this
+// helps a library recover from a wiped achievementMap slightly faster (fewer HTTP round trips),
+// but doesn't raise the ceiling on how much gets checked before Steam cuts the session off.
+const ACHIEVEMENT_CHUNK = 100;
 // How many of the most-recently-played games get force-refreshed on "새로고침" - see the call
 // site in loadLibrary for why the rest only fill gaps instead of a full re-check.
 const ACHIEVEMENT_REFRESH_RECENT_COUNT = 20;
