@@ -1963,7 +1963,13 @@ async function enrichGames(
   for (let i = 0; i < missingInitial.length; i += CHUNK) {
     const newGames = await fetchChunk(missingInitial.slice(i, i + CHUNK));
     if (!newGames) continue;
-    loaded = { ...loaded, ...newGames };
+    // Per-game merge (mergeGamesInto), not a wholesale {...loaded, ...newGames} - /api/games
+    // doesn't know about metacritic/lowestPrice/lowestPriceCheckedForEnd (those come from their
+    // own separate enrichment passes, never part of this response), so a top-level spread would
+    // silently wipe them back to "unchecked" on every forced refresh. That defeated both
+    // enrichLowestPrice's "skip the same sale" optimization and (mostly harmlessly, thanks to the
+    // server-side cache) enrichMetacritic's - a 새로고침 would re-ask for data it already had.
+    loaded = mergeGamesInto(loaded, newGames);
     onProgress(loaded);
   }
   // Only one short retry: some appids (delisted, tools, soundtracks, redirected listings) never
@@ -1978,7 +1984,7 @@ async function enrichGames(
     for (let i = 0; i < missing.length; i += CHUNK) {
       const newGames = await fetchChunk(missing.slice(i, i + CHUNK));
       if (!newGames) continue;
-      loaded = { ...loaded, ...newGames };
+      loaded = mergeGamesInto(loaded, newGames);
       onProgress(loaded);
     }
   }
