@@ -1257,6 +1257,16 @@ button:disabled {
   color: var(--muted);
   padding: 0 7px 0 3px;
 }
+/* Marks the price chip when ITAD has a recorded Steam low for this game but the current price
+   isn't it - a real, checked answer (unlike .noPriceData's "we don't know"), so a solid border in
+   this app's accent blue instead of the dashed muted one, but deliberately calmer than the gold
+   "great deal" state since there's nothing to act on here. */
+.chip.notLowestPrice {
+  background: rgba(102, 192, 244, 0.12);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 0 7px 0 3px;
+}
 .chip.good {
   background: rgba(107, 214, 138, 0.16);
   color: #6bd68a;
