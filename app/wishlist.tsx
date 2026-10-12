@@ -1271,7 +1271,7 @@ function GameRow({
   const tryLibrary = view === "library" && (!manual || manual === "steam");
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
-      {pollMode && view === "wishlist" && (
+      {pollMode && (
         <label className="pollSelectCheck" title="투표 후보로 추가">
           <input
             type="checkbox"
@@ -1660,6 +1660,9 @@ function CardCell({
   statusMap,
   ratingMap,
   starMap,
+  pollMode,
+  pollSelected,
+  onTogglePollSelect,
 }: CellComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -1668,6 +1671,9 @@ function CardCell({
   statusMap: Record<number, PlayStatus>;
   ratingMap: Record<number, Rating>;
   starMap: Record<number, StarRating>;
+  pollMode: boolean;
+  pollSelected: Set<number>;
+  onTogglePollSelect: (appid: number) => void;
 }>) {
   const index = rowIndex * columnCount + columnIndex;
   const item = items[index];
@@ -1742,6 +1748,22 @@ function CardCell({
   );
   return (
     <div style={style} className="cardCellOuter">
+      {pollMode && (
+        // A sibling of the <a>, not nested inside it - the whole card body is one big link here
+        // (unlike the list row, which has room for the checkbox outside its cover link), so this
+        // has to sit on top as its own element to avoid a click on it also triggering navigation.
+        <label
+          className="pollSelectCheckCard"
+          title="투표 후보로 추가"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            checked={pollSelected.has(item.appid)}
+            onChange={() => onTogglePollSelect(item.appid)}
+          />
+        </label>
+      )}
       {linkable ? (
         <a
           className="card"
@@ -2187,21 +2209,51 @@ export default function Wishlist() {
   const [manualPlaytime, setManualPlaytime] = useState<Record<number, number>>({});
   const [manualRemovedIds, setManualRemovedIds] = useState<number[]>([]);
 
-  // "어떤 게임을 살까요?" 투표 - 찜목록에서 몇 개 골라 로그인 없이 공유 가능한 /poll/[pollId] 링크를
-  // 만든다. 후보는 생성 시점 스냅샷(이름/이미지/가격)이라 투표 중 가격이 바뀌어도 영향 없음.
-  const [pollMode, setPollMode] = useState(false);
+  // Poll creation - pick a few games and get a login-free, shareable /poll/[pollId] link.
+  // Two separate polls live behind this one piece of state: "buy" (wishlist - which to buy) and
+  // "play" (library - which to play next). They're mutually exclusive and each only makes sense
+  // on its own tab, so pollKind carries which one is active (or null) instead of a plain boolean -
+  // that's what lets the UI show the right button/question per tab instead of one poll leaking
+  // into the other view. Candidates are a creation-time snapshot (name/image/price), so price
+  // changes during voting don't affect an already-created poll.
+  const [pollKind, setPollKind] = useState<"buy" | "play" | null>(null);
   const [pollSelected, setPollSelected] = useState<Set<number>>(new Set());
   const [pollShowSelectedOnly, setPollShowSelectedOnly] = useState(false);
   const [pollCreating, setPollCreating] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
   const [pollLink, setPollLink] = useState<string | null>(null);
-  function togglePollMode() {
-    setPollMode((v) => !v);
+  // True only when a poll is active AND it's the one that belongs to the tab currently showing -
+  // e.g. a "buy" poll started on the wishlist tab stays "active" in state but isn't rendered once
+  // the user switches to the library tab, rather than its bar/checkboxes leaking into that view.
+  const pollActiveForView =
+    (pollKind === "buy" && view === "wishlist") || (pollKind === "play" && view === "library");
+  function resetPollState() {
     setPollSelected(new Set());
     setPollShowSelectedOnly(false);
     setPollError(null);
     setPollLink(null);
   }
+  function togglePollMode(kind: "buy" | "play") {
+    setPollKind((cur) => (cur === kind ? null : kind));
+    resetPollState();
+  }
+  function closePollMode() {
+    setPollKind(null);
+    resetPollState();
+  }
+  // Switching tabs away from the one a poll belongs to closes it outright (not just hides the UI) -
+  // the user has to start over on whichever tab's poll they actually want, rather than stale
+  // selections from one tab's poll silently carrying over if they switch back.
+  useEffect(() => {
+    if (pollKind === "buy" && view !== "wishlist") {
+      setPollKind(null);
+      resetPollState();
+    } else if (pollKind === "play" && view !== "library") {
+      setPollKind(null);
+      resetPollState();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
   function togglePollSelect(appid: number) {
     setPollSelected((cur) => {
       const next = new Set(cur);
@@ -2220,13 +2272,14 @@ export default function Wishlist() {
         price: g?.price ?? "정보 없음",
       };
     });
+    const question = pollKind === "play" ? "어떤 게임을 먼저 할까요?" : "어떤 게임을 살까요?";
     setPollCreating(true);
     setPollError(null);
     try {
       const res = await fetch("/api/poll", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidates }),
+        body: JSON.stringify({ candidates, question }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "투표를 만들지 못했어요.");
@@ -2917,7 +2970,7 @@ export default function Wishlist() {
     return items.filter((item) => {
       const g = games[item.appid];
       if (q && !(g?.name ?? "").toLowerCase().includes(q)) return false;
-      if (pollMode && pollShowSelectedOnly && !pollSelected.has(item.appid)) return false;
+      if (pollActiveForView && pollShowSelectedOnly && !pollSelected.has(item.appid)) return false;
       if (view === "wishlist" && minDiscount > 0 && !(g && g.discountPercent >= minDiscount))
         return false;
       if (view === "wishlist" && excludeEarlyAccess && g?.earlyAccess) return false;
@@ -2963,7 +3016,7 @@ export default function Wishlist() {
     items,
     games,
     nameQuery,
-    pollMode,
+    pollActiveForView,
     pollShowSelectedOnly,
     pollSelected,
     minDiscount,
@@ -4032,20 +4085,6 @@ export default function Wishlist() {
                 +
               </button>
             )}
-            {view === "wishlist" && (
-              <button
-                type="button"
-                className={"refreshBtn" + (pollMode ? " active" : "")}
-                onClick={togglePollMode}
-                title="투표 만들기 (어떤 게임을 살지 친구에게 물어보는 공유 링크)"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="3" y="11" width="4.5" height="9" rx="1" />
-                  <rect x="9.75" y="6" width="4.5" height="14" rx="1" />
-                  <rect x="16.5" y="3" width="4.5" height="17" rx="1" />
-                </svg>
-              </button>
-            )}
             <button
               type="button"
               className="refreshBtn"
@@ -4071,6 +4110,23 @@ export default function Wishlist() {
                 <path d="M21 12a9 9 0 1 1-3-6.7" />
                 <polyline points="21 3 21 9 15 9" />
               </svg>
+            </button>
+            <button
+              type="button"
+              className={"pollToggleBtn" + (pollActiveForView ? " active" : "")}
+              onClick={() => togglePollMode(view === "wishlist" ? "buy" : "play")}
+              title={
+                view === "wishlist"
+                  ? "어떤 게임을 살지 투표로 공유하는 링크 만들기"
+                  : "어떤 게임을 먼저 할지 투표로 공유하는 링크 만들기"
+              }
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="3" y="11" width="4.5" height="9" rx="1" />
+                <rect x="9.75" y="6" width="4.5" height="14" rx="1" />
+                <rect x="16.5" y="3" width="4.5" height="17" rx="1" />
+              </svg>
+              {view === "wishlist" ? "구매 투표 공유" : "플레이 투표 공유"}
             </button>
             <div className="layoutToggle">
               <button
@@ -4124,7 +4180,7 @@ export default function Wishlist() {
             onClose={() => setManualFormOpen(false)}
           />
         )}
-        {pollMode && (
+        {pollActiveForView && (
           <div className="pollBar">
             {pollLink ? (
               <>
@@ -4144,7 +4200,7 @@ export default function Wishlist() {
                 >
                   복사
                 </button>
-                <button type="button" className="pollBarBtnGhost" onClick={togglePollMode}>
+                <button type="button" className="pollBarBtnGhost" onClick={closePollMode}>
                   닫기
                 </button>
               </>
@@ -4164,7 +4220,7 @@ export default function Wishlist() {
                 >
                   {pollCreating ? "만드는 중..." : "투표 링크 만들기"}
                 </button>
-                <button type="button" className="pollBarBtnGhost" onClick={togglePollMode}>
+                <button type="button" className="pollBarBtnGhost" onClick={closePollMode}>
                   취소
                 </button>
                 <label className="pollBarCheck">
@@ -4218,7 +4274,7 @@ export default function Wishlist() {
                 recommendPercentile,
                 sortKey,
                 steamId,
-                pollMode,
+                pollMode: pollActiveForView,
                 pollSelected,
                 onTogglePollSelect: togglePollSelect,
               }}
@@ -4243,6 +4299,9 @@ export default function Wishlist() {
                     statusMap,
                     ratingMap,
                     starMap,
+                    pollMode: pollActiveForView,
+                    pollSelected,
+                    onTogglePollSelect: togglePollSelect,
                   }}
                   style={{ height: listSize.height, width: "100%" }}
                 />

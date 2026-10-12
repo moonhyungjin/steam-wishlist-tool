@@ -534,8 +534,26 @@ button:disabled {
   }
 }
 .cardCellOuter {
+  position: relative;
   box-sizing: border-box;
   padding: 7px;
+}
+.pollSelectCheckCard {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  display: flex;
+  padding: 4px;
+  border-radius: 6px;
+  background: rgba(10, 15, 22, 0.75);
+  cursor: pointer;
+}
+.pollSelectCheckCard input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 .card {
   display: flex;
@@ -1944,6 +1962,32 @@ button:disabled {
 
 /* --- 투표 만들기 (poll creation entry point inside the wishlist view) --- */
 .refreshBtn.active {
+  background: #1b6d9b;
+  border-color: var(--accent);
+  color: white;
+}
+/* Icon-only wasn't enough to communicate "share a poll about which game to buy/play" on its own -
+   this is a wider icon+label pill instead of a square icon button like the others in this row. */
+.pollToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  color: var(--muted);
+}
+.pollToggleBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pollToggleBtn.active {
   background: #1b6d9b;
   border-color: var(--accent);
   color: white;

@@ -4,7 +4,12 @@ import { useParams } from "next/navigation";
 import { PollButton } from "./PollButton";
 
 type PollCandidate = { appid: number; name: string; headerImage: string | null; price: string };
-type PollData = { createdAt: number; candidates: PollCandidate[]; votes: Record<number, number> };
+type PollData = {
+  createdAt: number;
+  question?: string;
+  candidates: PollCandidate[];
+  votes: Record<number, number>;
+};
 
 function votedKey(pollId: string) {
   return `poll-voted:${pollId}`;
@@ -109,7 +114,7 @@ export default function PollPage() {
 
   return (
     <div className="pollPage">
-      <h1 className="pollTitle">어떤 게임을 살까요?</h1>
+      <h1 className="pollTitle">{data.question || "어떤 게임을 살까요?"}</h1>
       <p className="pollSubtitle">
         {showResults
           ? "투표해주셔서 감사해요! 다른 게임을 고르고 다시 투표하기를 누르면 바꿀 수 있어요."
