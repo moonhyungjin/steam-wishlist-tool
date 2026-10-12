@@ -21,6 +21,7 @@ export default function PollPage() {
   const [votedFor, setVotedFor] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     if (!pollId) return;
@@ -63,6 +64,26 @@ export default function PollPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function shareLink() {
+    const url = window.location.href;
+    // Native share sheet on mobile (where it's actually available) is nicer than a silent clipboard
+    // copy - falls back to copying the link when the Web Share API isn't supported (most desktop
+    // browsers) or the user cancels the share sheet.
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "어떤 게임을 살까요?", url });
+        return;
+      } catch {
+        // AbortError (user closed the share sheet) or any other failure - fall through to copy.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1500);
+    } catch {}
   }
 
   if (error) {
@@ -137,14 +158,19 @@ export default function PollPage() {
           );
         })}
       </div>
-      <button
-        type="button"
-        className="pollSubmitBtn"
-        disabled={!canSubmit}
-        onClick={submitVote}
-      >
-        {submitting ? "투표 중..." : showResults ? "다시 투표하기" : "투표하기"}
-      </button>
+      <div className="pollButtonRow">
+        <button type="button" className="pollShareBtn" onClick={shareLink}>
+          {shareCopied ? "링크 복사됨!" : "공유하기"}
+        </button>
+        <button
+          type="button"
+          className="pollSubmitBtn"
+          disabled={!canSubmit}
+          onClick={submitVote}
+        >
+          {submitting ? "투표 중..." : showResults ? "다시 투표하기" : "투표하기"}
+        </button>
+      </div>
     </div>
   );
 }
