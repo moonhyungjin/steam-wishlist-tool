@@ -69,6 +69,11 @@ export const EN: AboutContent = {
       text: "Rate games you own with a 5-star score and mark them as recommended, right from your library.",
     },
     {
+      emoji: "🗳️",
+      title: "Vote Sharing",
+      text: "Pick a few games from your wishlist or library and share a link - friends vote on which to buy or play next, no login needed. Find your polls and their results again anytime.",
+    },
+    {
       emoji: "📥",
       title: "Steam Wishlist Import",
       text: "Retrieve a public Steam wishlist using a Steam ID64 - no login required.",
@@ -151,6 +156,11 @@ export const KO: AboutContent = {
       emoji: "⭐",
       title: "나만의 평가",
       text: "보유한 게임에 5점 별점을 매기고 추천 표시까지, 라이브러리에서 바로 남길 수 있어요.",
+    },
+    {
+      emoji: "🗳️",
+      title: "투표 공유",
+      text: "위시리스트나 라이브러리에서 몇 개를 골라 링크로 공유하면, 친구들이 로그인 없이 뭘 살지/뭘 먼저 할지 투표해요. 만든 투표와 결과는 언제든 다시 볼 수 있어요.",
     },
     {
       emoji: "📥",

@@ -4242,16 +4242,6 @@ export default function Wishlist() {
               </span>
               {filteredItems.length} / {items.length}개
             </span>
-            {view === "library" && (
-              <button
-                type="button"
-                className="refreshBtn"
-                onClick={() => setManualFormOpen((v) => !v)}
-                title="Epic/STOVE 등 다른 곳에서 산 게임 직접 추가"
-              >
-                +
-              </button>
-            )}
             <button
               type="button"
               className="refreshBtn"
@@ -4362,6 +4352,31 @@ export default function Wishlist() {
                     </svg>
                     내가 만든 투표
                   </button>
+                  {view === "library" && (
+                    <button
+                      type="button"
+                      className="moreActionsItem"
+                      title="Epic/STOVE 등 다른 곳에서 산 게임을 직접 추가"
+                      onClick={() => {
+                        setManualFormOpen((v) => !v);
+                        setMoreActionsOpen(false);
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      >
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      게임 추가하기
+                    </button>
+                  )}
                   <div className="moreActionsDivider" />
                   {/* Temporary entries (per request) - the app's own UI is Korean-only, so the
                       language item is a visible-but-disabled placeholder rather than pretending
