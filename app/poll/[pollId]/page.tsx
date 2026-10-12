@@ -73,6 +73,7 @@ export default function PollPage() {
 
   const totalVotes = Object.values(data.votes).reduce((a, b) => a + b, 0);
   const showResults = votedFor != null;
+  const maxVotes = Math.max(0, ...Object.values(data.votes));
 
   return (
     <div className="pollPage">
@@ -85,19 +86,29 @@ export default function PollPage() {
           const count = data.votes[c.appid] ?? 0;
           const pct = totalVotes ? Math.round((count / totalVotes) * 100) : 0;
           const isPicked = votedFor === c.appid;
+          const isTop = showResults && maxVotes > 0 && count === maxVotes;
           return (
             <button
               key={c.appid}
               type="button"
-              className={"pollCard" + (isPicked ? " picked" : "")}
+              className={"pollCard" + (isPicked ? " picked" : "") + (isTop ? " top" : "")}
               onClick={() => vote(c.appid)}
               disabled={votedFor != null || submitting != null}
             >
-              {c.headerImage ? (
-                <img className="pollCardImg" src={c.headerImage} alt="" loading="lazy" />
-              ) : (
-                <div className="pollCardImg pollCardImgPlaceholder" />
-              )}
+              <div className="pollCardImgWrap">
+                {c.headerImage ? (
+                  <img className="pollCardImg" src={c.headerImage} alt="" loading="lazy" />
+                ) : (
+                  <div className="pollCardImg pollCardImgPlaceholder" />
+                )}
+                {isTop && (
+                  <span className="pollTopBadge" title="현재 1위">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M5 3v18h2v-7h11l-3-4 3-4H7V3H5z" />
+                    </svg>
+                  </span>
+                )}
+              </div>
               <div className="pollCardInfo">
                 <div className="pollCardName">{c.name}</div>
                 <div className="pollCardPrice">{c.price}</div>

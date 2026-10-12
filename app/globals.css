@@ -1743,16 +1743,40 @@ button:disabled {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent) inset;
 }
-.pollCardImg {
+/* The current leader (highest vote count, once at least one vote exists) gets a gold treatment so
+   it reads as "winning" at a glance instead of blending in with the rest of the list. */
+.pollCard.top {
+  border-color: #e8b93f;
+  box-shadow: 0 0 0 1px #e8b93f inset;
+}
+.pollCardImgWrap {
+  position: relative;
   flex: none;
-  width: 90px;
-  height: 42px;
+}
+.pollCardImg {
+  display: block;
+  width: 56px;
+  height: 56px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #0a0f16;
 }
 .pollCardImgPlaceholder {
   background: #0a0f16;
+}
+.pollTopBadge {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 100px;
+  background: #e8b93f;
+  color: #241b03;
+  box-shadow: 0 0 0 2px var(--panel);
 }
 .pollCardInfo {
   flex: 1;
@@ -1786,8 +1810,13 @@ button:disabled {
   position: absolute;
   inset: 0;
   width: 0;
-  background: rgba(102, 192, 244, 0.14);
+  /* A visible translucent gauge across the whole row (YouTube-poll-style), not just a faint tint -
+     the previous 0.14-alpha fill was barely perceptible as a "percentage bar". */
+  background: rgba(102, 192, 244, 0.22);
   transition: width 0.4s ease;
+}
+.pollCard.top .pollResultFill {
+  background: rgba(232, 185, 63, 0.26);
 }
 .pollResultLabel {
   position: relative;
@@ -1804,6 +1833,10 @@ button:disabled {
   color: var(--text);
   background: rgba(15, 23, 32, 0.82);
   border: 1px solid rgba(102, 192, 244, 0.5);
+}
+.pollCard.top .pollResultLabel {
+  color: #e8b93f;
+  border-color: rgba(232, 185, 63, 0.7);
 }
 .pollVotingLabel {
   position: absolute;
@@ -1843,8 +1876,8 @@ button:disabled {
     gap: 16px;
   }
   .pollCardImg {
-    width: 130px;
-    height: 61px;
+    width: 72px;
+    height: 72px;
   }
   .pollCardName {
     font-size: 16px;
