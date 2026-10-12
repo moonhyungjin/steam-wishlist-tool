@@ -1214,6 +1214,9 @@ function GameRow({
   recommendPercentile,
   sortKey,
   steamId,
+  pollMode,
+  pollSelected,
+  onTogglePollSelect,
 }: RowComponentProps<{
   items: Item[];
   games: Record<number, Game>;
@@ -1234,6 +1237,9 @@ function GameRow({
   onSetManualPlaytime: (appid: number, hours: number | null) => void;
   recommendPercentile: Record<number, number>;
   sortKey: SortKey | null;
+  pollMode: boolean;
+  pollSelected: Set<number>;
+  onTogglePollSelect: (appid: number) => void;
 }>) {
   const item = items[index];
   const g = games[item.appid];
@@ -1265,6 +1271,15 @@ function GameRow({
   const tryLibrary = view === "library" && (!manual || manual === "steam");
   return (
     <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
+      {pollMode && view === "wishlist" && (
+        <label className="pollSelectCheck" title="투표 후보로 추가">
+          <input
+            type="checkbox"
+            checked={pollSelected.has(item.appid)}
+            onChange={() => onTogglePollSelect(item.appid)}
+          />
+        </label>
+      )}
       <div className="coverWrap">
         {linkable ? (
           <a
@@ -2171,6 +2186,55 @@ export default function Wishlist() {
   const [manualGames, setManualGames] = useState<Record<number, Game>>({});
   const [manualPlaytime, setManualPlaytime] = useState<Record<number, number>>({});
   const [manualRemovedIds, setManualRemovedIds] = useState<number[]>([]);
+
+  // "어떤 게임을 살까요?" 투표 - 찜목록에서 몇 개 골라 로그인 없이 공유 가능한 /poll/[pollId] 링크를
+  // 만든다. 후보는 생성 시점 스냅샷(이름/이미지/가격)이라 투표 중 가격이 바뀌어도 영향 없음.
+  const [pollMode, setPollMode] = useState(false);
+  const [pollSelected, setPollSelected] = useState<Set<number>>(new Set());
+  const [pollCreating, setPollCreating] = useState(false);
+  const [pollError, setPollError] = useState<string | null>(null);
+  const [pollLink, setPollLink] = useState<string | null>(null);
+  function togglePollMode() {
+    setPollMode((v) => !v);
+    setPollSelected(new Set());
+    setPollError(null);
+    setPollLink(null);
+  }
+  function togglePollSelect(appid: number) {
+    setPollSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(appid)) next.delete(appid);
+      else if (next.size < 8) next.add(appid);
+      return next;
+    });
+  }
+  async function createPoll() {
+    const candidates = [...pollSelected].map((appid) => {
+      const g = games[appid];
+      return {
+        appid,
+        name: g?.name ?? String(appid),
+        headerImage: g?.headerImage ?? null,
+        price: g?.price ?? "정보 없음",
+      };
+    });
+    setPollCreating(true);
+    setPollError(null);
+    try {
+      const res = await fetch("/api/poll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidates }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error || "투표를 만들지 못했어요.");
+      setPollLink(`${location.origin}/poll/${body.pollId}`);
+    } catch (err) {
+      setPollError(err instanceof Error ? err.message : "투표를 만들지 못했어요.");
+    } finally {
+      setPollCreating(false);
+    }
+  }
   function persistManualRemoved(ids: number[]) {
     try {
       localStorage.setItem(MANUAL_REMOVED_STORAGE_KEY, JSON.stringify(ids));
@@ -3962,6 +4026,16 @@ export default function Wishlist() {
                 +
               </button>
             )}
+            {view === "wishlist" && (
+              <button
+                type="button"
+                className={"refreshBtn" + (pollMode ? " active" : "")}
+                onClick={togglePollMode}
+                title="투표 만들기 (어떤 게임을 살지 친구에게 물어보는 공유 링크)"
+              >
+                🗳️
+              </button>
+            )}
             <button
               type="button"
               className="refreshBtn"
@@ -4040,6 +4114,53 @@ export default function Wishlist() {
             onClose={() => setManualFormOpen(false)}
           />
         )}
+        {pollMode && (
+          <div className="pollBar">
+            {pollLink ? (
+              <>
+                <span className="pollBarText">투표 링크가 만들어졌어요!</span>
+                <input
+                  className="pollLinkInput"
+                  readOnly
+                  value={pollLink}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <button
+                  type="button"
+                  className="pollBarBtn"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(pollLink).catch(() => {});
+                  }}
+                >
+                  복사
+                </button>
+                <button type="button" className="pollBarBtnGhost" onClick={togglePollMode}>
+                  닫기
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="pollBarText">
+                  {pollSelected.size === 0
+                    ? "투표에 올릴 게임을 2~8개 체크해주세요."
+                    : `${pollSelected.size}개 선택됨`}
+                </span>
+                {pollError && <span className="pollBarError">{pollError}</span>}
+                <button
+                  type="button"
+                  className="pollBarBtn"
+                  disabled={pollSelected.size < 2 || pollCreating}
+                  onClick={createPoll}
+                >
+                  {pollCreating ? "만드는 중..." : "투표 링크 만들기"}
+                </button>
+                <button type="button" className="pollBarBtnGhost" onClick={togglePollMode}>
+                  취소
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <div className="listWrap" ref={listWrapRef}>
           {!items.length ? (
             <div className="empty">
@@ -4079,6 +4200,9 @@ export default function Wishlist() {
                 recommendPercentile,
                 sortKey,
                 steamId,
+                pollMode,
+                pollSelected,
+                onTogglePollSelect: togglePollSelect,
               }}
               style={{ height: listSize.height, width: "100%" }}
             />
