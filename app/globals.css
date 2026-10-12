@@ -1788,6 +1788,20 @@ button:disabled {
   text-align: center;
   color: var(--muted);
 }
+/* Top-of-page link back to the main tool - a plain text link, not a button, so it doesn't compete
+   with the poll's own vote/share actions further down. */
+.pollHomeLink {
+  display: inline-block;
+  margin-bottom: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+}
+.pollHomeLink:hover,
+.pollHomeLink:focus-visible {
+  color: var(--accent);
+}
 .pollTitle {
   font-size: 22px;
   font-weight: 700;
@@ -1966,8 +1980,12 @@ button:disabled {
   .pollCardPrice {
     font-size: 13px;
   }
+  /* width:100% is needed here - .pollPage is a column flex container at this breakpoint, where
+     auto side margins stop a child from stretching and it collapses to its content width (it was
+     rendering at ~200px) instead of filling up to max-width. */
   .pollButtonRow {
-    max-width: 420px;
+    width: 100%;
+    max-width: 600px;
     margin-left: auto;
     margin-right: auto;
   }

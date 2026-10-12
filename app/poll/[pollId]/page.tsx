@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PollButton } from "./PollButton";
 
@@ -96,6 +97,9 @@ export default function PollPage() {
     return (
       <div className="pollPage">
         <div className="pollEmpty">{error}</div>
+        <Link href="/" className="pollHomeLink">
+          My Steam Wishlist 바로가기
+        </Link>
       </div>
     );
   }
@@ -114,6 +118,9 @@ export default function PollPage() {
 
   return (
     <div className="pollPage">
+      <Link href="/" className="pollHomeLink">
+        My Steam Wishlist
+      </Link>
       <h1 className="pollTitle">{data.question || "어떤 게임을 살까요?"}</h1>
       <p className="pollSubtitle">
         {showResults
