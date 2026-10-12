@@ -1809,7 +1809,10 @@ button:disabled {
 /* Top-of-page link back to the main tool - a plain text link, not a button, so it doesn't compete
    with the poll's own vote/share actions further down. */
 .pollHomeLink {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 4px;
   margin-bottom: 18px;
   font-size: 13px;
   font-weight: 600;

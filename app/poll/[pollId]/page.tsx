@@ -99,6 +99,7 @@ export default function PollPage() {
         <div className="pollEmpty">{error}</div>
         <Link href="/" className="pollHomeLink">
           My Steam Wishlist 바로가기
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18" /></svg>
         </Link>
       </div>
     );
@@ -120,6 +121,7 @@ export default function PollPage() {
     <div className="pollPage">
       <Link href="/" className="pollHomeLink">
         My Steam Wishlist
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18" /></svg>
       </Link>
       <h1 className="pollTitle">{data.question || "어떤 게임을 살까요?"}</h1>
       <p className="pollSubtitle">
