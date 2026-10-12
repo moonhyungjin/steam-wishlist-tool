@@ -1698,6 +1698,28 @@ button:disabled {
   padding: 40px 16px 60px;
   color: var(--text);
 }
+.pollSubmitBtn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: #1b6d9b;
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+}
+.pollSubmitBtn:hover:not(:disabled) {
+  background: #2480ac;
+}
+.pollSubmitBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--muted);
+}
 .pollEmpty {
   padding: 60px 0;
   text-align: center;
@@ -1721,13 +1743,13 @@ button:disabled {
 .pollCard {
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: stretch;
   width: 100%;
-  padding: 10px;
+  min-height: 88px;
+  padding: 0;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -1739,29 +1761,35 @@ button:disabled {
 .pollCard:hover:not(:disabled) {
   border-color: var(--accent);
 }
-.pollCard.picked {
+.pollCard.selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent) inset;
 }
 .pollCardImgWrap {
   position: relative;
   flex: none;
+  /* Flush against the card's own edges (no padding/gap around it) and stretched to the row's full
+     height - .pollCard's overflow:hidden + border-radius clip it to match the card's rounded
+     corners, so the image itself needs none of its own. */
+  width: 100px;
+  align-self: stretch;
 }
 .pollCardImg {
   display: block;
-  width: 56px;
-  height: 56px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 8px;
   background: #0a0f16;
 }
 .pollCardImgPlaceholder {
+  width: 100%;
+  height: 100%;
   background: #0a0f16;
 }
 .pollTopBadge {
   position: absolute;
-  top: -6px;
-  left: -6px;
+  top: 6px;
+  left: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1770,16 +1798,20 @@ button:disabled {
   border-radius: 100px;
   background: #e8b93f;
   color: #241b03;
-  box-shadow: 0 0 0 2px var(--panel);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 .pollCardInfo {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
   /* Reserves room for .pollResultLabel, which floats on a separate absolutely-positioned overlay
      and isn't otherwise accounted for by this column's own flex width - without this, a long
      title's ellipsis only kicks in at the card's full width and the result label ends up
      overlapping its tail instead of sitting cleanly to the right of it. */
-  padding-right: 64px;
+  padding: 10px 64px 10px 14px;
 }
 .pollCardName {
   font-size: 14px;
@@ -1789,7 +1821,6 @@ button:disabled {
   text-overflow: ellipsis;
 }
 .pollCardPrice {
-  margin-top: 2px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -1829,12 +1860,6 @@ button:disabled {
   color: #e8b93f;
   border-color: rgba(232, 185, 63, 0.7);
 }
-.pollVotingLabel {
-  position: absolute;
-  right: 10px;
-  font-size: 12px;
-  color: var(--muted);
-}
 .pollHint {
   margin-top: 20px;
   text-align: center;
@@ -1866,15 +1891,22 @@ button:disabled {
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
-  .pollCardImg {
-    width: 72px;
-    height: 72px;
+  .pollCard {
+    min-height: 108px;
+  }
+  .pollCardImgWrap {
+    width: 140px;
   }
   .pollCardName {
     font-size: 16px;
   }
   .pollCardPrice {
     font-size: 13px;
+  }
+  .pollSubmitBtn {
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 

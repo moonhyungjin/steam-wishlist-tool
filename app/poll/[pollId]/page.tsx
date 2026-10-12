@@ -14,8 +14,13 @@ export default function PollPage() {
   const pollId = params.pollId;
   const [data, setData] = useState<PollData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // votedFor is the last confirmed vote (synced with localStorage); selected is just what's
+  // currently highlighted on screen - clicking a card only changes `selected`, nothing is sent to
+  // the server until the "투표하기" button is pressed, matching a pick-then-confirm poll instead
+  // of voting instantly on click.
   const [votedFor, setVotedFor] = useState<number | null>(null);
-  const [submitting, setSubmitting] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!pollId) return;
@@ -29,31 +34,34 @@ export default function PollPage() {
       .catch((err) => setError(err.message));
     try {
       const raw = localStorage.getItem(votedKey(pollId));
-      if (raw) setVotedFor(Number(raw));
+      if (raw) {
+        const appid = Number(raw);
+        setVotedFor(appid);
+        setSelected(appid);
+      }
     } catch {}
   }, [pollId]);
 
-  async function vote(appid: number) {
-    // Clicking the same card you already picked is a no-op, not a re-vote.
-    if (appid === votedFor || submitting != null) return;
-    setSubmitting(appid);
+  async function submitVote() {
+    if (selected == null || selected === votedFor || submitting) return;
+    setSubmitting(true);
     try {
       const res = await fetch(`/api/poll/${pollId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appid, previousAppid: votedFor }),
+        body: JSON.stringify({ appid: selected, previousAppid: votedFor }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "투표하지 못했어요.");
       setData(body as PollData);
-      setVotedFor(appid);
+      setVotedFor(selected);
       try {
-        localStorage.setItem(votedKey(pollId), String(appid));
+        localStorage.setItem(votedKey(pollId), String(selected));
       } catch {}
     } catch (err) {
       setError(err instanceof Error ? err.message : "투표하지 못했어요.");
     } finally {
-      setSubmitting(null);
+      setSubmitting(false);
     }
   }
 
@@ -75,28 +83,29 @@ export default function PollPage() {
   const totalVotes = Object.values(data.votes).reduce((a, b) => a + b, 0);
   const showResults = votedFor != null;
   const maxVotes = Math.max(0, ...Object.values(data.votes));
+  const canSubmit = selected != null && selected !== votedFor && !submitting;
 
   return (
     <div className="pollPage">
       <h1 className="pollTitle">어떤 게임을 살까요?</h1>
       <p className="pollSubtitle">
         {showResults
-          ? "투표해주셔서 감사해요! 다른 게임을 누르면 투표를 바꿀 수 있어요."
-          : "마음에 드는 게임을 골라주세요."}
+          ? "투표해주셔서 감사해요! 다른 게임을 고르고 다시 투표하기를 누르면 바꿀 수 있어요."
+          : "마음에 드는 게임을 고른 다음 투표하기를 눌러주세요."}
       </p>
       <div className="pollList">
         {data.candidates.map((c) => {
           const count = data.votes[c.appid] ?? 0;
           const pct = totalVotes ? Math.round((count / totalVotes) * 100) : 0;
-          const isPicked = votedFor === c.appid;
+          const isSelected = selected === c.appid;
           const isTop = showResults && maxVotes > 0 && count === maxVotes;
           return (
             <button
               key={c.appid}
               type="button"
-              className={"pollCard" + (isPicked ? " picked" : "") + (isTop ? " top" : "")}
-              onClick={() => vote(c.appid)}
-              disabled={isPicked || submitting != null}
+              className={"pollCard" + (isSelected ? " selected" : "") + (isTop ? " top" : "")}
+              onClick={() => setSelected(c.appid)}
+              disabled={submitting}
             >
               <div className="pollCardImgWrap">
                 {c.headerImage ? (
@@ -124,12 +133,18 @@ export default function PollPage() {
                   </span>
                 </div>
               )}
-              {submitting === c.appid && <span className="pollVotingLabel">투표 중...</span>}
             </button>
           );
         })}
       </div>
-      {!showResults && <div className="pollHint">하나를 클릭하면 바로 투표돼요.</div>}
+      <button
+        type="button"
+        className="pollSubmitBtn"
+        disabled={!canSubmit}
+        onClick={submitVote}
+      >
+        {submitting ? "투표 중..." : showResults ? "다시 투표하기" : "투표하기"}
+      </button>
     </div>
   );
 }
