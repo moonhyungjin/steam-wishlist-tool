@@ -20,6 +20,11 @@ export const POLL_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MAX_CANDIDATES = 8;
 const MIN_CANDIDATES = 2;
 const MAX_QUESTION_LENGTH = 60;
+// How many of a creator's most recent polls stay in their "my polls" list, and how long that list
+// itself lives after their last created poll (longer than a poll's own TTL, so the list never
+// disappears out from under a still-live poll).
+export const MAX_LISTED_POLLS = 30;
+export const MY_POLLS_TTL_SECONDS = 90 * 24 * 60 * 60;
 const DEFAULT_QUESTION = "어떤 게임을 살까요?";
 
 export type PollCandidate = {
@@ -76,5 +81,20 @@ export async function POST(request: NextRequest) {
   const pollId = makePollId();
   const data: PollData = { createdAt: Date.now(), question, candidates, votes };
   await client.set(`poll:${pollId}`, data, { ex: POLL_TTL_SECONDS });
+
+  // Record the poll under its creator's Steam ID so they can find the link again later (see
+  // /api/my-polls). Done server-side at creation instead of through /api/sync: that endpoint
+  // overwrites the whole record on every write, so adding a field there would let any stale
+  // client silently wipe it - this is an append-only sorted set with nothing to merge. Best
+  // effort: failing to record it must never fail the poll creation itself.
+  const owner = typeof body?.ownerSteamId === "string" ? body.ownerSteamId : "";
+  if (/^\d{17}$/.test(owner)) {
+    try {
+      const listKey = `mypolls:${owner}`;
+      await client.zadd(listKey, { score: data.createdAt, member: pollId });
+      await client.zremrangebyrank(listKey, 0, -(MAX_LISTED_POLLS + 1));
+      await client.expire(listKey, MY_POLLS_TTL_SECONDS);
+    } catch {}
+  }
   return NextResponse.json({ pollId });
 }
