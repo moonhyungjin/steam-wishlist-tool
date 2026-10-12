@@ -4033,7 +4033,11 @@ export default function Wishlist() {
                 onClick={togglePollMode}
                 title="투표 만들기 (어떤 게임을 살지 친구에게 물어보는 공유 링크)"
               >
-                🗳️
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="11" width="4.5" height="9" rx="1" />
+                  <rect x="9.75" y="6" width="4.5" height="14" rx="1" />
+                  <rect x="16.5" y="3" width="4.5" height="17" rx="1" />
+                </svg>
               </button>
             )}
             <button
