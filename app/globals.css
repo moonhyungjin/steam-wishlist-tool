@@ -538,22 +538,23 @@ button:disabled {
   box-sizing: border-box;
   padding: 7px;
 }
+/* Flatter now that clicking anywhere on the card also toggles it - this is just a status
+   indicator, not the only clickable target anymore, so it doesn't need its own prominent
+   background pill to stay findable. */
 .pollSelectCheckCard {
   position: absolute;
-  top: 14px;
-  left: 14px;
+  top: 8px;
+  left: 8px;
   z-index: 2;
   display: flex;
-  padding: 4px;
-  border-radius: 6px;
-  background: rgba(10, 15, 22, 0.75);
   cursor: pointer;
 }
 .pollSelectCheckCard input {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   accent-color: var(--accent);
   cursor: pointer;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
 }
 .card {
   display: flex;
@@ -1585,12 +1586,12 @@ button:disabled {
      card-grid layout does - pull it out of flow and overlay it on the image corner instead. */
   .pollSelectCheck {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: 8px;
+    left: 8px;
     z-index: 2;
-    padding: 4px;
-    border-radius: 6px;
-    background: rgba(10, 15, 22, 0.75);
+  }
+  .pollSelectCheck input {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
   }
   .info {
     display: flex;
@@ -2002,23 +2003,25 @@ button:disabled {
   min-width: 220px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
+/* A flat list row (icon + text, no background/border chip) instead of a button-styled box - this
+   is a menu, each item doesn't need to look like its own separate button. */
 .moreActionsItem {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  background: #0c1420;
-  border: 1px solid var(--line);
+  background: transparent;
+  border: none;
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
-  padding: 10px 14px;
-  border-radius: 8px;
+  padding: 10px 10px;
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
 }
 .moreActionsItem:hover {
-  border-color: var(--accent);
+  background: #0c1420;
   color: var(--accent);
 }
 .pollSelectCheck {
@@ -2039,13 +2042,14 @@ button:disabled {
 .card.pollActive {
   cursor: pointer;
 }
+/* border-color only, no inset box-shadow - the shadow version bit a visible 1px sliver out of the
+   cover image's edge (it sits flush against the row/card boundary), since inset shadows paint
+   just inside the border rather than only the border line itself. */
 .game.pollSelected {
   border-color: #e8b93f;
-  box-shadow: 0 0 0 1px #e8b93f inset;
 }
 .card.pollSelected {
   border-color: #e8b93f;
-  box-shadow: 0 0 0 1px #e8b93f inset;
 }
 .pollBar {
   display: flex;
