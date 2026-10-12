@@ -1709,37 +1709,46 @@ button:disabled {
   gap: 10px;
   margin-top: 16px;
 }
-.pollSubmitBtn {
-  flex: 1.4;
-  padding: 14px;
+/* Fixed height + flex-centered content instead of vertical padding - padding-based sizing let the
+   two buttons' heights drift apart on narrow screens whenever one's label wrapped to two lines and
+   the other didn't ("다시 투표하기" / "링크 복사됨!" vs "공유하기" / "투표하기"). white-space:nowrap
+   avoids that wrapping in the first place; height stays exact either way. */
+.pollBtn {
+  flex: 1;
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-radius: 10px;
+  font-size: 15px;
+}
+.pollBtn-primary {
   border: 1px solid var(--accent);
   background: #1b6d9b;
   color: white;
-  font-size: 15px;
   font-weight: 700;
 }
-.pollSubmitBtn:hover:not(:disabled) {
+.pollBtn-primary:hover:not(:disabled) {
   background: #2480ac;
 }
-.pollSubmitBtn:disabled {
+.pollBtn-primary:disabled {
   opacity: 0.35;
   cursor: default;
   background: var(--panel);
   border-color: var(--line);
   color: var(--muted);
 }
-.pollShareBtn {
-  flex: 1;
-  padding: 14px;
-  border-radius: 10px;
+.pollBtn-ghost {
   border: 1px solid var(--line);
   background: transparent;
   color: var(--text);
-  font-size: 15px;
   font-weight: 600;
 }
-.pollShareBtn:hover {
+.pollBtn-ghost:hover {
   border-color: var(--accent);
   color: var(--accent);
 }

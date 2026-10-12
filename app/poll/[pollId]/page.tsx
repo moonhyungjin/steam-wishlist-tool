@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { PollButton } from "./PollButton";
 
 type PollCandidate = { appid: number; name: string; headerImage: string | null; price: string };
 type PollData = { createdAt: number; candidates: PollCandidate[]; votes: Record<number, number> };
@@ -159,17 +160,12 @@ export default function PollPage() {
         })}
       </div>
       <div className="pollButtonRow">
-        <button type="button" className="pollShareBtn" onClick={shareLink}>
+        <PollButton variant="ghost" onClick={shareLink}>
           {shareCopied ? "링크 복사됨!" : "공유하기"}
-        </button>
-        <button
-          type="button"
-          className="pollSubmitBtn"
-          disabled={!canSubmit}
-          onClick={submitVote}
-        >
+        </PollButton>
+        <PollButton variant="primary" onClick={submitVote} disabled={!canSubmit}>
           {submitting ? "투표 중..." : showResults ? "다시 투표하기" : "투표하기"}
-        </button>
+        </PollButton>
       </div>
     </div>
   );
