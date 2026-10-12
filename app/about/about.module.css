@@ -88,65 +88,26 @@
   }
 }
 
-/* Example product preview - deliberately labeled, not presented as a real screenshot (none was
-   available to capture in this session). Swap in a real screenshot under public/ later and this
-   block can be replaced with a plain <img>. */
+/* Real screenshots of the running app - see AppScreenshot in page.tsx. */
 .previewCard {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 16px;
-}
-.previewLabel {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin: 0 0 12px;
-}
-.previewRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 10px;
+}
+.previewImg {
+  display: block;
+  width: 100%;
+  height: auto;
   border-radius: 8px;
-  background: #111c2a;
   border: 1px solid #29384b;
-  margin-bottom: 10px;
 }
-.previewRow:last-child {
-  margin-bottom: 0;
-}
-.previewThumb {
-  flex: none;
-  width: 64px;
-  height: 34px;
-  border-radius: 4px;
-}
-.previewInfo {
-  flex: 1;
-  min-width: 0;
-}
-.previewName {
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.previewMeta {
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.previewChip {
-  flex: none;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 100px;
-  background: rgba(102, 192, 244, 0.14);
-  color: var(--accent);
+/* The mobile screenshot is a tall 390x844 capture - without a cap it stretches to fill its grid
+   column just like the wide desktop one does, making it look blown up next to it instead of
+   reading as a small phone preview. */
+.previewCardMobile {
+  max-width: 220px;
+  margin: 0 auto;
 }
 
 .sectionTitle {
@@ -242,9 +203,17 @@
 .previewSection {
   background: #0c1420;
 }
-.previewList {
+.previewGrid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  align-items: start;
+  gap: 24px;
   margin-top: 40px;
-  max-width: 480px;
+}
+@media (max-width: 860px) {
+  .previewGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .finalCta {

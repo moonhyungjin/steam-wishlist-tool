@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import styles from "./about.module.css";
 
@@ -57,25 +58,20 @@ const STEPS = [
   },
 ];
 
-function ExamplePreview() {
-  const rows = [
-    { name: "Example Game One", meta: "Action · -40%", color: "#3b5a78" },
-    { name: "Example Game Two", meta: "RPG · Wishlisted", color: "#4a3b78" },
-    { name: "Example Game Three", meta: "Indie · -15%", color: "#2f6b5c" },
-  ];
+// Real screenshots of the running app (captured from its empty, pre-ID-entry state - not a
+// mockup), not a decorative recreation. See public/screenshots/.
+function AppScreenshot({ variant }: { variant: "desktop" | "mobile" }) {
+  const isDesktop = variant === "desktop";
   return (
-    <div className={styles.previewCard}>
-      <p className={styles.previewLabel}>EXAMPLE VIEW — ILLUSTRATIVE, NOT LIVE DATA</p>
-      {rows.map((row) => (
-        <div className={styles.previewRow} key={row.name}>
-          <div className={styles.previewThumb} style={{ background: row.color }} />
-          <div className={styles.previewInfo}>
-            <div className={styles.previewName}>{row.name}</div>
-            <div className={styles.previewMeta}>{row.meta}</div>
-          </div>
-          <span className={styles.previewChip}>Wishlist</span>
-        </div>
-      ))}
+    <div className={isDesktop ? styles.previewCard : `${styles.previewCard} ${styles.previewCardMobile}`}>
+      <Image
+        src={isDesktop ? "/screenshots/wishlist-desktop.png" : "/screenshots/wishlist-mobile.png"}
+        alt="Steam Wishlist Tool interface before a Steam ID has been entered, showing the ID input, filters, and sort options"
+        width={isDesktop ? 1440 : 390}
+        height={isDesktop ? 900 : 844}
+        className={styles.previewImg}
+        priority={isDesktop}
+      />
     </div>
   );
 }
@@ -111,7 +107,7 @@ export default function AboutPage() {
                 </a>
               </div>
             </div>
-            <ExamplePreview />
+            <AppScreenshot variant="desktop" />
           </div>
         </section>
 
@@ -174,8 +170,9 @@ export default function AboutPage() {
       <section className={`${styles.section} ${styles.previewSection}`}>
         <div className={styles.container}>
           <h2 className={styles.sectionTitle}>A clearer view of your next purchase.</h2>
-          <div className={styles.previewList}>
-            <ExamplePreview />
+          <div className={styles.previewGrid}>
+            <AppScreenshot variant="desktop" />
+            <AppScreenshot variant="mobile" />
           </div>
         </div>
       </section>
