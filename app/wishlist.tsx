@@ -296,6 +296,7 @@ const ROW_GAP = 10;
 // Card view keeps only image + title + one line of context (playtime for library, price/release
 // for wishlist) - a grid can't fit as much per item as the list row can, so it's deliberately thin.
 const CARD_MIN_WIDTH = 190;
+const CARD_NARROW_BREAKPOINT = 520;
 const CARD_ROW_HEIGHT = 168;
 function scoreClass(n: number): string {
   return n >= 75 ? "good" : n >= 50 ? "mid" : "bad";
@@ -4220,6 +4221,43 @@ export default function Wishlist() {
                     </svg>
                     {view === "wishlist" ? "구매 투표 만들기" : "플레이 투표 만들기"}
                   </button>
+                  <div className="moreActionsDivider" />
+                  {/* Temporary entries (per request) - the app's own UI is Korean-only, so the
+                      language item is a visible-but-disabled placeholder rather than pretending
+                      there's a working switcher. About goes to the Korean landing page. */}
+                  <a href="/about/ko" className="moreActionsItem">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <line x1="12" y1="11" x2="12" y2="16" />
+                      <circle cx="12" cy="8" r="0.6" fill="currentColor" />
+                    </svg>
+                    About
+                  </a>
+                  <button type="button" className="moreActionsItem" disabled>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M3 12h18" />
+                      <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
+                    </svg>
+                    언어 설정
+                    <span className="moreActionsTag">준비 중</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -4349,7 +4387,13 @@ export default function Wishlist() {
             />
           ) : listSize.height > 0 && listSize.width > 0 ? (
             (() => {
-              const columnCount = Math.max(1, Math.floor(listSize.width / CARD_MIN_WIDTH));
+              // Below CARD_NARROW_BREAKPOINT the min-width rule gives 1 column (e.g. 340px / 190),
+              // which stretches each card to full width and crops the cover art badly - phones get
+              // a fixed 2-column grid instead.
+              const columnCount =
+                listSize.width < CARD_NARROW_BREAKPOINT
+                  ? 2
+                  : Math.max(1, Math.floor(listSize.width / CARD_MIN_WIDTH));
               return (
                 <Grid
                   className="gameGrid"
