@@ -2191,12 +2191,14 @@ export default function Wishlist() {
   // 만든다. 후보는 생성 시점 스냅샷(이름/이미지/가격)이라 투표 중 가격이 바뀌어도 영향 없음.
   const [pollMode, setPollMode] = useState(false);
   const [pollSelected, setPollSelected] = useState<Set<number>>(new Set());
+  const [pollShowSelectedOnly, setPollShowSelectedOnly] = useState(false);
   const [pollCreating, setPollCreating] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
   const [pollLink, setPollLink] = useState<string | null>(null);
   function togglePollMode() {
     setPollMode((v) => !v);
     setPollSelected(new Set());
+    setPollShowSelectedOnly(false);
     setPollError(null);
     setPollLink(null);
   }
@@ -2915,6 +2917,7 @@ export default function Wishlist() {
     return items.filter((item) => {
       const g = games[item.appid];
       if (q && !(g?.name ?? "").toLowerCase().includes(q)) return false;
+      if (pollMode && pollShowSelectedOnly && !pollSelected.has(item.appid)) return false;
       if (view === "wishlist" && minDiscount > 0 && !(g && g.discountPercent >= minDiscount))
         return false;
       if (view === "wishlist" && excludeEarlyAccess && g?.earlyAccess) return false;
@@ -2960,6 +2963,9 @@ export default function Wishlist() {
     items,
     games,
     nameQuery,
+    pollMode,
+    pollShowSelectedOnly,
+    pollSelected,
     minDiscount,
     excludeEarlyAccess,
     excludeComingSoon,
@@ -4161,6 +4167,14 @@ export default function Wishlist() {
                 <button type="button" className="pollBarBtnGhost" onClick={togglePollMode}>
                   취소
                 </button>
+                <label className="pollBarCheck">
+                  <input
+                    type="checkbox"
+                    checked={pollShowSelectedOnly}
+                    onChange={(e) => setPollShowSelectedOnly(e.target.checked)}
+                  />
+                  체크한 게임만 보기
+                </label>
               </>
             )}
           </div>

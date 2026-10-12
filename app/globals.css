@@ -2013,3 +2013,18 @@ button:disabled {
   border-color: var(--accent);
   color: var(--accent);
 }
+.pollBarCheck {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pollBarCheck input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
