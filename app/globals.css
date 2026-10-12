@@ -1819,7 +1819,7 @@ button:disabled {
   gap: 10px;
   flex-wrap: wrap;
   padding: 10px 16px;
-  margin: 0 0 10px;
+  margin: 12px 0 10px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
