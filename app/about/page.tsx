@@ -22,6 +22,14 @@ export const metadata: Metadata = {
 
 const FEATURES = [
   {
+    title: "Lowest-Price & Discount Tracking",
+    text: "See whether a discounted game is actually at its lowest price ever on Steam, and how much time is left before the sale ends.",
+  },
+  {
+    title: "Your Own Ratings",
+    text: "Rate games you own with a 5-star score and mark them as recommended, right from your library.",
+  },
+  {
     title: "Steam Wishlist Import",
     text: "Retrieve a public Steam wishlist using a Steam ID64 - no login required.",
   },
@@ -58,21 +66,25 @@ const STEPS = [
   },
 ];
 
-// Real screenshots of the running app (captured from its empty, pre-ID-entry state - not a
-// mockup), not a decorative recreation. See public/screenshots/.
-function AppScreenshot({ variant }: { variant: "desktop" | "mobile" }) {
-  const isDesktop = variant === "desktop";
+// Real screenshots of the running app - a real wishlist/library, captured with the account's own
+// name and avatar swapped out for a placeholder (see public/screenshots/ and the capture script
+// used to generate them). Not a decorative recreation.
+function AppScreenshot({
+  src,
+  alt,
+  caption,
+  priority,
+}: {
+  src: string;
+  alt: string;
+  caption?: string;
+  priority?: boolean;
+}) {
   return (
-    <div className={isDesktop ? styles.previewCard : `${styles.previewCard} ${styles.previewCardMobile}`}>
-      <Image
-        src={isDesktop ? "/screenshots/wishlist-desktop.png" : "/screenshots/wishlist-mobile.png"}
-        alt="Steam Wishlist Tool interface before a Steam ID has been entered, showing the ID input, filters, and sort options"
-        width={isDesktop ? 1440 : 390}
-        height={isDesktop ? 900 : 844}
-        className={styles.previewImg}
-        priority={isDesktop}
-      />
-    </div>
+    <figure className={styles.previewCard}>
+      <Image src={src} alt={alt} width={1440} height={900} className={styles.previewImg} priority={priority} />
+      {caption && <figcaption className={styles.previewCaption}>{caption}</figcaption>}
+    </figure>
   );
 }
 
@@ -107,7 +119,11 @@ export default function AboutPage() {
                 </a>
               </div>
             </div>
-            <AppScreenshot variant="desktop" />
+            <AppScreenshot
+              src="/screenshots/wishlist-hero.png"
+              alt="Steam Wishlist Tool showing a real wishlist with discount, lowest-price, Metacritic, and review badges on each game"
+              priority
+            />
           </div>
         </section>
 
@@ -171,8 +187,16 @@ export default function AboutPage() {
         <div className={styles.container}>
           <h2 className={styles.sectionTitle}>A clearer view of your next purchase.</h2>
           <div className={styles.previewGrid}>
-            <AppScreenshot variant="desktop" />
-            <AppScreenshot variant="mobile" />
+            <AppScreenshot
+              src="/screenshots/wishlist-discount.png"
+              alt="Wishlist filtered to discounted games, showing lowest-price and discount-end-date badges on each one"
+              caption="Filter to discounted games and see the lowest price ever and when the sale ends."
+            />
+            <AppScreenshot
+              src="/screenshots/library-ratings.png"
+              alt="Library view showing 5-star ratings and thumbs-up recommendations on owned games"
+              caption="Rate and recommend games in your library."
+            />
           </div>
         </div>
       </section>

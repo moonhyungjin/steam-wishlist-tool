@@ -90,6 +90,7 @@
 
 /* Real screenshots of the running app - see AppScreenshot in page.tsx. */
 .previewCard {
+  margin: 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -102,12 +103,10 @@
   border-radius: 8px;
   border: 1px solid #29384b;
 }
-/* The mobile screenshot is a tall 390x844 capture - without a cap it stretches to fill its grid
-   column just like the wide desktop one does, making it look blown up next to it instead of
-   reading as a small phone preview. */
-.previewCardMobile {
-  max-width: 220px;
-  margin: 0 auto;
+.previewCaption {
+  margin: 10px 2px 2px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .sectionTitle {
@@ -205,7 +204,7 @@
 }
 .previewGrid {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: 1fr 1fr;
   align-items: start;
   gap: 24px;
   margin-top: 40px;
