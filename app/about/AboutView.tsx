@@ -70,6 +70,9 @@ export function AboutView({ content: c }: { content: AboutContent }) {
           <div className={styles.cardGrid}>
             {c.problemCards.map((card) => (
               <div className={styles.card} key={card.title}>
+                <span className={styles.cardEmoji} aria-hidden="true">
+                  {card.emoji}
+                </span>
                 <h3 className={styles.cardTitle}>{card.title}</h3>
                 <p className={styles.cardText}>{card.text}</p>
               </div>
@@ -82,6 +85,9 @@ export function AboutView({ content: c }: { content: AboutContent }) {
           <div className={styles.featureGrid}>
             {c.features.map((f) => (
               <div className={styles.card} key={f.title}>
+                <span className={styles.cardEmoji} aria-hidden="true">
+                  {f.emoji}
+                </span>
                 <h3 className={styles.cardTitle}>{f.title}</h3>
                 <p className={styles.cardText}>{f.text}</p>
               </div>

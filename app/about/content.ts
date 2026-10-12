@@ -12,9 +12,9 @@ export type AboutContent = {
   switchHref: string;
   problemTitle: string;
   problemDescription: string;
-  problemCards: { title: string; text: string }[];
+  problemCards: { emoji: string; title: string; text: string }[];
   featuresTitle: string;
-  features: { title: string; text: string }[];
+  features: { emoji: string; title: string; text: string }[];
   stepsTitle: string;
   steps: { title: string; text: string }[];
   howNote: string;
@@ -48,9 +48,10 @@ export const EN: AboutContent = {
   problemDescription:
     "A growing wishlist makes it harder to compare games, spot worthwhile discounts, and decide what to play next.",
   problemCards: [
-    { title: "Too Many Games", text: "Keep your growing wishlist easier to explore." },
-    { title: "Better Comparisons", text: "Review available game details in one place." },
+    { emoji: "🗂️", title: "Too Many Games", text: "Keep your growing wishlist easier to explore." },
+    { emoji: "🔍", title: "Better Comparisons", text: "Review available game details in one place." },
     {
+      emoji: "💡",
       title: "Smarter Decisions",
       text: "Use price, discount, and other available information to help decide what to buy.",
     },
@@ -58,30 +59,37 @@ export const EN: AboutContent = {
   featuresTitle: "Everything you need to review your wishlist.",
   features: [
     {
+      emoji: "🏷️",
       title: "Lowest-Price & Discount Tracking",
       text: "See whether a discounted game is actually at its lowest price ever on Steam, and how much time is left before the sale ends.",
     },
     {
+      emoji: "⭐",
       title: "Your Own Ratings",
       text: "Rate games you own with a 5-star score and mark them as recommended, right from your library.",
     },
     {
+      emoji: "📥",
       title: "Steam Wishlist Import",
       text: "Retrieve a public Steam wishlist using a Steam ID64 - no login required.",
     },
     {
+      emoji: "🎮",
       title: "Game Information",
       text: "Browse available game details, including artwork, price, discount, genre, and release information where available.",
     },
     {
+      emoji: "🔎",
       title: "Search and Filters",
       text: "Find games using the filters and search options supported by the current application.",
     },
     {
+      emoji: "🔀",
       title: "Sorting Options",
       text: "Organize games using the sorting options currently available in the tool.",
     },
     {
+      emoji: "🧭",
       title: "Personal Browsing Experience",
       text: "Review your wishlist in a focused interface designed for personal use.",
     },
@@ -128,37 +136,44 @@ export const KO: AboutContent = {
   problemDescription:
     "위시리스트가 늘어날수록 게임을 비교하고, 괜찮은 할인을 찾고, 다음에 뭘 할지 정하기가 더 어려워져요.",
   problemCards: [
-    { title: "너무 많은 게임", text: "점점 늘어나는 위시리스트를 더 쉽게 둘러보세요." },
-    { title: "더 나은 비교", text: "게임 정보를 한곳에서 확인하세요." },
-    { title: "더 똑똑한 결정", text: "가격, 할인 등 제공되는 정보로 구매 결정을 도와드려요." },
+    { emoji: "🗂️", title: "너무 많은 게임", text: "점점 늘어나는 위시리스트를 더 쉽게 둘러보세요." },
+    { emoji: "🔍", title: "더 나은 비교", text: "게임 정보를 한곳에서 확인하세요." },
+    { emoji: "💡", title: "더 똑똑한 결정", text: "가격, 할인 등 제공되는 정보로 구매 결정을 도와드려요." },
   ],
   featuresTitle: "위시리스트를 검토하는 데 필요한 모든 것.",
   features: [
     {
+      emoji: "🏷️",
       title: "최저가 & 할인 추적",
       text: "할인 중인 게임이 실제로 스팀 역대 최저가인지, 할인이 언제 끝나는지 확인하세요.",
     },
     {
+      emoji: "⭐",
       title: "나만의 평가",
       text: "보유한 게임에 5점 별점을 매기고 추천 표시까지, 라이브러리에서 바로 남길 수 있어요.",
     },
     {
+      emoji: "📥",
       title: "스팀 위시리스트 가져오기",
       text: "Steam ID64만으로 공개 위시리스트를 불러와요 - 로그인 불필요.",
     },
     {
+      emoji: "🎮",
       title: "게임 정보",
       text: "아트워크, 가격, 할인, 장르, 출시일 등 제공되는 정보를 확인하세요.",
     },
     {
+      emoji: "🔎",
       title: "검색 및 필터",
       text: "현재 앱이 지원하는 필터와 검색 옵션으로 게임을 찾아보세요.",
     },
     {
+      emoji: "🔀",
       title: "정렬 옵션",
       text: "지금 사용 가능한 정렬 옵션으로 게임을 정리하세요.",
     },
     {
+      emoji: "🧭",
       title: "개인 맞춤 열람 경험",
       text: "개인 사용에 맞춘 집중된 인터페이스로 위시리스트를 살펴보세요.",
     },

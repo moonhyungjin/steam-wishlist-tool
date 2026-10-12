@@ -159,6 +159,12 @@
   border-radius: 12px;
   padding: 24px;
 }
+.cardEmoji {
+  display: block;
+  font-size: 26px;
+  line-height: 1;
+  margin: 0 0 12px;
+}
 .cardTitle {
   font-size: 16px;
   font-weight: 700;
