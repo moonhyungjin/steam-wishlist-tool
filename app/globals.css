@@ -1966,31 +1966,45 @@ button:disabled {
   border-color: var(--accent);
   color: white;
 }
-/* Icon-only wasn't enough to communicate "share a poll about which game to buy/play" on its own -
-   this is a wider icon+label pill instead of a square icon button like the others in this row. */
-.pollToggleBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  height: 32px;
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  background: transparent;
+/* A wide icon+label pill button didn't have a good home squeezed between the small square icon
+   buttons (refresh/layout toggle) in this row - moved behind a "⋯ more actions" menu instead
+   (same native-popover pattern as statusPopover/starPopover), which keeps the icon row itself
+   dense/consistent and gives room for the label to actually explain what the action does. */
+.moreActionsPopover {
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 100px;
-  color: var(--muted);
+  border-radius: 12px;
+  padding: 8px;
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  min-width: 220px;
 }
-.pollToggleBtn:hover {
+.moreActionsPopover:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.moreActionsPopover::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+.moreActionsItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: #0c1420;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.moreActionsItem:hover {
   border-color: var(--accent);
   color: var(--accent);
-}
-.pollToggleBtn.active {
-  background: #1b6d9b;
-  border-color: var(--accent);
-  color: white;
 }
 .pollSelectCheck {
   flex: none;

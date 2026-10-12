@@ -2217,6 +2217,7 @@ export default function Wishlist() {
   // into the other view. Candidates are a creation-time snapshot (name/image/price), so price
   // changes during voting don't affect an already-created poll.
   const [pollKind, setPollKind] = useState<"buy" | "play" | null>(null);
+  const moreActionsPopoverRef = useRef<HTMLDivElement>(null);
   const [pollSelected, setPollSelected] = useState<Set<number>>(new Set());
   const [pollShowSelectedOnly, setPollShowSelectedOnly] = useState(false);
   const [pollCreating, setPollCreating] = useState(false);
@@ -4111,23 +4112,6 @@ export default function Wishlist() {
                 <polyline points="21 3 21 9 15 9" />
               </svg>
             </button>
-            <button
-              type="button"
-              className={"pollToggleBtn" + (pollActiveForView ? " active" : "")}
-              onClick={() => togglePollMode(view === "wishlist" ? "buy" : "play")}
-              title={
-                view === "wishlist"
-                  ? "어떤 게임을 살지 투표로 공유하는 링크 만들기"
-                  : "어떤 게임을 먼저 할지 투표로 공유하는 링크 만들기"
-              }
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="11" width="4.5" height="9" rx="1" />
-                <rect x="9.75" y="6" width="4.5" height="14" rx="1" />
-                <rect x="16.5" y="3" width="4.5" height="17" rx="1" />
-              </svg>
-              {view === "wishlist" ? "구매 투표 공유" : "플레이 투표 공유"}
-            </button>
             <div className="layoutToggle">
               <button
                 type="button"
@@ -4154,6 +4138,40 @@ export default function Wishlist() {
                   <rect x="3" y="13" width="8" height="8" />
                   <rect x="13" y="13" width="8" height="8" />
                 </svg>
+              </button>
+            </div>
+            <button
+              type="button"
+              className={"refreshBtn" + (pollActiveForView ? " active" : "")}
+              popoverTarget="more-actions-popover"
+              title="더보기"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
+            <div
+              popover="auto"
+              id="more-actions-popover"
+              className="moreActionsPopover"
+              ref={moreActionsPopoverRef}
+            >
+              <button
+                type="button"
+                className="moreActionsItem"
+                onClick={() => {
+                  togglePollMode(view === "wishlist" ? "buy" : "play");
+                  moreActionsPopoverRef.current?.hidePopover();
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="3" y="11" width="4.5" height="9" rx="1" />
+                  <rect x="9.75" y="6" width="4.5" height="14" rx="1" />
+                  <rect x="16.5" y="3" width="4.5" height="17" rx="1" />
+                </svg>
+                {view === "wishlist" ? "구매 투표 만들기" : "플레이 투표 만들기"}
               </button>
             </div>
           </div>
