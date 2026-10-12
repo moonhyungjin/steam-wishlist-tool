@@ -107,7 +107,7 @@ export default function PollPage() {
                 {isTop && (
                   <span className="pollTopBadge" title="현재 1위">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M5 3v18h2v-7h11l-3-4 3-4H7V3H5z" />
+                      <path d="M6 2a2 2 0 0 0-2 2v18l8-5.5 8 5.5V4a2 2 0 0 0-2-2H6z" />
                     </svg>
                   </span>
                 )}

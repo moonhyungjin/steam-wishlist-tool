@@ -1743,12 +1743,6 @@ button:disabled {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent) inset;
 }
-/* The current leader (highest vote count, once at least one vote exists) gets a gold treatment so
-   it reads as "winning" at a glance instead of blending in with the rest of the list. */
-.pollCard.top {
-  border-color: #e8b93f;
-  box-shadow: 0 0 0 1px #e8b93f inset;
-}
 .pollCardImgWrap {
   position: relative;
   flex: none;
@@ -1814,9 +1808,6 @@ button:disabled {
      the previous 0.14-alpha fill was barely perceptible as a "percentage bar". */
   background: rgba(102, 192, 244, 0.22);
   transition: width 0.4s ease;
-}
-.pollCard.top .pollResultFill {
-  background: rgba(232, 185, 63, 0.26);
 }
 .pollResultLabel {
   position: relative;
