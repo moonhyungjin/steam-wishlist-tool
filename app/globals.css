@@ -1757,6 +1757,11 @@ button:disabled {
 .pollCardInfo {
   flex: 1;
   min-width: 0;
+  /* Reserves room for .pollResultLabel, which floats on a separate absolutely-positioned overlay
+     and isn't otherwise accounted for by this column's own flex width - without this, a long
+     title's ellipsis only kicks in at the card's full width and the result label ends up
+     overlapping its tail instead of sitting cleanly to the right of it. */
+  padding-right: 64px;
 }
 .pollCardName {
   font-size: 14px;
@@ -1787,10 +1792,18 @@ button:disabled {
 .pollResultLabel {
   position: relative;
   margin-left: auto;
-  padding-right: 10px;
+  margin-right: 10px;
+  padding: 4px 9px;
+  border-radius: 100px;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+  /* A solid pill instead of plain accent-colored text sitting directly on the card - the old
+     version read fine over the plain panel background but became nearly illegible over busy,
+     light-colored game cover art (the accent blue has poor contrast against e.g. FEZ's cover). */
+  color: var(--text);
+  background: rgba(15, 23, 32, 0.82);
+  border: 1px solid rgba(102, 192, 244, 0.5);
 }
 .pollVotingLabel {
   position: absolute;
