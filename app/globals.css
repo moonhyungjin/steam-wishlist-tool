@@ -479,25 +479,33 @@ button:disabled {
   background: var(--line);
   border-radius: 99px;
 }
+/* One joined segmented control (shared outer border, hairline divider) instead of two separate
+   square buttons - saves the gap + a pair of borders, which matters on the library header where
+   the extra "+" button pushed the row past a phone's width once counts hit three digits. */
 .layoutToggle {
   display: flex;
-  gap: 6px;
   flex: none;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
 }
 .layoutToggleBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 32px;
-  height: 32px;
+  height: 30px;
   padding: 0;
   background: transparent;
-  border: 1px solid var(--line);
+  border: none;
+  border-radius: 0;
   color: var(--muted);
+}
+.layoutToggleBtn + .layoutToggleBtn {
+  border-left: 1px solid var(--line);
 }
 .layoutToggleBtn.active {
   background: #1b6d9b;
-  border-color: var(--accent);
   color: white;
 }
 .refreshBtn {
@@ -1557,6 +1565,16 @@ button:disabled {
   }
   .sectionHead h2 {
     margin: 0;
+    font-size: 20px;
+  }
+  /* The library header has an extra "+" button, so once the count reaches three digits
+     ("100 / 566개") the h2 + count + 4 icon controls overflowed and wrapped onto a second line.
+     Slightly smaller title/count and tighter gaps keep it on one row down to 360px. */
+  .sectionHead .itemCount {
+    font-size: 14px;
+  }
+  .headRight {
+    gap: 4px;
   }
   .searchRow {
     order: 3;
