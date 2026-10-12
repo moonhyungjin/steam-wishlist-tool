@@ -1269,10 +1269,30 @@ function GameRow({
   // really is Steam-owned (just added by hand because it didn't come through the normal sync), so
   // the client launch is worth attempting the same as a genuinely-synced item.
   const tryLibrary = view === "library" && (!manual || manual === "steam");
+  const pollChecked = pollMode && pollSelected.has(item.appid);
   return (
-    <article className="game" style={{ ...style, height: rowHeight - ROW_GAP }}>
+    <article
+      className={"game" + (pollMode ? " pollActive" : "") + (pollChecked ? " pollSelected" : "")}
+      style={{ ...style, height: rowHeight - ROW_GAP }}
+      // While poll mode is on, clicking anywhere in the row toggles the checkbox instead of
+      // following the cover/title links - preventDefault here cancels the nested <a>'s default
+      // navigation even though the click originated on a descendant, since the default action is
+      // tied to the event itself, not to whichever element's listener happens to call it.
+      onClick={
+        pollMode
+          ? (e) => {
+              e.preventDefault();
+              onTogglePollSelect(item.appid);
+            }
+          : undefined
+      }
+    >
       {pollMode && (
-        <label className="pollSelectCheck" title="투표 후보로 추가">
+        <label
+          className="pollSelectCheck"
+          title="투표 후보로 추가"
+          onClick={(e) => e.stopPropagation()}
+        >
           <input
             type="checkbox"
             checked={pollSelected.has(item.appid)}
@@ -1746,12 +1766,13 @@ function CardCell({
       </div>
     </>
   );
+  const pollChecked = pollMode && pollSelected.has(item.appid);
   return (
     <div style={style} className="cardCellOuter">
       {pollMode && (
-        // A sibling of the <a>, not nested inside it - the whole card body is one big link here
-        // (unlike the list row, which has room for the checkbox outside its cover link), so this
-        // has to sit on top as its own element to avoid a click on it also triggering navigation.
+        // A sibling of the card body, not nested inside it - the whole card is one big link
+        // outside poll mode, so this has to sit on top as its own element to avoid a click on it
+        // also triggering navigation.
         <label
           className="pollSelectCheckCard"
           title="투표 후보로 추가"
@@ -1764,7 +1785,16 @@ function CardCell({
           />
         </label>
       )}
-      {linkable ? (
+      {pollMode ? (
+        // In poll mode the card itself is just a big toggle target, not a store link - clicking
+        // anywhere on it (not only the small checkbox) selects/deselects the candidate.
+        <div
+          className={"card pollActive" + (pollChecked ? " pollSelected" : "")}
+          onClick={() => onTogglePollSelect(item.appid)}
+        >
+          {cardContent}
+        </div>
+      ) : linkable ? (
         <a
           className="card"
           href={`https://store.steampowered.com/app/${item.appid}`}

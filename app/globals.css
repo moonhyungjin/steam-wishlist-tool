@@ -1580,6 +1580,18 @@ button:disabled {
     height: 120px;
     border-radius: 0;
   }
+  /* .game becomes flex-direction:column above, so the checkbox (the row's first child) would
+     otherwise land as its own full-width strip above the cover instead of overlapping it like the
+     card-grid layout does - pull it out of flow and overlay it on the image corner instead. */
+  .pollSelectCheck {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    padding: 4px;
+    border-radius: 6px;
+    background: rgba(10, 15, 22, 0.75);
+  }
   .info {
     display: flex;
     flex-direction: column;
@@ -2019,6 +2031,21 @@ button:disabled {
   height: 18px;
   accent-color: var(--accent);
   cursor: pointer;
+}
+/* Gold border on the whole row/card once checked - the checkbox alone was easy to miss at a
+   glance, especially once several items in a long list are selected. Same gold used for the "1위"
+   poll-results badges elsewhere, so it reads consistently as "poll-related" throughout the app. */
+.game.pollActive,
+.card.pollActive {
+  cursor: pointer;
+}
+.game.pollSelected {
+  border-color: #e8b93f;
+  box-shadow: 0 0 0 1px #e8b93f inset;
+}
+.card.pollSelected {
+  border-color: #e8b93f;
+  box-shadow: 0 0 0 1px #e8b93f inset;
 }
 .pollBar {
   display: flex;
