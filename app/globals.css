@@ -1805,6 +1805,42 @@ button:disabled {
   color: var(--muted);
 }
 
+/* The base rules above were sized for mobile and never scaled back up - max-width stayed 480px
+   even on a wide desktop screen, so the whole page sat as a narrow strip with huge empty margins
+   on either side. This widens the column and the cards themselves once there's room for it. */
+@media (min-width: 700px) {
+  .pollPage {
+    max-width: 760px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .pollTitle {
+    font-size: 30px;
+  }
+  .pollSubtitle {
+    font-size: 16px;
+  }
+  .pollList {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .pollCardImg {
+    width: 130px;
+    height: 61px;
+  }
+  .pollCardName {
+    font-size: 16px;
+  }
+  .pollCardPrice {
+    font-size: 13px;
+  }
+}
+
 /* --- 투표 만들기 (poll creation entry point inside the wishlist view) --- */
 .refreshBtn.active {
   background: #1b6d9b;
