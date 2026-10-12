@@ -34,13 +34,14 @@ export default function PollPage() {
   }, [pollId]);
 
   async function vote(appid: number) {
-    if (votedFor != null || submitting != null) return;
+    // Clicking the same card you already picked is a no-op, not a re-vote.
+    if (appid === votedFor || submitting != null) return;
     setSubmitting(appid);
     try {
       const res = await fetch(`/api/poll/${pollId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appid }),
+        body: JSON.stringify({ appid, previousAppid: votedFor }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error || "투표하지 못했어요.");
@@ -79,7 +80,9 @@ export default function PollPage() {
     <div className="pollPage">
       <h1 className="pollTitle">어떤 게임을 살까요?</h1>
       <p className="pollSubtitle">
-        {showResults ? "투표해주셔서 감사해요! 지금까지의 결과예요." : "마음에 드는 게임을 골라주세요."}
+        {showResults
+          ? "투표해주셔서 감사해요! 다른 게임을 누르면 투표를 바꿀 수 있어요."
+          : "마음에 드는 게임을 골라주세요."}
       </p>
       <div className="pollList">
         {data.candidates.map((c) => {
@@ -93,7 +96,7 @@ export default function PollPage() {
               type="button"
               className={"pollCard" + (isPicked ? " picked" : "") + (isTop ? " top" : "")}
               onClick={() => vote(c.appid)}
-              disabled={votedFor != null || submitting != null}
+              disabled={isPicked || submitting != null}
             >
               <div className="pollCardImgWrap">
                 {c.headerImage ? (

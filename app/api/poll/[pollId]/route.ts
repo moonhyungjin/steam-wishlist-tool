@@ -30,7 +30,8 @@ export async function GET(
 
 // Deliberately no per-voter identity/anti-fraud here - this is a casual link shared with a few
 // friends, not a public ballot. The client keeps a localStorage "already voted" flag per pollId
-// for its own UI; this endpoint just increments a count.
+// for its own UI, and sends that back as `previousAppid` when changing a vote so this endpoint can
+// move the count instead of just adding a second one.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ pollId: string }> },
@@ -38,6 +39,7 @@ export async function POST(
   const { pollId } = await params;
   const body = await request.json().catch(() => null);
   const appid = Number(body?.appid);
+  const previousAppid = body?.previousAppid != null ? Number(body.previousAppid) : null;
   const client = getRedis();
   if (!client)
     return NextResponse.json({ error: "서버 DB가 설정되어 있지 않습니다." }, { status: 503 });
@@ -51,8 +53,15 @@ export async function POST(
     );
   if (!Number.isInteger(appid) || !(appid in data.votes))
     return NextResponse.json({ error: "유효하지 않은 후보예요." }, { status: 400 });
+  if (previousAppid != null && !(previousAppid in data.votes))
+    return NextResponse.json({ error: "유효하지 않은 이전 후보예요." }, { status: 400 });
 
-  data.votes[appid] = (data.votes[appid] ?? 0) + 1;
+  if (previousAppid != null && previousAppid !== appid) {
+    data.votes[previousAppid] = Math.max(0, (data.votes[previousAppid] ?? 0) - 1);
+  }
+  if (previousAppid !== appid) {
+    data.votes[appid] = (data.votes[appid] ?? 0) + 1;
+  }
   // Re-applying the TTL on every vote (instead of a keepttl write) is fine here - a poll that's
   // still getting votes is exactly the one that should keep living a bit longer.
   await client.set(key, data, { ex: POLL_TTL_SECONDS });
