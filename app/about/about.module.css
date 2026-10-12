@@ -14,8 +14,27 @@
 .section {
   padding: 72px 0;
 }
-.section:first-child {
+.section:first-of-type {
   padding-top: 56px;
+}
+.langSwitchRow {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 20px;
+}
+.langSwitch {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 100px;
+}
+.langSwitch:hover,
+.langSwitch:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .eyebrow {
   font-size: 13px;
