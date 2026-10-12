@@ -1967,25 +1967,28 @@ button:disabled {
   color: white;
 }
 /* A wide icon+label pill button didn't have a good home squeezed between the small square icon
-   buttons (refresh/layout toggle) in this row - moved behind a "⋯ more actions" menu instead
-   (same native-popover pattern as statusPopover/starPopover), which keeps the icon row itself
-   dense/consistent and gives room for the label to actually explain what the action does. */
-.moreActionsPopover {
+   buttons (refresh/layout toggle) in this row - moved behind a "⋯ more actions" menu instead,
+   which keeps the icon row itself dense/consistent and gives room for the label to actually
+   explain what the action does. A plain anchored dropdown (not the native popover API used for
+   statusPopover/starPopover) so it opens right under its own trigger button instead of centering
+   itself on screen like an unrelated modal. */
+.moreActionsWrap {
+  position: relative;
+}
+.moreActionsMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 8px;
-  color: var(--text);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  min-width: 220px;
-}
-.moreActionsPopover:popover-open {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-.moreActionsPopover::backdrop {
-  background: rgba(0, 0, 0, 0.4);
+  min-width: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 .moreActionsItem {
   display: flex;

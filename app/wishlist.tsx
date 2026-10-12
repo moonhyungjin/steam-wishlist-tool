@@ -2217,7 +2217,27 @@ export default function Wishlist() {
   // into the other view. Candidates are a creation-time snapshot (name/image/price), so price
   // changes during voting don't affect an already-created poll.
   const [pollKind, setPollKind] = useState<"buy" | "play" | null>(null);
-  const moreActionsPopoverRef = useRef<HTMLDivElement>(null);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const moreActionsWrapRef = useRef<HTMLDivElement>(null);
+  // Plain controlled dropdown instead of the native popover API used elsewhere (statusPopover/
+  // starPopover) - the native one renders in the top layer with no anchoring, so it centers
+  // itself on screen instead of appearing right under its trigger button, which read as an
+  // unrelated modal rather than a "more actions" menu for this specific button.
+  useEffect(() => {
+    if (!moreActionsOpen) return;
+    function handlePointerDown(e: PointerEvent) {
+      if (!moreActionsWrapRef.current?.contains(e.target as Node)) setMoreActionsOpen(false);
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMoreActionsOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [moreActionsOpen]);
   const [pollSelected, setPollSelected] = useState<Set<number>>(new Set());
   const [pollShowSelectedOnly, setPollShowSelectedOnly] = useState(false);
   const [pollCreating, setPollCreating] = useState(false);
@@ -4140,39 +4160,38 @@ export default function Wishlist() {
                 </svg>
               </button>
             </div>
-            <button
-              type="button"
-              className={"refreshBtn" + (pollActiveForView ? " active" : "")}
-              popoverTarget="more-actions-popover"
-              title="더보기"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="5" cy="12" r="2" />
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="19" cy="12" r="2" />
-              </svg>
-            </button>
-            <div
-              popover="auto"
-              id="more-actions-popover"
-              className="moreActionsPopover"
-              ref={moreActionsPopoverRef}
-            >
+            <div className="moreActionsWrap" ref={moreActionsWrapRef}>
               <button
                 type="button"
-                className="moreActionsItem"
-                onClick={() => {
-                  togglePollMode(view === "wishlist" ? "buy" : "play");
-                  moreActionsPopoverRef.current?.hidePopover();
-                }}
+                className={"refreshBtn" + (pollActiveForView ? " active" : "")}
+                onClick={() => setMoreActionsOpen((v) => !v)}
+                title="더보기"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="3" y="11" width="4.5" height="9" rx="1" />
-                  <rect x="9.75" y="6" width="4.5" height="14" rx="1" />
-                  <rect x="16.5" y="3" width="4.5" height="17" rx="1" />
+                  <circle cx="5" cy="12" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="19" cy="12" r="2" />
                 </svg>
-                {view === "wishlist" ? "구매 투표 만들기" : "플레이 투표 만들기"}
               </button>
+              {moreActionsOpen && (
+                <div className="moreActionsMenu">
+                  <button
+                    type="button"
+                    className="moreActionsItem"
+                    onClick={() => {
+                      togglePollMode(view === "wishlist" ? "buy" : "play");
+                      setMoreActionsOpen(false);
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="3" y="11" width="4.5" height="9" rx="1" />
+                      <rect x="9.75" y="6" width="4.5" height="14" rx="1" />
+                      <rect x="16.5" y="3" width="4.5" height="17" rx="1" />
+                    </svg>
+                    {view === "wishlist" ? "구매 투표 만들기" : "플레이 투표 만들기"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
