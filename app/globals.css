@@ -5,6 +5,15 @@
   --text: #edf2f7;
   --muted: #91a0b4;
   --accent: #66c0f4;
+  /* Spacing scale - prefer these over picking a new px value by eye when adding margin/gap/padding
+     to a new UI block, so spacing stays consistent instead of drifting per-component. Existing
+     hardcoded values aren't being mass-migrated (too much churn for too little gain), but anything
+     new should reach for one of these first. */
+  --space-xs: 6px;
+  --space-sm: 10px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
 }
 * {
   box-sizing: border-box;
@@ -1818,8 +1827,8 @@ button:disabled {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 10px 16px;
-  margin: 12px 0 10px;
+  padding: var(--space-sm) var(--space-md);
+  margin: var(--space-md) 0 var(--space-sm);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
