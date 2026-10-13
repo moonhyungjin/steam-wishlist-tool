@@ -4378,9 +4378,10 @@ export default function Wishlist() {
                     </button>
                   )}
                   <div className="moreActionsDivider" />
-                  {/* Temporary entries (per request) - the app's own UI is Korean-only, so the
-                      language item is a visible-but-disabled placeholder rather than pretending
-                      there's a working switcher. About goes to the Korean landing page. */}
+                  {/* Temporary entries (per request). 국가 설정 is a visible-but-disabled
+                      placeholder until the store-region switch is built: it would change the
+                      Steam store region (price currency + ITAD low), not the UI language, which
+                      stays Korean. About goes to the Korean landing page. */}
                   <a href="/about/ko" className="moreActionsItem">
                     <svg
                       width="14"
@@ -4411,7 +4412,7 @@ export default function Wishlist() {
                       <path d="M3 12h18" />
                       <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
                     </svg>
-                    언어 설정
+                    국가 설정
                     <span className="moreActionsTag">준비 중</span>
                   </button>
                 </div>
