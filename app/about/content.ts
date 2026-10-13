@@ -74,6 +74,11 @@ export const EN: AboutContent = {
       text: "Pick a few games from your wishlist or library and share a link - friends vote on which to buy or play next, no login needed. Find your polls and their results again anytime.",
     },
     {
+      emoji: "🌏",
+      title: "Store Region Setting",
+      text: "Switch between 12 Steam store regions to see prices and all-time lows in that region's own currency. The interface itself stays in Korean.",
+    },
+    {
       emoji: "📥",
       title: "Steam Wishlist Import",
       text: "Retrieve a public Steam wishlist using a Steam ID64 - no login required.",
@@ -161,6 +166,11 @@ export const KO: AboutContent = {
       emoji: "🗳️",
       title: "투표 공유",
       text: "위시리스트나 라이브러리에서 몇 개를 골라 링크로 공유하면, 친구들이 로그인 없이 뭘 살지/뭘 먼저 할지 투표해요. 만든 투표와 결과는 언제든 다시 볼 수 있어요.",
+    },
+    {
+      emoji: "🌏",
+      title: "스토어 국가 설정",
+      text: "12개 스팀 스토어 지역 중에 골라서, 그 지역의 통화로 가격과 역대 최저가를 볼 수 있어요. 화면 언어는 한국어 그대로예요.",
     },
     {
       emoji: "📥",
