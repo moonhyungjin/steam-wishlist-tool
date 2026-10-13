@@ -2256,3 +2256,37 @@ a.pollBarBtn {
     justify-content: center;
   }
 }
+
+/* --- 국가 설정 (store region picker, reuses the .myPollsPanel shell) --- */
+.countryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+.countryOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+.countryOption:hover {
+  border-color: var(--accent);
+}
+.countryOption.active {
+  border-color: var(--accent);
+  background: rgba(102, 192, 244, 0.14);
+}
+.countryCurrency {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}

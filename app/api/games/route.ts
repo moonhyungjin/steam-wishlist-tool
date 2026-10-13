@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { STEAM_TAG_NAMES } from "../../steamTags";
+import { parseCountry } from "../../countries";
 
 // Seeded from the static snapshot so the common case never needs a network round-trip; only
 // grows at runtime if a request hits a tagid the snapshot doesn't have (Valve added it since).
@@ -38,9 +39,13 @@ export async function GET(request: NextRequest) {
   if (!appids.length || appids.length > 200)
     return NextResponse.json({ error: "appids는 1~200개까지입니다." }, { status: 400 });
 
+  // Store region (price currency/availability) comes from the client's 국가 설정; language stays
+  // Korean regardless, since that's the app's UI language, not something the region implies.
+  const country = parseCountry(request.nextUrl.searchParams.get("cc"));
+
   const inputJson = JSON.stringify({
     ids: appids.map((appid) => ({ appid })),
-    context: { language: "koreana", country_code: "KR" },
+    context: { language: "koreana", country_code: country },
     data_request: {
       include_release: true,
       include_assets: true,

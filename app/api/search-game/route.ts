@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseCountry } from "../../countries";
 
 // Backs the manual-add autocomplete (Epic/STOVE games etc.) - Steam's public search doesn't need
 // a key or ownership, so it works as a general "does this game exist on Steam" name lookup even
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
   // for fuzzy matching without triggering the operator.
   const url = new URL("https://store.steampowered.com/api/storesearch/");
   url.searchParams.set("term", term.replace(/-/g, " "));
-  url.searchParams.set("cc", "kr");
+  url.searchParams.set("cc", parseCountry(request.nextUrl.searchParams.get("cc")).toLowerCase());
   url.searchParams.set("l", "koreana");
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) return NextResponse.json({ items: [] });

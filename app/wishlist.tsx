@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { Grid, List, type CellComponentProps, type RowComponentProps } from "react-window";
+import { COUNTRIES, DEFAULT_COUNTRY, countryLabel, isSupportedCountry } from "./countries";
 type Item = { appid: number; playtimeMinutes?: number; lastPlayedTimestamp?: number | null };
 type View = "wishlist" | "library";
 type Profile = { personaName: string | null; avatarUrl: string | null; profileUrl: string | null };
@@ -60,6 +61,20 @@ type LowestPrice = {
   shop: string;
   timestamp: string | null;
 };
+// ITAD hands back a bare number plus an ISO currency code - format it for that currency instead of
+// assuming won. Zero-decimal currencies drop the cents; anything Intl can't format falls back to
+// "<number> <code>" rather than throwing out of a render.
+function formatMoney(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: ["KRW", "JPY", "TWD"].includes(currency) ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `${Math.round(amount).toLocaleString("ko-KR")} ${currency}`;
+  }
+}
 // Placeholder for a manually-added game with no Steam match - every other field just means "no
 // data available" rather than "really zero/false", since none of it was actually looked up.
 function blankGame(appid: number, name: string): Game {
@@ -282,6 +297,9 @@ const MANUAL_PLAYTIME_STORAGE_KEY = "library:manualPlaytime";
 // returns, rather than trusting a plain non-empty-wins merge. Cleared for an appid the moment
 // it's re-added locally, so re-adding the same game later isn't permanently blocked.
 const MANUAL_REMOVED_STORAGE_KEY = "library:manualRemoved";
+// Steam store region (price currency + ITAD low) - a per-browser preference like the layout mode,
+// deliberately not part of the cross-device sync blob.
+const COUNTRY_STORAGE_KEY = "country";
 // Bump this whenever the Game shape changes - otherwise old cached entries silently keep
 // missing the new fields forever, since "resume from cache" treats them as already loaded.
 const CACHE_VERSION = 13;
@@ -1511,7 +1529,7 @@ function GameRow({
                       : noData
                         ? "IsThereAnyDeal에 이 게임의 가격 기록 없음"
                         : notAtLow
-                          ? `스팀 역대 최저가 아님 (역대 최저 ₩${Math.round(lowestPrice!.amount).toLocaleString("ko-KR")})`
+                          ? `스팀 역대 최저가 아님 (역대 최저 ${formatMoney(lowestPrice!.amount, lowestPrice!.currency)})`
                           : undefined
                   }
                 >
@@ -1811,6 +1829,44 @@ function CardCell({
     </div>
   );
 }
+// Picker for the Steam store region. Switching it changes the price currency and the ITAD all-time
+// low the app compares against - never the UI language, which stays Korean.
+function CountryPanel({
+  current,
+  onSelect,
+  onClose,
+}: {
+  current: string;
+  onSelect: (code: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="myPollsPanel">
+      <div className="myPollsHead">
+        <span className="myPollsTitle">스토어 국가</span>
+        <button type="button" className="pollBarBtnGhost" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+      <p className="myPollsEmpty">
+        선택한 국가의 스팀 스토어 기준으로 가격과 역대 최저가가 표시돼요. 언어는 한국어 그대로예요.
+      </p>
+      <div className="countryGrid">
+        {COUNTRIES.map((c) => (
+          <button
+            key={c.code}
+            type="button"
+            className={"countryOption" + (c.code === current ? " active" : "")}
+            onClick={() => onSelect(c.code)}
+          >
+            {c.label}
+            <span className="countryCurrency">{c.currency}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 type MyPoll = {
   pollId: string;
   question: string;
@@ -1959,9 +2015,11 @@ function FilterGroup({
 function ManualAddPanel({
   onAdd,
   onClose,
+  country,
 }: {
   onAdd: (appid: number, platform: ManualPlatform, game: Game) => void;
   onClose: () => void;
+  country: string;
 }) {
   const [manualQuery, setManualQuery] = useState("");
   const [manualPlatformChoice, setManualPlatformChoice] = useState<ManualPlatform>("epic");
@@ -1998,7 +2056,7 @@ function ManualAddPanel({
     }
     const timer = setTimeout(() => {
       setManualSearching(true);
-      fetch(`/api/search-game?term=${encodeURIComponent(manualQuery.trim())}`)
+      fetch(`/api/search-game?term=${encodeURIComponent(manualQuery.trim())}&cc=${country}`)
         .then((r) => r.json())
         .then((d) => setManualResults(d.items ?? []))
         .catch(() => setManualResults([]))
@@ -2018,7 +2076,7 @@ function ManualAddPanel({
   async function addManualMatched(appid: number, name: string, isDlc: boolean) {
     setManualAdding(true);
     try {
-      const loaded = await enrichGames([appid], {}, () => {});
+      const loaded = await enrichGames([appid], {}, () => {}, false, country);
       // /api/games (the store-page lookup enrichGames uses) has no DLC signal of its own - only
       // the search step that found this result knows, so carry it over explicitly here.
       const game = { ...(loaded[appid] ?? blankGame(appid, name)), isDlc };
@@ -2138,13 +2196,15 @@ async function enrichGames(
   // time, unlike name/genres) would never update past their first fetch no matter how many times
   // the user refreshes.
   forceRefresh = false,
+  // Store region for prices - see app/countries.ts.
+  country: string = DEFAULT_COUNTRY,
 ): Promise<Record<number, Game>> {
   // Build a new object per update instead of mutating in place - callers pass this straight into
   // setState, and mutating the same reference across calls means React (and any useMemo keyed on
   // it) can't tell later updates happened at all, since it looks like the "same" state each time.
   let loaded: Record<number, Game> = { ...existingGames };
   async function fetchChunk(chunk: number[]): Promise<Record<string, Game> | null> {
-    const r = await fetch(`/api/games?appids=${chunk.join(",")}`);
+    const r = await fetch(`/api/games?appids=${chunk.join(",")}&cc=${country}`);
     const d = await r.json();
     return r.ok ? (d.games ?? {}) : null;
   }
@@ -2247,6 +2307,7 @@ async function enrichLowestPrice(
   appids: number[],
   initialGames: Record<number, Game>,
   onUpdate: (games: Record<number, Game>) => void,
+  country: string = DEFAULT_COUNTRY,
 ) {
   let current = initialGames;
   const missing = appids.filter((id) => {
@@ -2257,7 +2318,7 @@ async function enrichLowestPrice(
   });
   for (let i = 0; i < missing.length; i += LOWPRICE_CHUNK) {
     const chunk = missing.slice(i, i + LOWPRICE_CHUNK);
-    const r = await fetch(`/api/lowestprice?appids=${chunk.join(",")}`);
+    const r = await fetch(`/api/lowestprice?appids=${chunk.join(",")}&cc=${country}`);
     const d = await r.json();
     if (!r.ok) return;
     const updates: Record<number, Game> = {};
@@ -2364,6 +2425,33 @@ export default function Wishlist() {
   const [pollKind, setPollKind] = useState<"buy" | "play" | null>(null);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [myPollsOpen, setMyPollsOpen] = useState(false);
+  // Steam store region. The ref mirrors the state so loaders that run right after a change (in the
+  // same handler, before the next render) and async continuations still read the current value.
+  const [country, setCountry] = useState<string>(DEFAULT_COUNTRY);
+  const countryRef = useRef<string>(DEFAULT_COUNTRY);
+  const [countryOpen, setCountryOpen] = useState(false);
+  function changeCountry(code: string) {
+    if (!isSupportedCountry(code) || code === countryRef.current) return;
+    countryRef.current = code;
+    setCountry(code);
+    try {
+      localStorage.setItem(COUNTRY_STORAGE_KEY, code);
+      // The cached wishlist holds old-region price strings - drop it so a reload can't resurrect
+      // them (the hydration check would reject it by its country stamp anyway; this just avoids
+      // keeping dead data around).
+      localStorage.removeItem(WISHLIST_CACHE_KEY);
+    } catch {}
+    // The ITAD low is a number in the OLD region's currency. /api/games never returns it, so a
+    // per-game merge would carry it over onto the new region's prices and compare e.g. a won low
+    // against a dollar price - strip it and let enrichLowestPrice re-ask under the new region.
+    const stripped: Record<number, Game> = {};
+    for (const [id, g] of Object.entries(wlGames)) {
+      stripped[Number(id)] = { ...g, lowestPrice: undefined, lowestPriceCheckedForEnd: undefined };
+    }
+    setWlGames(stripped);
+    setCountryOpen(false);
+    if (wlItems.length > 0) loadWishlistWith(stripped);
+  }
   const moreActionsWrapRef = useRef<HTMLDivElement>(null);
   // Plain controlled dropdown instead of the native popover API used elsewhere (statusPopover/
   // starPopover) - the native one renders in the top layer with no anchoring, so it centers
@@ -3246,9 +3334,19 @@ export default function Wishlist() {
     try {
       const savedId = localStorage.getItem(STEAM_ID_STORAGE_KEY);
       if (savedId) setSteamId(savedId);
+      const savedCountryRaw = localStorage.getItem(COUNTRY_STORAGE_KEY);
+      const savedCountry = isSupportedCountry(savedCountryRaw) ? savedCountryRaw : DEFAULT_COUNTRY;
+      countryRef.current = savedCountry;
+      if (savedCountry !== DEFAULT_COUNTRY) setCountry(savedCountry);
       const wl = JSON.parse(localStorage.getItem(WISHLIST_CACHE_KEY) ?? "null");
       if (!savedId && wl?.steamId) setSteamId(wl.steamId);
-      const wlCacheValid = wl?.version === CACHE_VERSION && Array.isArray(wl?.items);
+      // A cache written before regions existed has no `country` and was necessarily KR. Prices in
+      // it are only usable for the same region - the library cache isn't checked, since nothing
+      // in the library view displays a price.
+      const wlCacheValid =
+        wl?.version === CACHE_VERSION &&
+        Array.isArray(wl?.items) &&
+        (wl?.country ?? DEFAULT_COUNTRY) === savedCountry;
       if (wlCacheValid) {
         setWlItems(wl.items);
         setWlProgress({ done: wl.items.length, total: wl.items.length });
@@ -3351,6 +3449,7 @@ export default function Wishlist() {
         cacheKey,
         JSON.stringify({
           version: CACHE_VERSION,
+          country: countryRef.current,
           steamId: steamIdValue,
           items: itemsValue,
           games: gamesValue,
@@ -3398,7 +3497,12 @@ export default function Wishlist() {
     persistManualRemoved(nextRemoved);
     pushSync({ manualRemovedIds: nextRemoved });
   }
-  async function loadWishlist() {
+  // Zero-arg on purpose: this is passed straight to onClick handlers, which would otherwise hand
+  // the click event in as `gamesOverride`. Region changes call loadWishlistWith directly instead.
+  function loadWishlist() {
+    return loadWishlistWith();
+  }
+  async function loadWishlistWith(gamesOverride?: Record<number, Game>) {
     const id = steamId.trim();
     if (!/^\d{17}$/.test(id)) {
       setWlError("17자리 Steam ID64를 입력하세요.");
@@ -3437,7 +3541,7 @@ export default function Wishlist() {
       setEditingCreds(false);
       const listAppids = new Set(list.map((x) => x.appid));
       const existing: Record<number, Game> = {};
-      for (const [id, g] of Object.entries(wlGames)) {
+      for (const [id, g] of Object.entries(gamesOverride ?? wlGames)) {
         if (listAppids.has(Number(id))) existing[Number(id)] = g;
       }
       setWlGames(existing);
@@ -3453,6 +3557,7 @@ export default function Wishlist() {
           persistWishlistThrottled(list, cur);
         },
         true,
+        countryRef.current,
       );
       persistTo(WISHLIST_CACHE_KEY, id, list, loaded);
       enrichMetacritic(appids, loaded, (cur) => {
@@ -3467,13 +3572,18 @@ export default function Wishlist() {
       // checking every wishlist item (not just the ones a discount makes worth checking) was the
       // main thing driving unnecessary ITAD lookups through the shared cache.
       const discountedAppids = appids.filter((appid) => (loaded[appid]?.discountPercent ?? 0) > 0);
-      enrichLowestPrice(discountedAppids, loaded, (cur) => {
-        setWlGames((prev) => {
-          const merged = mergeGamesInto(prev, cur);
-          persistWishlistThrottled(list, merged);
-          return merged;
-        });
-      }).catch(() => {});
+      enrichLowestPrice(
+        discountedAppids,
+        loaded,
+        (cur) => {
+          setWlGames((prev) => {
+            const merged = mergeGamesInto(prev, cur);
+            persistWishlistThrottled(list, merged);
+            return merged;
+          });
+        },
+        countryRef.current,
+      ).catch(() => {});
     } catch (e) {
       setWlError(e instanceof Error ? e.message : "알 수 없는 오류");
     } finally {
@@ -3552,6 +3662,7 @@ export default function Wishlist() {
           persistLibraryThrottled(list, cur);
         },
         true,
+        countryRef.current,
       );
       persistTo(LIBRARY_CACHE_KEY, id, list, loaded);
       // Library doesn't show or sort by metacritic/review anywhere, so there's nothing to spend
@@ -4378,10 +4489,8 @@ export default function Wishlist() {
                     </button>
                   )}
                   <div className="moreActionsDivider" />
-                  {/* Temporary entries (per request). 국가 설정 is a visible-but-disabled
-                      placeholder until the store-region switch is built: it would change the
-                      Steam store region (price currency + ITAD low), not the UI language, which
-                      stays Korean. About goes to the Korean landing page. */}
+                  {/* 국가 설정 changes the Steam store region (price currency + ITAD low), not the
+                      UI language, which stays Korean. About goes to the Korean landing page. */}
                   <a href="/about/ko" className="moreActionsItem">
                     <svg
                       width="14"
@@ -4398,7 +4507,14 @@ export default function Wishlist() {
                     </svg>
                     About
                   </a>
-                  <button type="button" className="moreActionsItem" disabled>
+                  <button
+                    type="button"
+                    className="moreActionsItem"
+                    onClick={() => {
+                      setCountryOpen(true);
+                      setMoreActionsOpen(false);
+                    }}
+                  >
                     <svg
                       width="14"
                       height="14"
@@ -4413,7 +4529,7 @@ export default function Wishlist() {
                       <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
                     </svg>
                     국가 설정
-                    <span className="moreActionsTag">준비 중</span>
+                    <span className="moreActionsTag">{countryLabel(country)}</span>
                   </button>
                 </div>
               )}
@@ -4422,6 +4538,7 @@ export default function Wishlist() {
         </div>
         {view === "library" && manualFormOpen && (
           <ManualAddPanel
+            country={countryRef.current}
             onAdd={(appid, platform, game) => {
               const nextPlatform = { ...manualPlatform, [appid]: platform };
               const nextGames = { ...manualGames, [appid]: game };
@@ -4440,6 +4557,13 @@ export default function Wishlist() {
               }
             }}
             onClose={() => setManualFormOpen(false)}
+          />
+        )}
+        {countryOpen && (
+          <CountryPanel
+            current={country}
+            onSelect={changeCountry}
+            onClose={() => setCountryOpen(false)}
           />
         )}
         {myPollsOpen && <MyPollsPanel steamId={steamId.trim()} onClose={() => setMyPollsOpen(false)} />}

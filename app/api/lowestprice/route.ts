@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
+import { DEFAULT_COUNTRY, parseCountry } from "../../countries";
 
 // All-time-low price via IsThereAnyDeal (https://isthereanydeal.com) - Steam's own store API has
 // no price-history endpoint, so this is the only source for "is this actually a good deal"
@@ -62,7 +63,13 @@ export async function GET(request: NextRequest) {
   const client = getRedis();
   if (!client) return NextResponse.json({ prices: {}, configured: false });
 
-  const cacheKeys = appids.map((id) => `price:${id}`);
+  // The ITAD low is in the store region's own currency, so the cache has to be per-country too.
+  // KR keeps the original bare `price:{appid}` key (everything cached before regions existed was
+  // KR), so existing entries stay valid; every other region gets its own `price:{cc}:{appid}`.
+  const country = parseCountry(request.nextUrl.searchParams.get("cc"));
+  const cacheKey = (appid: number) =>
+    country === DEFAULT_COUNTRY ? `price:${appid}` : `price:${country}:${appid}`;
+  const cacheKeys = appids.map(cacheKey);
   const cached = await client.mget<(PriceCacheEntry | null)[]>(...cacheKeys);
 
   const now = Date.now();
@@ -119,7 +126,7 @@ export async function GET(request: NextRequest) {
         // exactly at their real Steam all-time-low, but historylow's cross-store low was cheaper
         // elsewhere, so the badge never lit up).
         const historyRes = await fetch(
-          `${ITAD_BASE}/games/storelow/v2?country=KR&shops=${STEAM_SHOP_ID}`,
+          `${ITAD_BASE}/games/storelow/v2?country=${country}&shops=${STEAM_SHOP_ID}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json", "ITAD-API-Key": apiKey },
@@ -163,7 +170,7 @@ export async function GET(request: NextRequest) {
       // set() per key (not mset) since each needs its own TTL-bearing JSON value - Upstash's
       // pipeline batches these into one round trip anyway when called concurrently.
       await Promise.all(
-        Object.values(freshEntries).map((entry) => client.set(`price:${entry.appid}`, entry)),
+        Object.values(freshEntries).map((entry) => client.set(cacheKey(entry.appid), entry)),
       );
       for (const entry of Object.values(freshEntries)) prices[entry.appid] = entry.low;
     } catch {
