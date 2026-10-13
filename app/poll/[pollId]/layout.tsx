@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Redis } from "@upstash/redis";
 import type { PollData } from "../../api/poll/route";
+import { OG_IMAGE } from "../../siteMeta";
 
 // The poll page itself is a client component (it needs state/localStorage), which can't export
 // metadata - so the per-poll <title> and link-preview tags come from this server layout instead.
@@ -36,12 +37,9 @@ export async function generateMetadata({
   const title = `${question} · ${SITE}`;
   const names = data.candidates.map((c) => c.name);
   const description = `${names.length}개 후보 중에 골라 투표해 주세요: ${names.join(", ")}`;
-  // Only Steam's own CDN art, never an arbitrary string from the request body, ends up as the
-  // preview image.
-  const image = data.candidates
-    .map((c) => c.headerImage)
-    .find((u): u is string => !!u && /^https:\/\/[^/]*steamstatic\.com\//.test(u));
-
+  // Always the app's own preview image, not a candidate's cover: a cover would show just one of
+  // the options and read as if that game were the favorite. The question and candidate names
+  // already ride along in the title/description.
   return {
     title,
     description,
@@ -50,8 +48,9 @@ export async function generateMetadata({
       description,
       siteName: SITE,
       type: "website",
-      ...(image ? { images: [image] } : {}),
+      images: [OG_IMAGE],
     },
+    twitter: { card: "summary_large_image", title: question, description, images: [OG_IMAGE.url] },
   };
 }
 
