@@ -12,7 +12,13 @@ import {
   type AchievementInfo,
   type ManualPlatform,
 } from "../types";
-import { formatMoney, lowestPriceStatus, scoreClass, openLibraryOrStore } from "../gameLogic";
+import {
+  type RecommendFit,
+  formatMoney,
+  lowestPriceStatus,
+  scoreClass,
+  openLibraryOrStore,
+} from "../gameLogic";
 import {
   STATUS_LABELS,
   STATUS_ORDER,
@@ -24,6 +30,11 @@ import {
 } from "../constants";
 import { GENRE_LEVELING_ENABLED } from "../genres";
 import { StatusGlyph, CoverPlaceholder, StarGlyph, StarPicker } from "./Glyphs";
+const RECOMMEND_FIT_LABELS: Record<RecommendFit, string> = {
+  good: "잘 맞음",
+  mid: "보통",
+  bad: "안 맞음",
+};
 export function GameRow({
   index,
   style,
@@ -43,7 +54,7 @@ export function GameRow({
   manualPlatform,
   onRemoveManual,
   onSetManualPlaytime,
-  recommendPercentile,
+  recommendFit,
   sortKey,
   steamId,
   pollMode,
@@ -67,7 +78,7 @@ export function GameRow({
   steamId: string;
   onRemoveManual: (appid: number) => void;
   onSetManualPlaytime: (appid: number, hours: number | null) => void;
-  recommendPercentile: Record<number, number>;
+  recommendFit: Record<number, RecommendFit>;
   sortKey: SortKey | null;
   pollMode: boolean;
   pollSelected: Set<number>;
@@ -85,7 +96,7 @@ export function GameRow({
   const checkingAchievement = checkingAchievements.has(item.appid);
   const recommend =
     GENRE_LEVELING_ENABLED && view === "wishlist" && sortKey === "recommend-desc"
-      ? (recommendPercentile[item.appid] ?? null)
+      ? (recommendFit[item.appid] ?? null)
       : null;
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
   // to - everything else about a manual entry behaves the same either way.
@@ -245,10 +256,10 @@ export function GameRow({
           )}
           {recommend != null && (
             <span
-              className="chip recommendTag"
-              title="위시리스트 안에서의 취향 매치 순위 - 100이면 위시리스트 전체 중 최고 매치 (실험적 기능)"
+              className={"chip recommendTag " + recommend}
+              title="내 라이브러리에서 평가한 취향을 바탕으로 한 매치 정도 (실험적 기능)"
             >
-              ✨ 추천 {recommend}%
+              ✨ {RECOMMEND_FIT_LABELS[recommend]}
             </span>
           )}
         </div>

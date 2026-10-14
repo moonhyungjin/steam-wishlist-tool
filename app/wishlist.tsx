@@ -12,7 +12,7 @@ import {
   computeGenreXp,
   computeGenreBreakdown,
   computeGenreTaste,
-  computeRecommendPercentile,
+  computeRecommendFit,
 } from "./gameLogic";
 import {
   STATUS_STORAGE_KEY,
@@ -411,15 +411,10 @@ export default function Wishlist() {
     for (const { genreId, affinity, games } of genreTaste) map[genreId] = { affinity, games };
     return map;
   }, [genreTaste]);
-  // recommendScore's raw value is only useful for sorting - on a real wishlist it clusters into
-  // a narrow band (checked against one real account: -19% to +8%, most within a couple points of
-  // the median), so the raw number reads as "barely anything" even for the best match available.
-  // Rank instead of value: percentile within the whole wishlist, not just what's currently
-  // filtered/visible, so the same game always shows the same number regardless of what filters
-  // happen to be active. Ties (identical genre-match sets) share a percentile.
-  const recommendPercentile = useMemo(
-    () =>
-      GENRE_LEVELING_ENABLED ? computeRecommendPercentile(wlItems, wlGames, genreTasteMap) : {},
+  // Wishlist-wide (not just what's currently filtered/visible), so a game shows the same label
+  // regardless of which filters happen to be active - see computeRecommendFit.
+  const recommendFit = useMemo(
+    () => (GENRE_LEVELING_ENABLED ? computeRecommendFit(wlItems, wlGames, genreTasteMap) : {}),
     [wlItems, wlGames, genreTasteMap],
   );
   const [genreTab, setGenreTab] = useState<"level" | "taste">("level");
@@ -1044,7 +1039,7 @@ export default function Wishlist() {
                 manualPlatform,
                 onRemoveManual: removeManualGame,
                 onSetManualPlaytime: setManualPlaytimeHours,
-                recommendPercentile,
+                recommendFit,
                 sortKey,
                 steamId,
                 pollMode: pollActiveForView,

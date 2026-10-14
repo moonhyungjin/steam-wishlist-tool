@@ -5,6 +5,7 @@ import {
   computeGenreBreakdown,
   computeGenreTaste,
   computeGenreXp,
+  computeRecommendFit,
   computeRecommendPercentile,
   formatMoney,
   gameAffinity,
@@ -321,5 +322,38 @@ describe("computeGenreBreakdown (sub-genre detail under each broad level)", () =
       const sum = b[id].children.reduce((t, c) => t + c.hours, 0) + b[id].other;
       expect(sum).toBeCloseTo(xp.xp[id]);
     }
+  });
+});
+
+describe("computeRecommendFit (잘 맞음 / 보통 / 안 맞음)", () => {
+  const mk = (appid: number, ids: number[]): Game => ({ ...game(appid), genreIds: ids });
+  const wl = (...ids: number[][]) => ({
+    games: Object.fromEntries(ids.map((g, i) => [i + 1, mk(i + 1, g)])),
+    items: ids.map((_, i) => ({ appid: i + 1 })),
+  });
+  it("needs both a top-third rank and a score above the player's baseline for 잘 맞음", () => {
+    const taste = {
+      19: { affinity: 1.3, games: 20 },
+      122: { affinity: 1.0, games: 20 },
+      9: { affinity: 0.7, games: 20 },
+    };
+    const { games, items } = wl([19], [122], [9]);
+    const fit = computeRecommendFit(items, games, taste);
+    expect(fit).toEqual({ 1: "good", 2: "mid", 3: "bad" });
+  });
+  it("never calls the best of a uniformly disliked wishlist 잘 맞음", () => {
+    const taste = {
+      19: { affinity: 0.9, games: 20 },
+      122: { affinity: 0.8, games: 20 },
+      9: { affinity: 0.7, games: 20 },
+    };
+    const { games, items } = wl([19], [122], [9]);
+    const fit = computeRecommendFit(items, games, taste);
+    expect(Object.values(fit)).not.toContain("good");
+    expect(fit[3]).toBe("bad");
+  });
+  it("leaves games with no overlapping taste data unlabeled", () => {
+    const { games, items } = wl([999999]);
+    expect(computeRecommendFit(items, games, { 19: { affinity: 1.2, games: 20 } })).toEqual({});
   });
 });

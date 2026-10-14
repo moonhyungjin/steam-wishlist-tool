@@ -2322,3 +2322,14 @@ a.pollBarBtn {
 .genreSubOther {
   opacity: 0.7;
 }
+
+.chip.recommendTag.mid {
+  background: transparent;
+  color: #aebbd0;
+  border-color: #4b5b74;
+}
+.chip.recommendTag.bad {
+  background: rgba(224, 106, 106, 0.12);
+  color: #e69a9a;
+  border-color: #b35a5a;
+}

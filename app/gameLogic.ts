@@ -451,3 +451,26 @@ export function computeGenreBreakdown(
   }
   return out;
 }
+
+// The wishlist's recommendation chip: 잘 맞음 / 보통 / 안 맞음. Ranks by the percentile above (so the
+// labels stay useful even though raw scores cluster in a narrow band), but only calls a game a
+// good/bad fit when its score also sits on that side of the player's own baseline (1.0 = their
+// average, see computeGenreTaste) - otherwise a wishlist full of mediocre matches would still
+// crown a "잘 맞음" just for being the least bad.
+export type RecommendFit = "good" | "mid" | "bad";
+export function computeRecommendFit(
+  wlItems: Item[],
+  wlGames: Record<number, Game>,
+  genreTasteMap: Record<number, { affinity: number; games: number }>,
+): Record<number, RecommendFit> {
+  const pct = computeRecommendPercentile(wlItems, wlGames, genreTasteMap);
+  const out: Record<number, RecommendFit> = {};
+  for (const item of wlItems) {
+    const p = pct[item.appid];
+    if (p == null) continue;
+    const score = recommendScore(wlGames[item.appid]?.genreIds, genreTasteMap);
+    if (score == null) continue;
+    out[item.appid] = score > 1 && p >= 67 ? "good" : score < 1 && p <= 33 ? "bad" : "mid";
+  }
+  return out;
+}
