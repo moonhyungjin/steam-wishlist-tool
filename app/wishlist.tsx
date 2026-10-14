@@ -10,10 +10,10 @@ import {
 } from "react";
 import { Grid, List, type CellComponentProps, type RowComponentProps } from "react-window";
 import { COUNTRIES, DEFAULT_COUNTRY, countryLabel, isSupportedCountry } from "./countries";
-type Item = { appid: number; playtimeMinutes?: number; lastPlayedTimestamp?: number | null };
+export type Item = { appid: number; playtimeMinutes?: number; lastPlayedTimestamp?: number | null };
 type View = "wishlist" | "library";
 type Profile = { personaName: string | null; avatarUrl: string | null; profileUrl: string | null };
-type Game = {
+export type Game = {
   appid: number;
   name: string;
   headerImage: string | null;
@@ -64,7 +64,7 @@ type LowestPrice = {
 // ITAD hands back a bare number plus an ISO currency code - format it for that currency instead of
 // assuming won. Zero-decimal currencies drop the cents; anything Intl can't format falls back to
 // "<number> <code>" rather than throwing out of a render.
-function formatMoney(amount: number, currency: string): string {
+export function formatMoney(amount: number, currency: string): string {
   try {
     return new Intl.NumberFormat("ko-KR", {
       style: "currency",
@@ -75,9 +75,24 @@ function formatMoney(amount: number, currency: string): string {
     return `${Math.round(amount).toLocaleString("ko-KR")} ${currency}`;
   }
 }
+// The price chip's all-time-low state for one game. Only meaningful while the game is actually on
+// sale - a stored lowestPrice outlives the sale it was fetched for, so a full-price game must
+// report "none" instead of a stale verdict. "unchecked" = on sale but not looked up yet,
+// "no-data" = ITAD has no Steam price history, "at-low"/"not-at-low" compare the current price
+// (priceValue is Steam's cents-scaled price; ITAD's amount is already plain currency, hence /100).
+export type LowestPriceStatus = "none" | "unchecked" | "no-data" | "at-low" | "not-at-low";
+export function lowestPriceStatus(
+  g: Pick<Game, "discountPercent" | "priceValue" | "lowestPrice"> | undefined,
+): LowestPriceStatus {
+  if (!g || !(g.discountPercent > 0)) return "none";
+  const low = g.lowestPrice;
+  if (low === undefined) return "unchecked";
+  if (low === null) return "no-data";
+  return g.priceValue != null && g.priceValue / 100 <= low.amount ? "at-low" : "not-at-low";
+}
 // Placeholder for a manually-added game with no Steam match - every other field just means "no
 // data available" rather than "really zero/false", since none of it was actually looked up.
-function blankGame(appid: number, name: string): Game {
+export function blankGame(appid: number, name: string): Game {
   return {
     appid,
     name,
@@ -103,7 +118,7 @@ function blankGame(appid: number, name: string): Game {
     isDlc: false,
   };
 }
-type SortKey =
+export type SortKey =
   | "price-asc"
   | "review"
   | "metacritic"
@@ -226,7 +241,7 @@ const TASTE_PCT_DOMAIN = 60;
 // baseline "just average" case - deliberately separate from GENRE_XP_PER_LEVEL_SQ's pure-hours
 // level curve, since this is about how much the player *liked* the time spent, not how much they
 // spent. Tune independently as real data comes in.
-function gameAffinity(
+export function gameAffinity(
   status: PlayStatus | undefined,
   rating: Rating | undefined,
   star: StarRating | undefined,
@@ -319,7 +334,7 @@ const CARD_ROW_HEIGHT = 168;
 function scoreClass(n: number): string {
   return n >= 75 ? "good" : n >= 50 ? "mid" : "bad";
 }
-function genreLevelInfo(hours: number) {
+export function genreLevelInfo(hours: number) {
   const level = Math.floor(Math.sqrt(hours / GENRE_XP_PER_LEVEL_SQ));
   const thisLevelHours = level ** 2 * GENRE_XP_PER_LEVEL_SQ;
   const nextLevelHours = (level + 1) ** 2 * GENRE_XP_PER_LEVEL_SQ;
@@ -331,7 +346,7 @@ function genreLevelInfo(hours: number) {
 // so a genre backed by 40 games doesn't get diluted by one that just barely cleared the floor.
 // null (not 0/neutral) means "no overlapping genre has taste data yet" - that's a different,
 // honest state from "known to be a middling match," and sorts to the bottom either way.
-function recommendScore(
+export function recommendScore(
   genreIds: number[] | undefined,
   taste: Record<number, { affinity: number; games: number }>,
 ): number | null {
@@ -345,7 +360,7 @@ function recommendScore(
   }
   return weightSum > 0 ? scoreSum / weightSum : null;
 }
-function compareByKey(
+export function compareByKey(
   key: SortKey,
   a: Item,
   b: Item,
@@ -381,7 +396,7 @@ function compareByKey(
 // mostly just reduces to the first one anyway, since exact ties across price/review/etc. are
 // rare, so a single, honest "sort by this" is more predictable than a chain that quietly does
 // nothing past the first key.
-function sortItems(
+export function sortItems(
   items: Item[],
   games: Record<number, Game>,
   sortKey: SortKey | null,
@@ -1498,21 +1513,11 @@ function GameRow({
           {g?.isDlc && <span className="dlcTag">DLC</span>}
           {view === "wishlist" && g?.price ? (
             (() => {
-              // priceValue is Steam's own cents-scaled price (final_price_in_cents) - ITAD's
-              // amount is already plain KRW, so this has to be divided by 100 before comparing or
-              // the "is this the all-time low" check would be off by 100x.
-              // Only meaningful while the game is actually on sale - a stored lowestPrice outlives
-              // the sale it was fetched for, so a full-price game must not keep showing its marker.
-              const lowestPrice = g.discountPercent > 0 ? g.lowestPrice : undefined;
-              const atLow =
-                !!lowestPrice && g.priceValue != null && g.priceValue / 100 <= lowestPrice.amount;
-              // lowestPrice === null (not undefined) means it was actually checked and ITAD just
-              // has no Steam price history for this game - distinct from "not checked yet"
-              // (undefined) and from "checked, has a recorded low, just not this one" (a real
-              // object with atLow false) - three genuinely different states, each gets its own
-              // icon+color instead of collapsing "not at low" and "no data" into the same silence.
-              const noData = lowestPrice === null;
-              const notAtLow = !!lowestPrice && !atLow;
+              const lowestPrice = g.lowestPrice;
+              const status = lowestPriceStatus(g);
+              const atLow = status === "at-low";
+              const noData = status === "no-data";
+              const notAtLow = status === "not-at-low";
               return (
                 <span
                   className={
@@ -2248,7 +2253,7 @@ async function enrichGames(
 // last would silently erase whatever field the OTHER pass had already written for a game neither
 // of them just touched. This merges per-game against the latest live state instead, so concurrent
 // passes layer their own field(s) on top of each other instead of stomping.
-function mergeGamesInto(
+export function mergeGamesInto(
   prev: Record<number, Game>,
   delta: Record<number, Game>,
 ): Record<number, Game> {
@@ -2507,7 +2512,6 @@ export default function Wishlist() {
       setPollKind(null);
       resetPollState();
     } else if (pollKind === "play" && view !== "library") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPollKind(null);
       resetPollState();
     }
@@ -3234,13 +3238,7 @@ export default function Wishlist() {
         return false;
       if (view === "wishlist" && excludeEarlyAccess && g?.earlyAccess) return false;
       if (view === "wishlist" && excludeComingSoon && g?.comingSoon) return false;
-      if (
-        view === "wishlist" &&
-        excludeNotLowest &&
-        g?.discountPercent &&
-        g.lowestPrice &&
-        !(g.priceValue != null && g.priceValue / 100 <= g.lowestPrice.amount)
-      )
+      if (view === "wishlist" && excludeNotLowest && lowestPriceStatus(g) === "not-at-low")
         return false;
       if (view === "wishlist" && koreanFilter) {
         const k = g?.koreanSupported ? "supported" : "unsupported";

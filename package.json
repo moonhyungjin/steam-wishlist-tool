@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.2",
@@ -31,6 +32,7 @@
     "eslint-config-next": "latest",
     "eslint-config-prettier": "latest",
     "prettier": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vitest": "^5.0.4"
   }
 }
