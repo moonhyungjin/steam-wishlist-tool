@@ -26,8 +26,35 @@ export function ShareButton({ label, copiedLabel }: { label: string; copiedLabel
     } catch {}
   }
   return (
-    <button type="button" className={styles.shareBtn} onClick={share}>
-      {copied ? copiedLabel : label}
+    <button
+      type="button"
+      className={styles.shareBtn}
+      onClick={share}
+      aria-label={copied ? copiedLabel : label}
+      title={copied ? copiedLabel : label}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {copied ? (
+          <path d="M20 6 9 17l-5-5" />
+        ) : (
+          <>
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" />
+          </>
+        )}
+      </svg>
     </button>
   );
 }
