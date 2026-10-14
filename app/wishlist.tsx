@@ -301,43 +301,26 @@ export default function Wishlist() {
     setView(next);
     setSortKey(null);
   }
+  const filters = useFilterState();
   const {
     sortKey,
     setSortKey,
     nameQuery,
-    setNameQuery,
     minDiscount,
     excludeEarlyAccess,
-    setExcludeEarlyAccess,
     excludeComingSoon,
-    setExcludeComingSoon,
     excludeNotLowest,
-    setExcludeNotLowest,
     koreanFilter,
     excludeAdult,
     excludeDemo,
-    setExcludeDemo,
     excludeFree,
-    setExcludeFree,
-    collapsedGroups,
     isMobile,
-    mobileFiltersOpen,
-    setMobileFiltersOpen,
     genreFilter,
     statusFilter,
     ratingFilter,
     starFilter,
     platformFilter,
-    selectSortKey,
-    selectMinDiscount,
-    selectKoreanFilter,
-    toggleGroup,
-    toggleGenre,
-    toggleStatusFilter,
-    toggleRatingFilter,
-    toggleStarFilter,
-    togglePlatformFilter,
-  } = useFilterState();
+  } = filters;
   const [statusMap, setStatusMap] = useState<Record<number, PlayStatus>>({});
   function setGameStatus(appid: number, status: PlayStatus | null) {
     const next = { ...statusMap };
@@ -1352,65 +1335,37 @@ export default function Wishlist() {
         </div>
       )}
       <Sidebar
-        collapsedGroups={collapsedGroups}
+        filters={filters}
         discountTierCounts={discountTierCounts}
         error={error}
-        excludeComingSoon={excludeComingSoon}
-        excludeDemo={excludeDemo}
-        excludeEarlyAccess={excludeEarlyAccess}
-        excludeFree={excludeFree}
-        excludeNotLowest={excludeNotLowest}
         formVisible={formVisible}
         genreCounts={genreCounts}
-        genreFilter={genreFilter}
         genreLevels={genreLevels}
         genreTab={genreTab}
         genreTaste={genreTaste}
         koreanCounts={koreanCounts}
-        koreanFilter={koreanFilter}
         loadActive={loadActive}
         loading={loading}
-        minDiscount={minDiscount}
-        mobileFiltersOpen={mobileFiltersOpen}
         openCredsForm={openCredsForm}
         platformCounts={platformCounts}
-        platformFilter={platformFilter}
         profile={profile}
         profileError={profileError}
         profileLoading={profileLoading}
         ratingCounts={ratingCounts}
-        ratingFilter={ratingFilter}
         rememberMe={rememberMe}
-        selectKoreanFilter={selectKoreanFilter}
-        selectMinDiscount={selectMinDiscount}
-        selectSortKey={selectSortKey}
-        setExcludeComingSoon={setExcludeComingSoon}
-        setExcludeDemo={setExcludeDemo}
-        setExcludeEarlyAccess={setExcludeEarlyAccess}
-        setExcludeFree={setExcludeFree}
-        setExcludeNotLowest={setExcludeNotLowest}
         setGenreTab={setGenreTab}
-        setMobileFiltersOpen={setMobileFiltersOpen}
         setRememberMe={setRememberMe}
         setSteamId={setSteamId}
         showGenreLevels={showGenreLevels}
-        sortKey={sortKey}
         starCounts={starCounts}
-        starFilter={starFilter}
         statusCounts={statusCounts}
-        statusFilter={statusFilter}
         steamId={steamId}
         switchView={switchView}
-        toggleGenre={toggleGenre}
-        toggleGroup={toggleGroup}
-        togglePlatformFilter={togglePlatformFilter}
-        toggleRatingFilter={toggleRatingFilter}
-        toggleStarFilter={toggleStarFilter}
-        toggleStatusFilter={toggleStatusFilter}
         view={view}
       />
       <main className="mainArea">
         <Toolbar
+          filters={filters}
           country={country}
           filteredItems={filteredItems}
           hasActiveFilter={hasActiveFilter}
@@ -1420,15 +1375,12 @@ export default function Wishlist() {
           loading={loading}
           moreActionsOpen={moreActionsOpen}
           moreActionsWrapRef={moreActionsWrapRef}
-          nameQuery={nameQuery}
           pollActiveForView={pollActiveForView}
           setCountryOpen={setCountryOpen}
           setLayoutMode={setLayoutMode}
           setManualFormOpen={setManualFormOpen}
-          setMobileFiltersOpen={setMobileFiltersOpen}
           setMoreActionsOpen={setMoreActionsOpen}
           setMyPollsOpen={setMyPollsOpen}
-          setNameQuery={setNameQuery}
           togglePollMode={togglePollMode}
           view={view}
         />

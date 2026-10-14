@@ -137,3 +137,4 @@ export function useFilterState() {
     togglePlatformFilter,
   };
 }
+export type FilterState = ReturnType<typeof useFilterState>;

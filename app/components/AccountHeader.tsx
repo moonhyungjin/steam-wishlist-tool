@@ -34,7 +34,7 @@ export function AccountHeader({
   setGenreTab: React.Dispatch<React.SetStateAction<"level" | "taste">>;
   setRememberMe: React.Dispatch<React.SetStateAction<boolean>>;
   setSteamId: React.Dispatch<React.SetStateAction<string>>;
-  showGenreLevels: false;
+  showGenreLevels: boolean;
   steamId: string;
   view: View;
 }) {

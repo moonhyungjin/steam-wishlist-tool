@@ -1,13 +1,7 @@
 "use client";
+import type { FilterState } from "../useFilterState";
 import { STAR_VALUES } from "../constants";
-import {
-  type View,
-  type SortKey,
-  type PlayStatus,
-  type Rating,
-  type StarRating,
-  type ManualPlatform,
-} from "../types";
+import { type View } from "../types";
 import {
   WISHLIST_SORT_OPTIONS,
   LIBRARY_SORT_OPTIONS,
@@ -21,86 +15,60 @@ import { GENRE_LEVELING_ENABLED } from "../genres";
 import { StarRow } from "./Glyphs";
 import { FilterGroup } from "./FilterGroup";
 export function FilterPanel({
-  collapsedGroups,
+  filters,
   discountTierCounts,
-  excludeComingSoon,
-  excludeDemo,
-  excludeEarlyAccess,
-  excludeFree,
-  excludeNotLowest,
   genreCounts,
-  genreFilter,
   genreTaste,
   koreanCounts,
-  koreanFilter,
-  minDiscount,
-  mobileFiltersOpen,
   platformCounts,
-  platformFilter,
   ratingCounts,
-  ratingFilter,
-  selectKoreanFilter,
-  selectMinDiscount,
-  selectSortKey,
-  setExcludeComingSoon,
-  setExcludeDemo,
-  setExcludeEarlyAccess,
-  setExcludeFree,
-  setExcludeNotLowest,
-  setMobileFiltersOpen,
-  sortKey,
   starCounts,
-  starFilter,
   statusCounts,
-  statusFilter,
-  toggleGenre,
-  toggleGroup,
-  togglePlatformFilter,
-  toggleRatingFilter,
-  toggleStarFilter,
-  toggleStatusFilter,
   view,
 }: {
-  collapsedGroups: Set<string>;
+  filters: FilterState;
   discountTierCounts: { any: number; p50: number; p75: number };
-  excludeComingSoon: boolean;
-  excludeDemo: boolean;
-  excludeEarlyAccess: boolean;
-  excludeFree: boolean;
-  excludeNotLowest: boolean;
   genreCounts: { id: number; name: string; count: number }[];
-  genreFilter: number[];
   genreTaste: { genreId: number; genre: string; games: number; affinity: number }[];
   koreanCounts: { supported: number; unsupported: number };
-  koreanFilter: "supported" | "unsupported" | null;
-  minDiscount: number;
-  mobileFiltersOpen: boolean;
   platformCounts: Record<string, number>;
-  platformFilter: ManualPlatform[];
   ratingCounts: Record<string, number>;
-  ratingFilter: (Rating | "none")[];
-  selectKoreanFilter: (v: "supported" | "unsupported") => void;
-  selectMinDiscount: (v: number) => void;
-  selectSortKey: (key: SortKey) => void;
-  setExcludeComingSoon: React.Dispatch<React.SetStateAction<boolean>>;
-  setExcludeDemo: React.Dispatch<React.SetStateAction<boolean>>;
-  setExcludeEarlyAccess: React.Dispatch<React.SetStateAction<boolean>>;
-  setExcludeFree: React.Dispatch<React.SetStateAction<boolean>>;
-  setExcludeNotLowest: React.Dispatch<React.SetStateAction<boolean>>;
-  setMobileFiltersOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  sortKey: SortKey | null;
   starCounts: Record<string, number>;
-  starFilter: ("none" | StarRating)[];
   statusCounts: Record<string, number>;
-  statusFilter: ("none" | PlayStatus)[];
-  toggleGenre: (genreId: number) => void;
-  toggleGroup: (key: string) => void;
-  togglePlatformFilter: (p: "steam" | ManualPlatform) => void;
-  toggleRatingFilter: (r: Rating | "none") => void;
-  toggleStarFilter: (s: StarRating | "none") => void;
-  toggleStatusFilter: (s: PlayStatus | "none") => void;
   view: View;
 }) {
+  const {
+    collapsedGroups,
+    excludeComingSoon,
+    excludeDemo,
+    excludeEarlyAccess,
+    excludeFree,
+    excludeNotLowest,
+    genreFilter,
+    koreanFilter,
+    minDiscount,
+    mobileFiltersOpen,
+    platformFilter,
+    ratingFilter,
+    selectKoreanFilter,
+    selectMinDiscount,
+    selectSortKey,
+    setExcludeComingSoon,
+    setExcludeDemo,
+    setExcludeEarlyAccess,
+    setExcludeFree,
+    setExcludeNotLowest,
+    setMobileFiltersOpen,
+    sortKey,
+    starFilter,
+    statusFilter,
+    toggleGenre,
+    toggleGroup,
+    togglePlatformFilter,
+    toggleRatingFilter,
+    toggleStarFilter,
+    toggleStatusFilter,
+  } = filters;
   return (
     <section className={"panel filterPanel" + (mobileFiltersOpen ? " mobileOpen" : "")}>
       <div className="filterPanelHeader">

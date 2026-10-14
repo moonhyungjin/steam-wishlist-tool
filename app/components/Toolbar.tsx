@@ -1,7 +1,9 @@
 "use client";
+import type { FilterState } from "../useFilterState";
 import { type Item, type View } from "../types";
 import { countryLabel } from "../countries";
 export function Toolbar({
+  filters,
   country,
   filteredItems,
   hasActiveFilter,
@@ -11,18 +13,16 @@ export function Toolbar({
   loading,
   moreActionsOpen,
   moreActionsWrapRef,
-  nameQuery,
   pollActiveForView,
   setCountryOpen,
   setLayoutMode,
   setManualFormOpen,
-  setMobileFiltersOpen,
   setMoreActionsOpen,
   setMyPollsOpen,
-  setNameQuery,
   togglePollMode,
   view,
 }: {
+  filters: FilterState;
   country: string;
   filteredItems: Item[];
   hasActiveFilter: boolean;
@@ -32,18 +32,16 @@ export function Toolbar({
   loading: boolean;
   moreActionsOpen: boolean;
   moreActionsWrapRef: React.RefObject<HTMLDivElement | null>;
-  nameQuery: string;
   pollActiveForView: boolean;
   setCountryOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setLayoutMode: React.Dispatch<React.SetStateAction<"list" | "card">>;
   setManualFormOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setMobileFiltersOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setMoreActionsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setMyPollsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setNameQuery: React.Dispatch<React.SetStateAction<string>>;
   togglePollMode: (kind: "buy" | "play") => void;
   view: View;
 }) {
+  const { nameQuery, setMobileFiltersOpen, setNameQuery } = filters;
   return (
     <div className="sectionHead">
       <h2>{view === "wishlist" ? "Wishlist" : "Library"}</h2>

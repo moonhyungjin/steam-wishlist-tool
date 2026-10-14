@@ -76,3 +76,29 @@ export async function loadWishlist(page: Page) {
   await page.getByPlaceholder("Steam ID64").fill(STEAM_ID);
   await page.getByRole("button", { name: "찜목록 가져오기" }).click();
 }
+
+// Library tab: owned appids (their details still come from the mocked /api/games) plus whatever
+// the cross-device sync endpoint "remembers" for status/rating/star. Registered after mockApis so
+// these handlers win.
+export async function mockLibrary(
+  page: Page,
+  appids: number[],
+  sync: { statusMap?: object; ratingMap?: object; starMap?: object } = {},
+) {
+  await page.route("**/api/library**", (r) =>
+    r.fulfill({
+      json: { count: appids.length, items: appids.map((appid) => ({ appid, playtimeMinutes: 600 })) },
+    }),
+  );
+  await page.route("**/api/achievements**", (r) => r.fulfill({ json: { achievements: {} } }));
+  await page.route("**/api/sync**", (r) =>
+    r.request().method() === "GET" ? r.fulfill({ json: { configured: true, ...sync } }) : r.fulfill({ json: {} }),
+  );
+}
+
+export async function loadLibrary(page: Page) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "라이브러리", exact: true }).click();
+  await page.getByPlaceholder("Steam ID64").fill(STEAM_ID);
+  await page.getByRole("button", { name: "라이브러리 가져오기" }).click();
+}
