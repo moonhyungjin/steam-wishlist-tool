@@ -28,3 +28,7 @@ next-env.d.ts
 
 # claude code local state
 .claude/
+
+# playwright
+/test-results/
+/playwright-report/

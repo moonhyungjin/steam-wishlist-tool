@@ -1,0 +1,63 @@
+import { expect, test } from "@playwright/test";
+import { loadWishlist, mockApis } from "./helpers";
+
+test("lowest-price markers show only on discounted games", async ({ page }) => {
+  await mockApis(
+    page,
+    [
+      // on sale, current price 10,000 vs recorded low 5,000 -> not at the low
+      { appid: 1, name: "Sale Not Low", priceValue: 1000000, discountPercent: 50 },
+      // on sale at exactly the recorded low
+      { appid: 2, name: "Sale At Low", priceValue: 500000, discountPercent: 75 },
+      // full price - must never carry a marker
+      { appid: 3, name: "Full Price", priceValue: 2000000 },
+    ],
+    { 1: 5000, 2: 5000, 3: 1000 },
+  );
+  await loadWishlist(page);
+
+  await expect(page.getByText("Sale Not Low").first()).toBeVisible();
+  await expect(page.locator(".chip.notLowestPrice")).toHaveCount(1);
+  await expect(page.locator(".chip.lowestPriceChip")).toHaveCount(1);
+  await expect(page.locator(".chip.noPriceData")).toHaveCount(0);
+  // the full-price game's chip is a plain price chip
+  await expect(page.locator(".chip", { hasText: "20,000" }).first()).not.toHaveClass(/lowestPriceChip|notLowestPrice|noPriceData/);
+});
+
+test("a game whose sale ended drops its marker after a refresh (stale-low regression)", async ({ page }) => {
+  let saleOver = false;
+  await mockApis(
+    page,
+    () => [
+      saleOver
+        ? { appid: 7, name: "Ended Sale", priceValue: 2000000 }
+        : { appid: 7, name: "Ended Sale", priceValue: 1000000, discountPercent: 50 },
+    ],
+    { 7: 5000 },
+  );
+  await loadWishlist(page);
+  await expect(page.locator(".chip.notLowestPrice")).toHaveCount(1);
+
+  saleOver = true;
+  await page.getByRole("button", { name: "찜목록 새로고침" }).click();
+  await expect(page.locator(".chip", { hasText: "20,000" })).toBeVisible();
+  await expect(page.locator(".chip.notLowestPrice, .chip.lowestPriceChip, .chip.noPriceData")).toHaveCount(0);
+});
+
+test("a 900-game wishlist stays virtualized and loads quickly", async ({ page }) => {
+  const games = Array.from({ length: 900 }, (_, i) => ({
+    appid: 1000 + i,
+    name: `Game ${i}`,
+    priceValue: 1000000,
+    discountPercent: i % 3 === 0 ? 30 : 0,
+  }));
+  await mockApis(page, games);
+  const t0 = Date.now();
+  await loadWishlist(page);
+  await expect(page.getByText("Game 0").first()).toBeVisible();
+  const ms = Date.now() - t0;
+  console.log(`900 games: first row visible after ${ms}ms`);
+  const rendered = await page.getByText(/^Game \d+$/).count();
+  expect(rendered).toBeLessThan(60);
+  expect(ms).toBeLessThan(5000);
+});
