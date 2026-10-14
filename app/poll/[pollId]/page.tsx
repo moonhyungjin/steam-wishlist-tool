@@ -44,6 +44,8 @@ export default function PollPage() {
       const raw = localStorage.getItem(votedKey(pollId));
       if (raw) {
         const appid = Number(raw);
+        // localStorage is only readable after mount, so restoring the saved vote has to happen here.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setVotedFor(appid);
         setSelected(appid);
       }

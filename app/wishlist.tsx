@@ -2065,7 +2065,7 @@ function ManualAddPanel({
         .finally(() => setManualSearching(false));
     }, 200);
     return () => clearTimeout(timer);
-  }, [manualQuery, isComposing]);
+  }, [manualQuery, isComposing, country]);
   // Adding a game shouldn't close the whole panel - clearing just the query/results (autoFocus
   // on the input keeps focus) lets the user search-then-add the next game right away, which is
   // what actually makes adding several games in a row fast.
@@ -2503,9 +2503,11 @@ export default function Wishlist() {
   // selections from one tab's poll silently carrying over if they switch back.
   useEffect(() => {
     if (pollKind === "buy" && view !== "wishlist") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPollKind(null);
       resetPollState();
     } else if (pollKind === "play" && view !== "library") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPollKind(null);
       resetPollState();
     }
@@ -3428,6 +3430,7 @@ export default function Wishlist() {
   // immediately so this never fires again outside of that specific post-cache-invalidation case.
   useEffect(() => {
     if (!needsAutoLoad || !steamId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNeedsAutoLoad(false);
     if (view === "wishlist") loadWishlist();
     else loadLibrary();
