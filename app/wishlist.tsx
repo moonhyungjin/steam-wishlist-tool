@@ -54,6 +54,7 @@ import { PollBar } from "./components/PollBar";
 import { GameRow } from "./components/GameRow";
 import { CardCell } from "./components/CardCell";
 import { CountryPanel } from "./components/CountryPanel";
+import { SyncPanel } from "./components/SyncPanel";
 import { MyPollsPanel } from "./components/MyPollsPanel";
 import { ManualAddPanel } from "./components/ManualAddPanel";
 import { enrichGames, enrichMetacritic, enrichLowestPrice, enrichAchievements } from "./enrich";
@@ -62,6 +63,8 @@ export default function Wishlist() {
   // Shared across both tabs - one Steam account, viewed two ways.
   const [steamId, setSteamId] = useState("");
   const {
+    syncLink,
+    linkSyncCode,
     manualPlatform,
     setManualPlatform,
     manualGames,
@@ -135,6 +138,7 @@ export default function Wishlist() {
   const [country, setCountry] = useState<string>(DEFAULT_COUNTRY);
   const countryRef = useRef<string>(DEFAULT_COUNTRY);
   const [countryOpen, setCountryOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
   function changeCountry(code: string) {
     if (!isSupportedCountry(code) || code === countryRef.current) return;
     countryRef.current = code;
@@ -957,6 +961,8 @@ export default function Wishlist() {
           moreActionsWrapRef={moreActionsWrapRef}
           pollActiveForView={pollActiveForView}
           setCountryOpen={setCountryOpen}
+          setSyncOpen={setSyncOpen}
+          syncLocked={syncLink === "locked"}
           setLayoutMode={setLayoutMode}
           setManualFormOpen={setManualFormOpen}
           setMoreActionsOpen={setMoreActionsOpen}
@@ -992,6 +998,14 @@ export default function Wishlist() {
             current={country}
             onSelect={changeCountry}
             onClose={() => setCountryOpen(false)}
+          />
+        )}
+        {syncOpen && (
+          <SyncPanel
+            steamId={steamId.trim()}
+            link={syncLink}
+            onLink={linkSyncCode}
+            onClose={() => setSyncOpen(false)}
           />
         )}
         {myPollsOpen && (

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { getSyncToken, setSyncToken } from "./syncToken";
 import type {
   Game,
   PlayStatus,
@@ -23,7 +24,10 @@ import {
 // achievements, manually-added games), plus everything that keeps it in sync: the localStorage
 // writes, the refs that always hold the latest values, the per-account reset, and the cross-device
 // push/pull against /api/sync. steamId is whichever account is currently entered.
+export type SyncLinkState = "unknown" | "unclaimed" | "linked" | "locked";
 export function useSyncedData(steamId: string) {
+  // Whether this browser may write the account's synced record - see app/api/sync/route.ts.
+  const [syncLink, setSyncLink] = useState<SyncLinkState>("unknown");
   const [manualPlatform, setManualPlatform] = useState<Record<number, ManualPlatform>>({});
   const [manualGames, setManualGames] = useState<Record<number, Game>>({});
   const [manualPlaytime, setManualPlaytime] = useState<Record<number, number>>({});
@@ -180,9 +184,11 @@ export function useSyncedData(steamId: string) {
     // here that fell back to a stale render's closured state (instead of the always-current ref)
     // would silently wipe out newer data already saved server-side - most dangerously
     // achievementMap, which gets pushed repeatedly in small chunks during every library load.
+    const token = getSyncToken(id);
+    if (!token) return;
     fetch("/api/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-sync-token": token },
       body: JSON.stringify({
         steamId: id,
         statusMap: overrides.statusMap ?? statusMapRef.current,
@@ -194,13 +200,22 @@ export function useSyncedData(steamId: string) {
         manualPlaytime: overrides.manualPlaytime ?? manualPlaytimeRef.current,
         manualRemovedIds: overrides.manualRemovedIds ?? manualRemovedIdsRef.current,
       }),
-    }).catch(() => {});
+    })
+      .then((r) => {
+        if (r.status === 403) setSyncLink("locked");
+        else if (r.ok) setSyncLink((prev) => (prev === "locked" ? prev : "linked"));
+      })
+      .catch(() => {});
   }
   function syncFromServer(id: string) {
-    fetch(`/api/sync?steamid=${encodeURIComponent(id)}`)
+    const token = getSyncToken(id);
+    fetch(`/api/sync?steamid=${encodeURIComponent(id)}`, {
+      headers: token ? { "x-sync-token": token } : undefined,
+    })
       .then((r) => r.json())
       .then((d) => {
         if (!d.configured) return;
+        setSyncLink(d.linked === true ? "linked" : d.linked === false ? "locked" : "unclaimed");
         // An empty map from the server is indistinguishable from "nothing pushed yet" vs. "you
         // really cleared everything" - so when local already has real entries, prefer local over
         // a server value that would wipe it. A stale/empty push (e.g. from a fresh session that
@@ -321,7 +336,17 @@ export function useSyncedData(steamId: string) {
     } catch {}
     pushSync({ achievementMap: next });
   }
+  // Adopts another device's sync code for the current account, then re-pulls its record.
+  function linkSyncCode(code: string): boolean {
+    const id = steamId.trim();
+    if (!/^\d{17}$/.test(id) || !setSyncToken(id, code)) return false;
+    setSyncLink("unknown");
+    syncFromServer(id);
+    return true;
+  }
   return {
+    syncLink,
+    linkSyncCode,
     manualPlatform,
     setManualPlatform,
     manualGames,

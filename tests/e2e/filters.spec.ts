@@ -132,3 +132,42 @@ test("switching accounts drops the previous account's synced status/ratings", as
   // account A's "완료" badge must not leak onto account B's library
   await expect(page.getByText("상태 없음")).toHaveCount(3);
 });
+
+test("sync write protection: a second device is locked until it enters the owner's code", async ({
+  page,
+}) => {
+  const OWNER = "c".repeat(64);
+  const seenOnPost: string[] = [];
+  await mockApis(page, base);
+  await mockGenreGames(page);
+  await mockLibrary(page, [1, 2, 3]);
+  // stand-in for /api/sync's claim logic: OWNER's token owns the record
+  await page.route("**/api/sync**", (r) => {
+    const token = r.request().headers()["x-sync-token"] ?? "";
+    if (r.request().method() === "GET")
+      return r.fulfill({ json: { configured: true, linked: token === OWNER } });
+    seenOnPost.push(token);
+    return token === OWNER
+      ? r.fulfill({ json: { ok: true, linked: true } })
+      : r.fulfill({ status: 403, json: { error: "locked", locked: true } });
+  });
+  await loadLibrary(page);
+  await expect(page.getByText("Action One").first()).toBeVisible();
+
+  // this browser minted its own random 64-hex token and the menu says it's not connected
+  await page.getByTitle("더보기").click();
+  await expect(page.locator(".moreActionsTag.warn", { hasText: "연결 필요" })).toBeVisible();
+  await page.getByText("동기화 코드", { exact: false }).first().click();
+  await expect(page.getByText("변경 내용이 저장되지 않아요")).toBeVisible();
+
+  // entering the wrong shape is refused, the right code connects
+  await page.getByPlaceholder("코드를 붙여 넣으세요").fill("not-a-code");
+  await page.getByRole("button", { name: "연결" }).click();
+  await expect(page.getByText("코드 형식이 올바르지 않아요")).toBeVisible();
+  await page.getByPlaceholder("코드를 붙여 넣으세요").fill(OWNER);
+  await page.getByRole("button", { name: "연결" }).click();
+  await expect(page.getByText("이 기기가 이 기록에 연결돼 있어요")).toBeVisible();
+  const stored = await page.evaluate(() => localStorage.getItem("syncToken:76561198000000000"));
+  expect(stored).toBe(OWNER);
+  for (const t of seenOnPost) expect(t).toMatch(/^[0-9a-f]{64}$/);
+});
