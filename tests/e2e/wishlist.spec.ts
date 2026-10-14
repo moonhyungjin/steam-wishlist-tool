@@ -152,3 +152,24 @@ test("creating a purchase poll: pick two games, get a share link", async ({ page
   expect(posted!.candidates.map((c) => c.appid).sort()).toEqual([1, 2]);
   expect(posted!.question).toBe("어떤 게임을 살까요?");
 });
+
+test("the refresh button shows a 'due' dot after a day and clears it after refreshing", async ({
+  page,
+}) => {
+  await mockApis(page, FILTER_GAMES, FILTER_LOWS);
+  await loadWishlist(page);
+  await expect(page.getByText("Alpha Sale").first()).toBeVisible();
+  // a refresh just completed -> nothing due
+  await expect(page.locator(".refreshBtn .refreshDot")).toHaveCount(0);
+
+  // pretend the last refresh was 25h ago, then reload (data restores from the local cache)
+  await page.evaluate(() =>
+    localStorage.setItem("wishlist:refreshedAt", String(Date.now() - 25 * 60 * 60 * 1000)),
+  );
+  await page.reload();
+  await expect(page.getByText("Alpha Sale").first()).toBeVisible();
+  await expect(page.locator(".refreshBtn .refreshDot")).toHaveCount(1);
+
+  await page.getByRole("button", { name: /찜목록 새로고침/ }).click();
+  await expect(page.locator(".refreshBtn .refreshDot")).toHaveCount(0);
+});

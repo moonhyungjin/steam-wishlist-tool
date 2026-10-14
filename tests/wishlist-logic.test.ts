@@ -12,6 +12,7 @@ import {
   genreLevelInfo,
   lowestPriceStatus,
   mergeGamesInto,
+  refreshStatus,
   recommendScore,
   sortItems,
 } from "../app/gameLogic";
@@ -355,5 +356,26 @@ describe("computeRecommendFit (잘 맞음 / 보통 / 안 맞음)", () => {
   it("leaves games with no overlapping taste data unlabeled", () => {
     const { games, items } = wl([999999]);
     expect(computeRecommendFit(items, games, { 19: { affinity: 1.2, games: 20 } })).toEqual({});
+  });
+});
+
+describe("refreshStatus (daily refresh nudge)", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = 1_000_000_000_000;
+  it("is stale when never refreshed", () => {
+    expect(refreshStatus(undefined, now, DAY)).toEqual({ stale: true, label: "갱신 기록 없음" });
+  });
+  it("turns stale exactly at the threshold and labels the age", () => {
+    expect(refreshStatus(now - 30_000, now, DAY)).toEqual({ stale: false, label: "방금 갱신" });
+    expect(refreshStatus(now - 90 * 60_000, now, DAY)).toEqual({
+      stale: false,
+      label: "1시간 전 갱신",
+    });
+    expect(refreshStatus(now - (DAY - 1), now, DAY).stale).toBe(false);
+    expect(refreshStatus(now - DAY, now, DAY)).toEqual({ stale: true, label: "1일 전 갱신" });
+    expect(refreshStatus(now - 3 * DAY, now, DAY).label).toBe("3일 전 갱신");
+  });
+  it("never reports a negative age if the clock moved backwards", () => {
+    expect(refreshStatus(now + 5000, now, DAY)).toEqual({ stale: false, label: "방금 갱신" });
   });
 });

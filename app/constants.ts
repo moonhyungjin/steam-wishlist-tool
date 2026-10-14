@@ -116,3 +116,12 @@ export const ROW_GAP = 10;
 export const CARD_MIN_WIDTH = 190;
 export const CARD_NARROW_BREAKPOINT = 520;
 export const CARD_ROW_HEIGHT = 168;
+// When each tab's data was last actually re-fetched (a "새로고침"/"가져오기" run, not a restore from
+// the localStorage cache) - drives the "refresh today" dot on the refresh button.
+export const REFRESHED_AT_STORAGE_KEYS = {
+  wishlist: "wishlist:refreshedAt",
+  library: "library:refreshedAt",
+} as const;
+// The app only re-fetches when the refresh button is pressed (never on F5), so the button nudges
+// once the data is a day old.
+export const REFRESH_STALE_MS = 24 * 60 * 60 * 1000;

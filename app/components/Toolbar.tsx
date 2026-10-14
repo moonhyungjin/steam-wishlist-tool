@@ -10,6 +10,8 @@ export function Toolbar({
   items,
   layoutMode,
   loadActive,
+  refreshDue,
+  refreshLabel,
   loading,
   moreActionsOpen,
   moreActionsWrapRef,
@@ -29,6 +31,8 @@ export function Toolbar({
   items: Item[];
   layoutMode: "list" | "card";
   loadActive: () => Promise<void>;
+  refreshDue: boolean;
+  refreshLabel: string;
   loading: boolean;
   moreActionsOpen: boolean;
   moreActionsWrapRef: React.RefObject<HTMLDivElement | null>;
@@ -42,6 +46,12 @@ export function Toolbar({
   view: View;
 }) {
   const { nameQuery, setMobileFiltersOpen, setNameQuery } = filters;
+  const refreshTitle =
+    (view === "wishlist"
+      ? "찜목록 새로고침"
+      : "라이브러리 새로고침 (최근 플레이한 게임 업적 포함)") +
+    ` · ${refreshLabel}` +
+    (refreshDue ? " - 하루에 한 번은 새로고침해 주세요" : "");
   return (
     <div className="sectionHead">
       <h2>{view === "wishlist" ? "Wishlist" : "Library"}</h2>
@@ -76,11 +86,8 @@ export function Toolbar({
           className="refreshBtn"
           onClick={loadActive}
           disabled={loading}
-          title={
-            view === "wishlist"
-              ? "찜목록 새로고침"
-              : "라이브러리 새로고침 (최근 플레이한 게임 업적 포함)"
-          }
+          title={refreshTitle}
+          aria-label={refreshTitle}
         >
           <svg
             className={loading ? "spinning" : ""}
@@ -96,6 +103,7 @@ export function Toolbar({
             <path d="M21 12a9 9 0 1 1-3-6.7" />
             <polyline points="21 3 21 9 15 9" />
           </svg>
+          {refreshDue && !loading && <i className="refreshDot" aria-hidden="true" />}
         </button>
         <div className="layoutToggle">
           <button

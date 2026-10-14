@@ -47,6 +47,7 @@ import { useElementSize } from "./hooks";
 import { useFilterState } from "./useFilterState";
 import { useSyncedData } from "./useSyncedData";
 import { usePoll } from "./usePoll";
+import { useRefreshStamp } from "./useRefreshStamp";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
 import { PollBar } from "./components/PollBar";
@@ -231,6 +232,7 @@ export default function Wishlist() {
     setView(next);
     setSortKey(null);
   }
+  const { markRefreshed, statusFor } = useRefreshStamp();
   const filters = useFilterState();
   const {
     sortKey,
@@ -754,6 +756,7 @@ export default function Wishlist() {
         countryRef.current,
       );
       persistTo(WISHLIST_CACHE_KEY, id, list, loaded);
+      markRefreshed("wishlist");
       enrichMetacritic(appids, loaded, (cur) => {
         setWlGames((prev) => {
           const merged = mergeGamesInto(prev, cur);
@@ -859,6 +862,7 @@ export default function Wishlist() {
         countryRef.current,
       );
       persistTo(LIBRARY_CACHE_KEY, id, list, loaded);
+      markRefreshed("library");
       // Library doesn't show or sort by metacritic/review anywhere, so there's nothing to spend
       // that rate-limited endpoint's budget on here - only the wishlist view enriches it.
       const achievementOrder = prioritizeAchievementOrder(list, loaded, sortKey, {
@@ -946,6 +950,8 @@ export default function Wishlist() {
           items={items}
           layoutMode={layoutMode}
           loadActive={loadActive}
+          refreshDue={dataLoadedForView && statusFor(view).stale}
+          refreshLabel={statusFor(view).label}
           loading={loading}
           moreActionsOpen={moreActionsOpen}
           moreActionsWrapRef={moreActionsWrapRef}

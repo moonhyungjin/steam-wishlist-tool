@@ -474,3 +474,24 @@ export function computeRecommendFit(
   }
   return out;
 }
+
+// Whether a tab's data is due for a refresh (never refreshed, or at least `staleMs` old) plus a
+// short Korean "last refreshed" label for the button tooltip.
+export function refreshStatus(
+  refreshedAt: number | undefined,
+  now: number,
+  staleMs: number,
+): { stale: boolean; label: string } {
+  if (refreshedAt == null) return { stale: true, label: "갱신 기록 없음" };
+  const ms = Math.max(0, now - refreshedAt);
+  const min = Math.floor(ms / 60000);
+  const label =
+    min < 1
+      ? "방금 갱신"
+      : min < 60
+        ? `${min}분 전 갱신`
+        : min < 60 * 24
+          ? `${Math.floor(min / 60)}시간 전 갱신`
+          : `${Math.floor(min / (60 * 24))}일 전 갱신`;
+  return { stale: ms >= staleMs, label };
+}
