@@ -61,3 +61,58 @@ test("a 900-game wishlist stays virtualized and loads quickly", async ({ page })
   expect(rendered).toBeLessThan(60);
   expect(ms).toBeLessThan(5000);
 });
+
+const FILTER_GAMES = [
+  { appid: 1, name: "Alpha Sale", priceValue: 1000000, discountPercent: 50 },
+  { appid: 2, name: "Bravo Low", priceValue: 500000, discountPercent: 75 },
+  { appid: 3, name: "Charlie Full", priceValue: 2000000 },
+  { appid: 4, name: "Delta Sale", priceValue: 800000, discountPercent: 20 },
+];
+// Alpha: sale but not at its low; Bravo: sale at its low; Delta: sale, no ITAD data (not returned)
+const FILTER_LOWS = { 1: 5000, 2: 5000 };
+
+const visibleNames = (page: import("@playwright/test").Page) =>
+  page
+    .getByText(/^(Alpha|Bravo|Charlie|Delta) /)
+    .evaluateAll((els) => [...new Set(els.map((e) => e.textContent?.trim()))]);
+
+test("name search narrows the list", async ({ page }) => {
+  await mockApis(page, FILTER_GAMES, FILTER_LOWS);
+  await loadWishlist(page);
+  await expect(page.getByText("Alpha Sale").first()).toBeVisible();
+  await page.getByPlaceholder("게임 이름 검색").fill("brav");
+  await expect(page.getByText("Bravo Low").first()).toBeVisible();
+  await expect(page.getByText("Alpha Sale")).toHaveCount(0);
+  await expect(page.getByText("Charlie Full")).toHaveCount(0);
+});
+
+test("the 할인 중 filter keeps only discounted games", async ({ page }) => {
+  await mockApis(page, FILTER_GAMES, FILTER_LOWS);
+  await loadWishlist(page);
+  await expect(page.getByText("Charlie Full").first()).toBeVisible();
+  await page.getByLabel(/^할인 중/).first().check({ force: true });
+  await expect(page.getByText("Charlie Full")).toHaveCount(0);
+  expect(await visibleNames(page)).toEqual(
+    expect.arrayContaining(["Alpha Sale", "Bravo Low", "Delta Sale"]),
+  );
+});
+
+test("최저가 아닌 게임 제외 drops only the confirmed not-at-low game", async ({ page }) => {
+  await mockApis(page, FILTER_GAMES, FILTER_LOWS);
+  await loadWishlist(page);
+  await expect(page.locator(".chip.notLowestPrice")).toHaveCount(1);
+  await page.getByLabel("최저가 아닌 게임 제외").check({ force: true });
+  await expect(page.getByText("Alpha Sale")).toHaveCount(0); // ❌ - excluded
+  await expect(page.getByText("Bravo Low").first()).toBeVisible(); // 🏷️ at its low
+  await expect(page.getByText("Charlie Full").first()).toBeVisible(); // full price - never judged
+  await expect(page.getByText("Delta Sale").first()).toBeVisible(); // no ITAD data - kept
+});
+
+test("sorting by discount puts the deepest sale first and full price last", async ({ page }) => {
+  await mockApis(page, FILTER_GAMES, FILTER_LOWS);
+  await loadWishlist(page);
+  await page.getByText("할인율 높은순").first().click();
+  await expect.poll(async () => (await visibleNames(page)).join("|")).toBe(
+    "Bravo Low|Alpha Sale|Delta Sale|Charlie Full",
+  );
+});
