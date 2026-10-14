@@ -9,18 +9,28 @@ import {
   mergeGamesInto,
   recommendScore,
   sortItems,
-  type Game,
-} from "../app/wishlist";
+} from "../app/gameLogic";
+import type { Game } from "../app/types";
 
 const game = (appid: number, over: Partial<Game> = {}): Game => ({
   ...blankGame(appid, `game${appid}`),
   ...over,
 });
-const low = (amount: number) => ({ amount, currency: "KRW", cut: 80, shop: "Steam", timestamp: null });
+const low = (amount: number) => ({
+  amount,
+  currency: "KRW",
+  cut: 80,
+  shop: "Steam",
+  timestamp: null,
+});
 
 describe("lowestPriceStatus", () => {
   it("is none for full-price games even with a stale stored low (the bug fixed 2026-10-14)", () => {
-    expect(lowestPriceStatus(game(1, { discountPercent: 0, lowestPrice: low(1000), priceValue: 5000000 }))).toBe("none");
+    expect(
+      lowestPriceStatus(
+        game(1, { discountPercent: 0, lowestPrice: low(1000), priceValue: 5000000 }),
+      ),
+    ).toBe("none");
     expect(lowestPriceStatus(game(1, { discountPercent: 0, lowestPrice: null }))).toBe("none");
   });
   it("is none for a missing game", () => {
@@ -32,12 +42,28 @@ describe("lowestPriceStatus", () => {
   });
   it("compares Steam's cents-scaled price against ITAD's plain amount", () => {
     // 10,000 KRW = 1,000,000 in Steam's cents
-    expect(lowestPriceStatus(game(1, { discountPercent: 50, priceValue: 1000000, lowestPrice: low(10000) }))).toBe("at-low");
-    expect(lowestPriceStatus(game(1, { discountPercent: 50, priceValue: 900000, lowestPrice: low(10000) }))).toBe("at-low");
-    expect(lowestPriceStatus(game(1, { discountPercent: 50, priceValue: 1000100, lowestPrice: low(10000) }))).toBe("not-at-low");
+    expect(
+      lowestPriceStatus(
+        game(1, { discountPercent: 50, priceValue: 1000000, lowestPrice: low(10000) }),
+      ),
+    ).toBe("at-low");
+    expect(
+      lowestPriceStatus(
+        game(1, { discountPercent: 50, priceValue: 900000, lowestPrice: low(10000) }),
+      ),
+    ).toBe("at-low");
+    expect(
+      lowestPriceStatus(
+        game(1, { discountPercent: 50, priceValue: 1000100, lowestPrice: low(10000) }),
+      ),
+    ).toBe("not-at-low");
   });
   it("treats an unknown price as not at the low", () => {
-    expect(lowestPriceStatus(game(1, { discountPercent: 50, priceValue: null, lowestPrice: low(10000) }))).toBe("not-at-low");
+    expect(
+      lowestPriceStatus(
+        game(1, { discountPercent: 50, priceValue: null, lowestPrice: low(10000) }),
+      ),
+    ).toBe("not-at-low");
   });
 });
 
@@ -75,8 +101,12 @@ describe("gameAffinity", () => {
   it("centers stars on 3 and rewards high achievement completion", () => {
     expect(gameAffinity(undefined, undefined, 3, undefined)).toBe(1);
     expect(gameAffinity(undefined, undefined, 5, undefined)).toBeCloseTo(1.3);
-    expect(gameAffinity(undefined, undefined, undefined, { achieved: 7, total: 10, percent: 70 })).toBeCloseTo(1.1);
-    expect(gameAffinity(undefined, undefined, undefined, { achieved: 6, total: 10, percent: 60 })).toBe(1);
+    expect(
+      gameAffinity(undefined, undefined, undefined, { achieved: 7, total: 10, percent: 70 }),
+    ).toBeCloseTo(1.1);
+    expect(
+      gameAffinity(undefined, undefined, undefined, { achieved: 6, total: 10, percent: 60 }),
+    ).toBe(1);
   });
 });
 
@@ -129,7 +159,9 @@ describe("sorting", () => {
 
 describe("mergeGamesInto", () => {
   it("keeps enrichment fields the fresh fetch doesn't know about", () => {
-    const prev = { 1: game(1, { metacritic: 88, lowestPrice: low(500), lowestPriceCheckedForEnd: 123 }) };
+    const prev = {
+      1: game(1, { metacritic: 88, lowestPrice: low(500), lowestPriceCheckedForEnd: 123 }),
+    };
     const fresh = { 1: game(1, { priceValue: 700, discountPercent: 30 }) };
     const merged = mergeGamesInto(prev, fresh);
     expect(merged[1].priceValue).toBe(700);
