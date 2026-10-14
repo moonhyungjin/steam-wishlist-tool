@@ -102,3 +102,33 @@ test.describe("library filters (status / rating / stars from synced data)", () =
     await expect(page.getByText("Rpg One")).toHaveCount(0);
   });
 });
+
+test("switching accounts drops the previous account's synced status/ratings", async ({ page }) => {
+  const A = "76561198000000000";
+  const B = "76561198000000001";
+  await mockApis(page, base);
+  await mockGenreGames(page);
+  await mockLibrary(page, [1, 2, 3]);
+  // per-account sync: A has data, B has none
+  await page.route("**/api/sync**", (r) => {
+    if (r.request().method() !== "GET") return r.fulfill({ json: {} });
+    const id = new URL(r.request().url()).searchParams.get("steamid");
+    return r.fulfill({
+      json:
+        id === A
+          ? { configured: true, statusMap: { 1: "completed" }, ratingMap: { 1: "like" } }
+          : { configured: true },
+    });
+  });
+  await loadLibrary(page);
+  await expect(page.getByText("Action One").first()).toBeVisible();
+  // account A: one game has a status, the other two show "상태 없음"
+  await expect(page.getByText("상태 없음")).toHaveCount(2);
+
+  await page.getByRole("button", { name: "계정 변경" }).click();
+  await page.getByPlaceholder("Steam ID64").fill(B);
+  await page.getByRole("button", { name: "라이브러리 가져오기" }).click();
+  await expect(page.getByText("Action One").first()).toBeVisible();
+  // account A's "완료" badge must not leak onto account B's library
+  await expect(page.getByText("상태 없음")).toHaveCount(3);
+});
