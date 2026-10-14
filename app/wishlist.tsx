@@ -45,8 +45,10 @@ import {
 import { useElementSize } from "./hooks";
 import { useFilterState } from "./useFilterState";
 import { useSyncedData } from "./useSyncedData";
+import { usePoll } from "./usePoll";
 import { Sidebar } from "./components/Sidebar";
 import { Toolbar } from "./components/Toolbar";
+import { PollBar } from "./components/PollBar";
 import { GameRow } from "./components/GameRow";
 import { CardCell } from "./components/CardCell";
 import { CountryPanel } from "./components/CountryPanel";
@@ -124,14 +126,6 @@ export default function Wishlist() {
   const [libError, setLibError] = useState("");
   const [libFetchedOnce, setLibFetchedOnce] = useState(false);
 
-  // Poll creation - pick a few games and get a login-free, shareable /poll/[pollId] link.
-  // Two separate polls live behind this one piece of state: "buy" (wishlist - which to buy) and
-  // "play" (library - which to play next). They're mutually exclusive and each only makes sense
-  // on its own tab, so pollKind carries which one is active (or null) instead of a plain boolean -
-  // that's what lets the UI show the right button/question per tab instead of one poll leaking
-  // into the other view. Candidates are a creation-time snapshot (name/image/price), so price
-  // changes during voting don't affect an already-created poll.
-  const [pollKind, setPollKind] = useState<"buy" | "play" | null>(null);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [myPollsOpen, setMyPollsOpen] = useState(false);
   // Steam store region. The ref mirrors the state so loaders that run right after a change (in the
@@ -181,80 +175,6 @@ export default function Wishlist() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [moreActionsOpen]);
-  const [pollSelected, setPollSelected] = useState<Set<number>>(new Set());
-  const [pollShowSelectedOnly, setPollShowSelectedOnly] = useState(false);
-  const [pollCreating, setPollCreating] = useState(false);
-  const [pollError, setPollError] = useState<string | null>(null);
-  const [pollLink, setPollLink] = useState<string | null>(null);
-  // True only when a poll is active AND it's the one that belongs to the tab currently showing -
-  // e.g. a "buy" poll started on the wishlist tab stays "active" in state but isn't rendered once
-  // the user switches to the library tab, rather than its bar/checkboxes leaking into that view.
-  const pollActiveForView =
-    (pollKind === "buy" && view === "wishlist") || (pollKind === "play" && view === "library");
-  function resetPollState() {
-    setPollSelected(new Set());
-    setPollShowSelectedOnly(false);
-    setPollError(null);
-    setPollLink(null);
-  }
-  function togglePollMode(kind: "buy" | "play") {
-    setPollKind((cur) => (cur === kind ? null : kind));
-    resetPollState();
-  }
-  function closePollMode() {
-    setPollKind(null);
-    resetPollState();
-  }
-  // Switching tabs away from the one a poll belongs to closes it outright (not just hides the UI) -
-  // the user has to start over on whichever tab's poll they actually want, rather than stale
-  // selections from one tab's poll silently carrying over if they switch back.
-  useEffect(() => {
-    if (pollKind === "buy" && view !== "wishlist") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPollKind(null);
-      resetPollState();
-    } else if (pollKind === "play" && view !== "library") {
-      setPollKind(null);
-      resetPollState();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
-  function togglePollSelect(appid: number) {
-    setPollSelected((cur) => {
-      const next = new Set(cur);
-      if (next.has(appid)) next.delete(appid);
-      else if (next.size < 8) next.add(appid);
-      return next;
-    });
-  }
-  async function createPoll() {
-    const candidates = [...pollSelected].map((appid) => {
-      const g = games[appid];
-      return {
-        appid,
-        name: g?.name ?? String(appid),
-        headerImage: g?.headerImage ?? null,
-        price: g?.price ?? "정보 없음",
-      };
-    });
-    const question = pollKind === "play" ? "어떤 게임을 먼저 할까요?" : "어떤 게임을 살까요?";
-    setPollCreating(true);
-    setPollError(null);
-    try {
-      const res = await fetch("/api/poll", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidates, question, ownerSteamId: steamId.trim() }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error || "투표를 만들지 못했어요.");
-      setPollLink(`${location.origin}/poll/${body.pollId}`);
-    } catch (err) {
-      setPollError(err instanceof Error ? err.message : "투표를 만들지 못했어요.");
-    } finally {
-      setPollCreating(false);
-    }
-  }
   // A library refresh only ever touches libItems/libGames (the Steam-fetched half), so merging
   // manual entries in here - rather than mixing them into libItems itself - means they survive
   // every "라이브러리 가져오기" click instead of being wiped by it.
@@ -286,6 +206,19 @@ export default function Wishlist() {
 
   const items = view === "wishlist" ? wlItems : combinedLibItems;
   const games = view === "wishlist" ? wlGames : combinedLibGames;
+  const {
+    pollSelected,
+    pollShowSelectedOnly,
+    setPollShowSelectedOnly,
+    pollCreating,
+    pollError,
+    pollLink,
+    pollActiveForView,
+    togglePollMode,
+    closePollMode,
+    togglePollSelect,
+    createPoll,
+  } = usePoll(view, games, steamId);
   const loading = view === "wishlist" ? wlLoading : libLoading;
   const progress = view === "wishlist" ? wlProgress : libProgress;
   const error = view === "wishlist" ? wlError : libError;
@@ -1058,59 +991,16 @@ export default function Wishlist() {
           <MyPollsPanel steamId={steamId.trim()} onClose={() => setMyPollsOpen(false)} />
         )}
         {pollActiveForView && (
-          <div className="pollBar">
-            {pollLink ? (
-              <>
-                <span className="pollBarText">투표 링크가 만들어졌어요!</span>
-                <input
-                  className="pollLinkInput"
-                  readOnly
-                  value={pollLink}
-                  onFocus={(e) => e.currentTarget.select()}
-                />
-                <button
-                  type="button"
-                  className="pollBarBtn"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(pollLink).catch(() => {});
-                  }}
-                >
-                  복사
-                </button>
-                <button type="button" className="pollBarBtnGhost" onClick={closePollMode}>
-                  닫기
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="pollBarText">
-                  {pollSelected.size === 0
-                    ? "투표에 올릴 게임을 2~8개 체크해주세요."
-                    : `${pollSelected.size}개 선택됨`}
-                </span>
-                {pollError && <span className="pollBarError">{pollError}</span>}
-                <button
-                  type="button"
-                  className="pollBarBtn"
-                  disabled={pollSelected.size < 2 || pollCreating}
-                  onClick={createPoll}
-                >
-                  {pollCreating ? "만드는 중..." : "투표 링크 만들기"}
-                </button>
-                <button type="button" className="pollBarBtnGhost" onClick={closePollMode}>
-                  취소
-                </button>
-                <label className="pollBarCheck">
-                  <input
-                    type="checkbox"
-                    checked={pollShowSelectedOnly}
-                    onChange={(e) => setPollShowSelectedOnly(e.target.checked)}
-                  />
-                  체크한 게임만 보기
-                </label>
-              </>
-            )}
-          </div>
+          <PollBar
+            closePollMode={closePollMode}
+            createPoll={createPoll}
+            pollCreating={pollCreating}
+            pollError={pollError}
+            pollLink={pollLink}
+            pollSelected={pollSelected}
+            pollShowSelectedOnly={pollShowSelectedOnly}
+            setPollShowSelectedOnly={setPollShowSelectedOnly}
+          />
         )}
         <div className="listWrap" ref={listWrapRef}>
           {!items.length ? (

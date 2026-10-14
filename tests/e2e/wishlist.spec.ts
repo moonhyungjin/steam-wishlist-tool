@@ -125,3 +125,30 @@ test("sorting by discount puts the deepest sale first and full price last", asyn
     .poll(async () => (await visibleNames(page)).join("|"))
     .toBe("Bravo Low|Alpha Sale|Delta Sale|Charlie Full");
 });
+
+test("creating a purchase poll: pick two games, get a share link", async ({ page }) => {
+  await mockApis(page, FILTER_GAMES, FILTER_LOWS);
+  let posted: { candidates: { appid: number }[]; question: string } | null = null;
+  await page.route("**/api/poll", async (r) => {
+    posted = r.request().postDataJSON();
+    await r.fulfill({ json: { pollId: "abc123" } });
+  });
+  await loadWishlist(page);
+  await expect(page.getByText("Alpha Sale").first()).toBeVisible();
+
+  await page.getByTitle("더보기").click();
+  await page.getByText("구매 투표 만들기").click();
+  const create = page.getByRole("button", { name: "투표 링크 만들기" });
+  await expect(create).toBeDisabled(); // needs at least 2 picks
+
+  await page.getByText("Alpha Sale").first().click();
+  await expect(create).toBeDisabled();
+  await page.getByText("Bravo Low").first().click();
+  await expect(create).toBeEnabled();
+  await create.click();
+
+  await expect(page.getByText("투표 링크가 만들어졌어요!")).toBeVisible();
+  await expect(page.locator(".pollLinkInput")).toHaveValue(/\/poll\/abc123$/);
+  expect(posted!.candidates.map((c) => c.appid).sort()).toEqual([1, 2]);
+  expect(posted!.question).toBe("어떤 게임을 살까요?");
+});
