@@ -1501,7 +1501,9 @@ function GameRow({
               // priceValue is Steam's own cents-scaled price (final_price_in_cents) - ITAD's
               // amount is already plain KRW, so this has to be divided by 100 before comparing or
               // the "is this the all-time low" check would be off by 100x.
-              const lowestPrice = g.lowestPrice;
+              // Only meaningful while the game is actually on sale - a stored lowestPrice outlives
+              // the sale it was fetched for, so a full-price game must not keep showing its marker.
+              const lowestPrice = g.discountPercent > 0 ? g.lowestPrice : undefined;
               const atLow =
                 !!lowestPrice && g.priceValue != null && g.priceValue / 100 <= lowestPrice.amount;
               // lowestPrice === null (not undefined) means it was actually checked and ITAD just
@@ -3233,7 +3235,8 @@ export default function Wishlist() {
       if (
         view === "wishlist" &&
         excludeNotLowest &&
-        g?.lowestPrice &&
+        g?.discountPercent &&
+        g.lowestPrice &&
         !(g.priceValue != null && g.priceValue / 100 <= g.lowestPrice.amount)
       )
         return false;
