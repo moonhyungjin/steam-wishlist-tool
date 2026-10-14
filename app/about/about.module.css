@@ -20,9 +20,12 @@
 .langSwitchRow {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   padding-top: 20px;
 }
-.langSwitch {
+.langSwitch,
+.shareBtn {
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
@@ -31,8 +34,15 @@
   border: 1px solid var(--line);
   border-radius: 100px;
 }
+.shareBtn {
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
 .langSwitch:hover,
-.langSwitch:focus-visible {
+.langSwitch:focus-visible,
+.shareBtn:hover,
+.shareBtn:focus-visible {
   border-color: var(--accent);
   color: var(--accent);
 }

@@ -9,6 +9,8 @@ export type AboutContent = {
   ctaPrimary: string;
   ctaSecondary: string;
   switchLabel: string;
+  shareLabel: string;
+  shareCopiedLabel: string;
   switchHref: string;
   problemTitle: string;
   problemDescription: string;
@@ -43,6 +45,8 @@ export const EN: AboutContent = {
   ctaPrimary: "Explore My Wishlist",
   ctaSecondary: "View on GitHub",
   switchLabel: "한국어",
+  shareLabel: "Share",
+  shareCopiedLabel: "Link copied!",
   switchHref: "/about/ko",
   problemTitle: "Your wishlist is a starting point, not a buying decision.",
   problemDescription:
@@ -121,6 +125,8 @@ export const KO: AboutContent = {
   ctaPrimary: "내 위시리스트 보기",
   ctaSecondary: "GitHub에서 보기",
   switchLabel: "English",
+  shareLabel: "공유하기",
+  shareCopiedLabel: "링크 복사됨!",
   switchHref: "/about",
   problemTitle: "위시리스트는 시작일 뿐, 구매 결정은 아니에요.",
   problemDescription:

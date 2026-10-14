@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import styles from "./about.module.css";
 import { GITHUB_URL, type AboutContent } from "./content";
+import { ShareButton } from "./ShareButton";
 
 // Shared by app/about/page.tsx (English, default) and app/about/ko/page.tsx (Korean) - two
 // static routes with the same structure instead of a client-side language switch, so each
@@ -32,6 +33,7 @@ export function AboutView({ content: c }: { content: AboutContent }) {
     <div className={styles.page}>
       <div className={styles.container}>
         <div className={styles.langSwitchRow}>
+          <ShareButton label={c.shareLabel} copiedLabel={c.shareCopiedLabel} />
           <Link href={c.switchHref} className={styles.langSwitch}>
             {c.switchLabel}
           </Link>
