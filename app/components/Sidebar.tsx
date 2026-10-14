@@ -1,5 +1,6 @@
 "use client";
 import type { FilterState } from "../useFilterState";
+import type { GenreBreakdown } from "../gameLogic";
 import { type View, type Profile } from "../types";
 import { AccountHeader } from "./AccountHeader";
 import { FilterPanel } from "./FilterPanel";
@@ -10,6 +11,7 @@ export function Sidebar({
   formVisible,
   genreCounts,
   genreLevels,
+  genreBreakdown,
   genreTab,
   genreTaste,
   koreanCounts,
@@ -38,6 +40,7 @@ export function Sidebar({
   formVisible: boolean;
   genreCounts: { id: number; name: string; count: number }[];
   genreLevels: { level: number; progress: number; genreId: number; genre: string; hours: number }[];
+  genreBreakdown: Record<number, GenreBreakdown>;
   genreTab: "level" | "taste";
   genreTaste: { genreId: number; genre: string; games: number; affinity: number }[];
   koreanCounts: { supported: number; unsupported: number };
@@ -65,6 +68,7 @@ export function Sidebar({
       <AccountHeader
         formVisible={formVisible}
         genreLevels={genreLevels}
+        genreBreakdown={genreBreakdown}
         genreTab={genreTab}
         genreTaste={genreTaste}
         loadActive={loadActive}

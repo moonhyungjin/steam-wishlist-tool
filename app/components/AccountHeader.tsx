@@ -1,11 +1,13 @@
 "use client";
-import { type CSSProperties } from "react";
+import type { GenreBreakdown } from "../gameLogic";
+import { useState, type CSSProperties } from "react";
 import { type View, type Profile } from "../types";
 import { TASTE_PCT_DOMAIN } from "../genres";
 import { GenreGlyph, GENRE_ICON_PARENT, GenreRadar } from "./GenreGlyph";
 export function AccountHeader({
   formVisible,
   genreLevels,
+  genreBreakdown,
   genreTab,
   genreTaste,
   loadActive,
@@ -23,6 +25,7 @@ export function AccountHeader({
 }: {
   formVisible: boolean;
   genreLevels: { level: number; progress: number; genreId: number; genre: string; hours: number }[];
+  genreBreakdown: Record<number, GenreBreakdown>;
   genreTab: "level" | "taste";
   genreTaste: { genreId: number; genre: string; games: number; affinity: number }[];
   loadActive: () => Promise<void>;
@@ -38,6 +41,16 @@ export function AccountHeader({
   steamId: string;
   view: View;
 }) {
+  // Which broad genre rows in the level tab are expanded to show their sub-genre breakdown.
+  const [expandedGenres, setExpandedGenres] = useState<Set<number>>(() => new Set());
+  function toggleExpanded(genreId: number) {
+    setExpandedGenres((prev) => {
+      const next = new Set(prev);
+      if (next.has(genreId)) next.delete(genreId);
+      else next.add(genreId);
+      return next;
+    });
+  }
   return (
     <header>
       <p className="eyebrow">PERSONAL STEAM TOOL</p>
@@ -223,29 +236,62 @@ export function AccountHeader({
               <div className="genreChartScroll">
                 {(() => {
                   const maxHours = genreLevels[0]?.hours || 1;
-                  return genreLevels.map(({ genreId, genre, hours, level }) => (
-                    <div
-                      key={genreId}
-                      className="chartRow"
-                      title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
-                    >
-                      <span className="chartLabel">
-                        <GenreGlyph genreId={genreId} className="genreGlyph" />
-                        {genre}
-                      </span>
-                      <div className="chartTrack">
-                        <i
-                          className="chartBar"
-                          style={
-                            {
-                              "--bar-pct": `${(hours / maxHours) * 100}%`,
-                            } as CSSProperties
-                          }
-                        />
+                  return genreLevels.map(({ genreId, genre, hours, level }) => {
+                    const detail = genreBreakdown[genreId];
+                    const hasDetail = !!detail && detail.children.length > 0;
+                    const expanded = expandedGenres.has(genreId);
+                    return (
+                      <div key={genreId} className="chartGroup">
+                        <div
+                          className={"chartRow" + (hasDetail ? " expandable" : "")}
+                          title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
+                          onClick={hasDetail ? () => toggleExpanded(genreId) : undefined}
+                          role={hasDetail ? "button" : undefined}
+                          aria-expanded={hasDetail ? expanded : undefined}
+                        >
+                          <span className="chartLabel">
+                            <GenreGlyph genreId={genreId} className="genreGlyph" />
+                            {genre}
+                            {hasDetail && (
+                              <span className={"fieldChevron" + (expanded ? " open" : "")} />
+                            )}
+                          </span>
+                          <div className="chartTrack">
+                            <i
+                              className="chartBar"
+                              style={
+                                {
+                                  "--bar-pct": `${(hours / maxHours) * 100}%`,
+                                } as CSSProperties
+                              }
+                            />
+                          </div>
+                          <span className="chartValue">Lv.{level}</span>
+                        </div>
+                        {hasDetail && expanded && (
+                          <ul className="genreSubList">
+                            {detail.children.slice(0, 8).map((c) => (
+                              <li key={c.id}>
+                                <span>{c.name}</span>
+                                <span className="genreSubHours">
+                                  {Math.round(c.hours)}시간 · {Math.round((c.hours / hours) * 100)}%
+                                </span>
+                              </li>
+                            ))}
+                            {detail.other > 0.5 && (
+                              <li className="genreSubOther">
+                                <span>그 외</span>
+                                <span className="genreSubHours">
+                                  {Math.round(detail.other)}시간 ·{" "}
+                                  {Math.round((detail.other / hours) * 100)}%
+                                </span>
+                              </li>
+                            )}
+                          </ul>
+                        )}
                       </div>
-                      <span className="chartValue">Lv.{level}</span>
-                    </div>
-                  ));
+                    );
+                  });
                 })()}
               </div>
             </>

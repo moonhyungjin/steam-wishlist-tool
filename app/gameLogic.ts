@@ -12,6 +12,7 @@ import {
 import {
   GENRE_XP_PER_LEVEL_SQ,
   GENRE_LEVEL_ALLOWLIST_IDS,
+  GENRE_LEVEL_CHILDREN,
   GENRE_ALLOWLIST_IDS,
   TASTE_MIN_GAMES,
 } from "./genres";
@@ -398,4 +399,55 @@ export function computeRecommendPercentile(
     i = j + 1;
   }
   return map;
+}
+
+// For each broad level genre: how its hours break down across the sub-genre tags the games carry
+// (see GENRE_LEVEL_CHILDREN). Uses the same per-game split as computeGenreXp - a game's hours
+// first divide across its matched broad genres, then each broad genre's share divides across the
+// sub-genres that game has under it. A game with no sub-genre under a parent lands in `other`.
+export type GenreBreakdown = {
+  children: { id: number; name: string; hours: number }[];
+  other: number;
+};
+export function computeGenreBreakdown(
+  combinedLibItems: Item[],
+  combinedLibGames: Record<number, Game>,
+  statusMap: Record<number, PlayStatus>,
+): Record<number, GenreBreakdown> {
+  const acc: Record<
+    number,
+    { kids: Record<number, { name: string; hours: number }>; other: number }
+  > = {};
+  for (const item of combinedLibItems) {
+    const minutes = item.playtimeMinutes;
+    if (!minutes) continue;
+    if (statusMap[item.appid] === "excluded") continue;
+    const g = combinedLibGames[item.appid];
+    const ids = g?.genreIds ?? [];
+    const parents = ids.filter((id) => GENRE_LEVEL_ALLOWLIST_IDS.has(id));
+    if (!parents.length) continue;
+    const share = minutes / 60 / parents.length;
+    for (const parent of parents) {
+      const entry = (acc[parent] ??= { kids: {}, other: 0 });
+      const kidIds = ids.filter((id) => GENRE_LEVEL_CHILDREN[parent]?.includes(id));
+      if (!kidIds.length) {
+        entry.other += share;
+        continue;
+      }
+      for (const kid of kidIds) {
+        const k = (entry.kids[kid] ??= { name: g!.genres[ids.indexOf(kid)], hours: 0 });
+        k.hours += share / kidIds.length;
+      }
+    }
+  }
+  const out: Record<number, GenreBreakdown> = {};
+  for (const [parent, { kids, other }] of Object.entries(acc)) {
+    out[Number(parent)] = {
+      children: Object.entries(kids)
+        .map(([id, k]) => ({ id: Number(id), name: k.name, hours: k.hours }))
+        .sort((a, b) => b.hours - a.hours),
+      other,
+    };
+  }
+  return out;
 }

@@ -10,6 +10,7 @@ import {
   prioritizeAchievementOrder,
   mergeGamesInto,
   computeGenreXp,
+  computeGenreBreakdown,
   computeGenreTaste,
   computeRecommendPercentile,
 } from "./gameLogic";
@@ -361,6 +362,10 @@ export default function Wishlist() {
   // owned-and-played, non-excluded games level up a genre.
   const genreXp = useMemo(
     () => computeGenreXp(combinedLibItems, combinedLibGames, statusMap),
+    [combinedLibItems, combinedLibGames, statusMap],
+  );
+  const genreBreakdown = useMemo(
+    () => computeGenreBreakdown(combinedLibItems, combinedLibGames, statusMap),
     [combinedLibItems, combinedLibGames, statusMap],
   );
   const genreLevels = useMemo(
@@ -914,6 +919,7 @@ export default function Wishlist() {
         formVisible={formVisible}
         genreCounts={genreCounts}
         genreLevels={genreLevels}
+        genreBreakdown={genreBreakdown}
         genreTab={genreTab}
         genreTaste={genreTaste}
         koreanCounts={koreanCounts}

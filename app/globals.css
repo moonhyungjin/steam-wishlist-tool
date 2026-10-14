@@ -2290,3 +2290,35 @@ a.pollBarBtn {
   font-weight: 500;
   color: var(--muted);
 }
+
+.chartRow.expandable {
+  cursor: pointer;
+}
+.chartRow.expandable:hover .chartLabel {
+  color: var(--accent, #4cb4f5);
+}
+.chartLabel .fieldChevron {
+  margin-left: 6px;
+}
+.genreSubList {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 2px 4px 4px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #aebbd0;
+}
+.genreSubList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.genreSubList .genreSubHours {
+  font-variant-numeric: tabular-nums;
+  color: #8fa1b8;
+}
+.genreSubOther {
+  opacity: 0.7;
+}

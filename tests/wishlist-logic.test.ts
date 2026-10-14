@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   blankGame,
   compareByKey,
+  computeGenreBreakdown,
   computeGenreTaste,
   computeGenreXp,
   computeRecommendPercentile,
@@ -263,5 +264,62 @@ describe("genre level / taste / recommendation (feature flag is still off in pro
     expect(p[3]).toBe(0);
     expect(p[1]).toBe(p[2]);
     expect(p[1]).toBe(100);
+  });
+});
+
+describe("computeGenreBreakdown (sub-genre detail under each broad level)", () => {
+  const mk = (appid: number, ids: number[], names: string[]): Game => ({
+    ...game(appid),
+    genreIds: ids,
+    genres: names,
+  });
+  it("credits a child to every parent it belongs to, with each parent's share of the hours", () => {
+    // 액션(19) + 액션 RPG(4231) + RPG(122), 10h: 5h to 액션, 5h to RPG; 액션 RPG is under both
+    const games = { 1: mk(1, [19, 4231, 122], ["액션", "액션 RPG", "RPG"]) };
+    const b = computeGenreBreakdown([{ appid: 1, playtimeMinutes: 600 }], games, {});
+    expect(b[19].children).toEqual([{ id: 4231, name: "액션 RPG", hours: 5 }]);
+    expect(b[122].children).toEqual([{ id: 4231, name: "액션 RPG", hours: 5 }]);
+    expect(b[19].other).toBe(0);
+  });
+  it("splits a parent's share evenly across the sub-genres a game has, and sorts biggest first", () => {
+    const games = {
+      1: mk(1, [122, 4434], ["RPG", "JRPG"]),
+      2: mk(2, [122, 4434, 4474], ["RPG", "JRPG", "CRPG"]),
+    };
+    const b = computeGenreBreakdown(
+      [
+        { appid: 1, playtimeMinutes: 600 },
+        { appid: 2, playtimeMinutes: 600 },
+      ],
+      games,
+      {},
+    );
+    expect(b[122].children.map((c) => [c.id, c.hours])).toEqual([
+      [4434, 15],
+      [4474, 5],
+    ]);
+  });
+  it("puts hours with no sub-genre into 'other' and ignores excluded/unplayed games", () => {
+    const games = { 1: mk(1, [122], ["RPG"]), 2: mk(2, [122, 4434], ["RPG", "JRPG"]) };
+    const b = computeGenreBreakdown(
+      [
+        { appid: 1, playtimeMinutes: 120 },
+        { appid: 2, playtimeMinutes: 600 },
+      ],
+      games,
+      { 2: "excluded" },
+    );
+    expect(b[122].other).toBeCloseTo(2);
+    expect(b[122].children).toEqual([]);
+  });
+  it("children plus other add back up to the genre's total hours", () => {
+    const games = { 1: mk(1, [19, 1628, 1625], ["액션", "메트로배니아", "플랫폼"]) };
+    const items = [{ appid: 1, playtimeMinutes: 900 }];
+    const xp = computeGenreXp(items, games, {});
+    const b = computeGenreBreakdown(items, games, {});
+    for (const id of [19, 1625]) {
+      const sum = b[id].children.reduce((t, c) => t + c.hours, 0) + b[id].other;
+      expect(sum).toBeCloseTo(xp.xp[id]);
+    }
   });
 });

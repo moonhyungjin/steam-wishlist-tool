@@ -14,27 +14,47 @@ export const GENRE_LEVELING_ENABLED = false;
 // readability when editing this list.
 export const GENRE_LEVEL_ALLOWLIST_IDS = new Set([
   19, // 액션
-  21, // 어드벤처
   122, // RPG
   9, // 전략
   599, // 시뮬레이션
   701, // 스포츠
   699, // 레이싱
-  597, // 캐주얼
-  492, // 인디
   1664, // 퍼즐
   1625, // 플랫폼
   1774, // 슈팅
   1667, // 공포
-  1662, // 생존
-  1716, // 로그라이크
   1743, // 격투
-  128, // MMO
-  3810, // 샌드박스
-  3799, // 비주얼 노벨
   1752, // 리듬
   1718, // MOBA
+  128, // MMO
+  1666, // 카드 게임
+  3799, // 비주얼 노벨
 ]);
+// Narrower sub-genre tags shown *inside* each broad level above (the popover's expandable
+// breakdown) - they never level up on their own, so a game's hours aren't split into extra
+// buckets. A child can sit under several parents (액션 RPG is both 액션 and RPG). Picked with
+// tools/genre-tag-picker.html's "세부 장르" category.
+export const GENRE_LEVEL_CHILDREN: Record<number, number[]> = {
+  19: [
+    1628, 1646, 29482, 4255, 4158, 4777, 323922, 1687, 42804, 4106, 4231, 4608, 176981, 1723, 3955,
+  ],
+  122: [4434, 4474, 4231, 17305, 21725, 10695, 1720, 1754, 29482],
+  9: [1676, 1741, 1670, 4364, 1645, 1708, 3813, 14139, 4684, 1723, 17305, 21725],
+  599: [
+    87918, 10235, 9551, 4328, 12472, 35079, 16598, 1100687, 26921, 5900, 220585, 1100688, 1100686,
+    1220528, 9204, 91114, 22602, 1643, 7332, 16689, 8945,
+  ],
+  1774: [
+    1663, 3814, 4637, 4885, 4758, 5547, 620519, 1199779, 1023537, 56690, 3954, 353880, 4255, 176981,
+  ],
+  1664: [1665, 5537, 6129, 1738],
+  1625: [5379, 5395, 3877, 5537, 8666, 1628],
+  1667: [3978, 1721],
+  1743: [4736, 6506, 4777],
+  1666: [9271, 32322, 1091588, 791774, 1084988],
+  699: [4102],
+  128: [1754],
+};
 // Quadratic RPG-style curve: level N needs N^2 * GENRE_XP_PER_LEVEL_SQ cumulative hours (5h/20h/
 // 45h/80h/125h...) - cheap early levels, meaningfully harder later. Tune this one constant to
 // retune the whole curve.
