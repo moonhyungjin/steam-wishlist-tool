@@ -16,11 +16,12 @@ import {
 import {
   lowestPriceStatus,
   genreLevelInfo,
-  gameAffinity,
-  recommendScore,
   sortItems,
   prioritizeAchievementOrder,
   mergeGamesInto,
+  computeGenreXp,
+  computeGenreTaste,
+  computeRecommendPercentile,
 } from "./gameLogic";
 import {
   STATUS_STORAGE_KEY,
@@ -46,8 +47,6 @@ import {
 } from "./constants";
 import {
   GENRE_LEVELING_ENABLED,
-  GENRE_LEVEL_ALLOWLIST_IDS,
-  TASTE_MIN_GAMES,
   GENRE_LEVELS_MIN_GAMES,
   GENRE_LEVELS_MIN_HOURS,
   GENRE_FILTER_LIMIT,
@@ -699,37 +698,10 @@ export default function Wishlist() {
   // on that constant. Manual entries have no playtimeMinutes (never actually tracked by Steam), and
   // '제외' (excluded) games don't count either - both silently contribute nothing, so only real
   // owned-and-played, non-excluded games level up a genre.
-  const genreXp = useMemo(() => {
-    const xp: Record<number, number> = {};
-    const nameById: Record<number, string> = {};
-    const gameIds = new Set<number>();
-    for (const item of combinedLibItems) {
-      const minutes = item.playtimeMinutes;
-      if (!minutes) continue;
-      if (statusMap[item.appid] === "excluded") continue;
-      const g = combinedLibGames[item.appid];
-      const matches = (g?.genreIds ?? [])
-        .map((id, i) => ({ id, name: g!.genres[i] }))
-        .filter((m) => GENRE_LEVEL_ALLOWLIST_IDS.has(m.id));
-      if (!matches.length) continue;
-      gameIds.add(item.appid);
-      // Split evenly across every matched genre rather than crediting each in full - otherwise a
-      // broadly-tagged genre (어드벤처, which co-occurs with almost everything) always outranks a
-      // narrowly-applied one (전략) purely from tag co-occurrence, not from actually being played
-      // more. Verified against real data: 전략 (삼국지/섀도우 갬빗) only overtakes 어드벤처 once
-      // split, matching the player's actual stated preference.
-      const splitHours = minutes / 60 / matches.length;
-      for (const m of matches) {
-        nameById[m.id] = m.name;
-        xp[m.id] = (xp[m.id] ?? 0) + splitHours;
-      }
-    }
-    // Splitting a game's hours across its matched genres never loses or duplicates hours (each
-    // game's own total is preserved, just redistributed), so summing every genre's xp back up
-    // gives the real total hours behind this whole picture - reused below for GENRE_LEVELS_MIN_HOURS.
-    const totalHours = Object.values(xp).reduce((sum, h) => sum + h, 0);
-    return { xp, nameById, gameCount: gameIds.size, totalHours };
-  }, [combinedLibItems, combinedLibGames, statusMap]);
+  const genreXp = useMemo(
+    () => computeGenreXp(combinedLibItems, combinedLibGames, statusMap),
+    [combinedLibItems, combinedLibGames, statusMap],
+  );
   const genreLevels = useMemo(
     () =>
       Object.entries(genreXp.xp)
@@ -754,67 +726,18 @@ export default function Wishlist() {
   // like JRPG vs CRPG vs 액션 RPG matter here, unlike for the level badge where they'd just dilute
   // one bucket. A genre only surfaces once it's crossed TASTE_MIN_GAMES games, so a couple of
   // flukes (one dropped game, one over-generous 5-star) can't swing a tiny-sample average.
-  const genreTaste = useMemo(() => {
-    const gameCounts: Record<number, number> = {};
-    const hoursByGenre: Record<number, number> = {};
-    const weightedByGenre: Record<number, number> = {};
-    const nameById: Record<number, string> = {};
-    // gameAffinity()'s multiplier assumes a universal "neutral" player (3-star midpoint, status/
-    // rating absent = no adjustment) - real libraries skew hard off that (e.g. one real account:
-    // 241 completed vs 21 dropped, 247 liked vs 65 disliked, 4.01 avg star), so every genre came
-    // out positive against the fixed 1.0 baseline and the taste list lost all discriminating
-    // power. Tracking this player's own hours-weighted average affinity (across every played,
-    // non-excluded game, regardless of genre match) and recentering each genre against it below
-    // fixes that - genres above the player's own average read positive, below read negative,
-    // instead of everything reading positive against a baseline nobody's library actually sits at.
-    let totalHoursAll = 0;
-    let totalWeightedAll = 0;
-    for (const item of combinedLibItems) {
-      const hours = (item.playtimeMinutes ?? 0) / 60;
-      if (!hours) continue;
-      const status = statusMap[item.appid];
-      if (status === "excluded") continue;
-      const rating = ratingMap[item.appid];
-      const star = starMap[item.appid];
-      // Only count games with a deliberate, fully-recorded opinion (진행 상태 + 추천 + 별점 all
-      // set) - hours alone with none of those set is just "was open at some point," not a signal
-      // of whether the player actually liked it. 하차 (dropped) is the one exception: dropping a
-      // game is already an unambiguous negative signal by itself, so it counts even without a
-      // rating/star also being recorded.
-      const fullyRated = status != null && rating != null && star != null;
-      if (!fullyRated && status !== "dropped") continue;
-      const g = combinedLibGames[item.appid];
-      const affinity = gameAffinity(status, rating, star, achievementMap[item.appid]);
-      totalHoursAll += hours;
-      totalWeightedAll += hours * affinity;
-      const matches = (g?.genreIds ?? [])
-        .map((id, i) => ({ id, name: g!.genres[i] }))
-        .filter((m) => GENRE_ALLOWLIST_IDS.has(m.id));
-      if (!matches.length) continue;
-      // Hours split the same way as genreXp (see its comment) - gameCounts stays unsplit, since
-      // "this genre showed up in N games" is a sample-size count, not a time budget.
-      const splitHours = hours / matches.length;
-      for (const m of matches) {
-        nameById[m.id] = m.name;
-        gameCounts[m.id] = (gameCounts[m.id] ?? 0) + 1;
-        hoursByGenre[m.id] = (hoursByGenre[m.id] ?? 0) + splitHours;
-        weightedByGenre[m.id] = (weightedByGenre[m.id] ?? 0) + splitHours * affinity;
-      }
-    }
-    const personalAvg = totalHoursAll > 0 ? totalWeightedAll / totalHoursAll : 1;
-    return Object.entries(gameCounts)
-      .filter(([, count]) => count >= TASTE_MIN_GAMES)
-      .map(([id, count]) => ({
-        genreId: Number(id),
-        genre: nameById[Number(id)],
-        games: count,
-        // Recentered around this player's own average (see comment above), not an absolute 1.0 -
-        // still expressed on the same "1.0 = neutral" scale every consumer (recommendScore, the
-        // taste chart, the recommend chip) already expects, so nothing downstream needs to change.
-        affinity: weightedByGenre[Number(id)] / hoursByGenre[Number(id)] - personalAvg + 1,
-      }))
-      .sort((a, b) => b.affinity - a.affinity);
-  }, [combinedLibItems, combinedLibGames, statusMap, ratingMap, starMap, achievementMap]);
+  const genreTaste = useMemo(
+    () =>
+      computeGenreTaste(
+        combinedLibItems,
+        combinedLibGames,
+        statusMap,
+        ratingMap,
+        starMap,
+        achievementMap,
+      ),
+    [combinedLibItems, combinedLibGames, statusMap, ratingMap, starMap, achievementMap],
+  );
   // Keyed by genreId for O(1) lookup from recommendScore, rather than re-scanning the array per
   // wishlist game on every sort comparison.
   const genreTasteMap = useMemo(() => {
@@ -828,22 +751,11 @@ export default function Wishlist() {
   // Rank instead of value: percentile within the whole wishlist, not just what's currently
   // filtered/visible, so the same game always shows the same number regardless of what filters
   // happen to be active. Ties (identical genre-match sets) share a percentile.
-  const recommendPercentile = useMemo(() => {
-    if (!GENRE_LEVELING_ENABLED || Object.keys(genreTasteMap).length === 0) return {};
-    const scored = wlItems
-      .map((item) => ({
-        appid: item.appid,
-        score: recommendScore(wlGames[item.appid]?.genreIds, genreTasteMap),
-      }))
-      .filter((x): x is { appid: number; score: number } => x.score != null)
-      .sort((a, b) => a.score - b.score);
-    const n = scored.length;
-    const map: Record<number, number> = {};
-    scored.forEach((x, i) => {
-      map[x.appid] = n > 1 ? Math.round((i / (n - 1)) * 100) : 100;
-    });
-    return map;
-  }, [wlItems, wlGames, genreTasteMap]);
+  const recommendPercentile = useMemo(
+    () =>
+      GENRE_LEVELING_ENABLED ? computeRecommendPercentile(wlItems, wlGames, genreTasteMap) : {},
+    [wlItems, wlGames, genreTasteMap],
+  );
   const [genreTab, setGenreTab] = useState<"level" | "taste">("level");
   const filteredItems = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();

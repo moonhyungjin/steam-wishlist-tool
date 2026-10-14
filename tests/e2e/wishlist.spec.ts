@@ -21,10 +21,14 @@ test("lowest-price markers show only on discounted games", async ({ page }) => {
   await expect(page.locator(".chip.lowestPriceChip")).toHaveCount(1);
   await expect(page.locator(".chip.noPriceData")).toHaveCount(0);
   // the full-price game's chip is a plain price chip
-  await expect(page.locator(".chip", { hasText: "20,000" }).first()).not.toHaveClass(/lowestPriceChip|notLowestPrice|noPriceData/);
+  await expect(page.locator(".chip", { hasText: "20,000" }).first()).not.toHaveClass(
+    /lowestPriceChip|notLowestPrice|noPriceData/,
+  );
 });
 
-test("a game whose sale ended drops its marker after a refresh (stale-low regression)", async ({ page }) => {
+test("a game whose sale ended drops its marker after a refresh (stale-low regression)", async ({
+  page,
+}) => {
   let saleOver = false;
   await mockApis(
     page,
@@ -41,7 +45,9 @@ test("a game whose sale ended drops its marker after a refresh (stale-low regres
   saleOver = true;
   await page.getByRole("button", { name: "찜목록 새로고침" }).click();
   await expect(page.locator(".chip", { hasText: "20,000" })).toBeVisible();
-  await expect(page.locator(".chip.notLowestPrice, .chip.lowestPriceChip, .chip.noPriceData")).toHaveCount(0);
+  await expect(
+    page.locator(".chip.notLowestPrice, .chip.lowestPriceChip, .chip.noPriceData"),
+  ).toHaveCount(0);
 });
 
 test("a 900-game wishlist stays virtualized and loads quickly", async ({ page }) => {
@@ -90,7 +96,10 @@ test("the 할인 중 filter keeps only discounted games", async ({ page }) => {
   await mockApis(page, FILTER_GAMES, FILTER_LOWS);
   await loadWishlist(page);
   await expect(page.getByText("Charlie Full").first()).toBeVisible();
-  await page.getByLabel(/^할인 중/).first().check({ force: true });
+  await page
+    .getByLabel(/^할인 중/)
+    .first()
+    .check({ force: true });
   await expect(page.getByText("Charlie Full")).toHaveCount(0);
   expect(await visibleNames(page)).toEqual(
     expect.arrayContaining(["Alpha Sale", "Bravo Low", "Delta Sale"]),
@@ -112,7 +121,7 @@ test("sorting by discount puts the deepest sale first and full price last", asyn
   await mockApis(page, FILTER_GAMES, FILTER_LOWS);
   await loadWishlist(page);
   await page.getByText("할인율 높은순").first().click();
-  await expect.poll(async () => (await visibleNames(page)).join("|")).toBe(
-    "Bravo Low|Alpha Sale|Delta Sale|Charlie Full",
-  );
+  await expect
+    .poll(async () => (await visibleNames(page)).join("|"))
+    .toBe("Bravo Low|Alpha Sale|Delta Sale|Charlie Full");
 });

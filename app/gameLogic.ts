@@ -9,7 +9,12 @@ import {
   type AchievementInfo,
   type ManualPlatform,
 } from "./types";
-import { GENRE_XP_PER_LEVEL_SQ } from "./genres";
+import {
+  GENRE_XP_PER_LEVEL_SQ,
+  GENRE_LEVEL_ALLOWLIST_IDS,
+  GENRE_ALLOWLIST_IDS,
+  TASTE_MIN_GAMES,
+} from "./genres";
 // ITAD hands back a bare number plus an ISO currency code - format it for that currency instead of
 // assuming won. Zero-decimal currencies drop the cents; anything Intl can't format falls back to
 // "<number> <code>" rather than throwing out of a render.
@@ -259,4 +264,138 @@ export function mergeGamesInto(
     next[appid] = { ...prev[appid], ...delta[appid] };
   }
   return next;
+}
+
+export function computeGenreXp(
+  combinedLibItems: Item[],
+  combinedLibGames: Record<number, Game>,
+  statusMap: Record<number, PlayStatus>,
+) {
+  const xp: Record<number, number> = {};
+  const nameById: Record<number, string> = {};
+  const gameIds = new Set<number>();
+  for (const item of combinedLibItems) {
+    const minutes = item.playtimeMinutes;
+    if (!minutes) continue;
+    if (statusMap[item.appid] === "excluded") continue;
+    const g = combinedLibGames[item.appid];
+    const matches = (g?.genreIds ?? [])
+      .map((id, i) => ({ id, name: g!.genres[i] }))
+      .filter((m) => GENRE_LEVEL_ALLOWLIST_IDS.has(m.id));
+    if (!matches.length) continue;
+    gameIds.add(item.appid);
+    // Split evenly across every matched genre rather than crediting each in full - otherwise a
+    // broadly-tagged genre (어드벤처, which co-occurs with almost everything) always outranks a
+    // narrowly-applied one (전략) purely from tag co-occurrence, not from actually being played
+    // more. Verified against real data: 전략 (삼국지/섀도우 갬빗) only overtakes 어드벤처 once
+    // split, matching the player's actual stated preference.
+    const splitHours = minutes / 60 / matches.length;
+    for (const m of matches) {
+      nameById[m.id] = m.name;
+      xp[m.id] = (xp[m.id] ?? 0) + splitHours;
+    }
+  }
+  // Splitting a game's hours across its matched genres never loses or duplicates hours (each
+  // game's own total is preserved, just redistributed), so summing every genre's xp back up
+  // gives the real total hours behind this whole picture - reused below for GENRE_LEVELS_MIN_HOURS.
+  const totalHours = Object.values(xp).reduce((sum, h) => sum + h, 0);
+  return { xp, nameById, gameCount: gameIds.size, totalHours };
+}
+
+export function computeGenreTaste(
+  combinedLibItems: Item[],
+  combinedLibGames: Record<number, Game>,
+  statusMap: Record<number, PlayStatus>,
+  ratingMap: Record<number, Rating>,
+  starMap: Record<number, StarRating>,
+  achievementMap: Record<number, AchievementInfo | null>,
+) {
+  const gameCounts: Record<number, number> = {};
+  const hoursByGenre: Record<number, number> = {};
+  const weightedByGenre: Record<number, number> = {};
+  const nameById: Record<number, string> = {};
+  // gameAffinity()'s multiplier assumes a universal "neutral" player (3-star midpoint, status/
+  // rating absent = no adjustment) - real libraries skew hard off that (e.g. one real account:
+  // 241 completed vs 21 dropped, 247 liked vs 65 disliked, 4.01 avg star), so every genre came
+  // out positive against the fixed 1.0 baseline and the taste list lost all discriminating
+  // power. Tracking this player's own hours-weighted average affinity (across every played,
+  // non-excluded game, regardless of genre match) and recentering each genre against it below
+  // fixes that - genres above the player's own average read positive, below read negative,
+  // instead of everything reading positive against a baseline nobody's library actually sits at.
+  let totalHoursAll = 0;
+  let totalWeightedAll = 0;
+  for (const item of combinedLibItems) {
+    const hours = (item.playtimeMinutes ?? 0) / 60;
+    if (!hours) continue;
+    const status = statusMap[item.appid];
+    if (status === "excluded") continue;
+    const rating = ratingMap[item.appid];
+    const star = starMap[item.appid];
+    // Only count games with a deliberate, fully-recorded opinion (진행 상태 + 추천 + 별점 all
+    // set) - hours alone with none of those set is just "was open at some point," not a signal
+    // of whether the player actually liked it. 하차 (dropped) is the one exception: dropping a
+    // game is already an unambiguous negative signal by itself, so it counts even without a
+    // rating/star also being recorded.
+    const fullyRated = status != null && rating != null && star != null;
+    if (!fullyRated && status !== "dropped") continue;
+    const g = combinedLibGames[item.appid];
+    const affinity = gameAffinity(status, rating, star, achievementMap[item.appid]);
+    totalHoursAll += hours;
+    totalWeightedAll += hours * affinity;
+    const matches = (g?.genreIds ?? [])
+      .map((id, i) => ({ id, name: g!.genres[i] }))
+      .filter((m) => GENRE_ALLOWLIST_IDS.has(m.id));
+    if (!matches.length) continue;
+    // Hours split the same way as genreXp (see its comment) - gameCounts stays unsplit, since
+    // "this genre showed up in N games" is a sample-size count, not a time budget.
+    const splitHours = hours / matches.length;
+    for (const m of matches) {
+      nameById[m.id] = m.name;
+      gameCounts[m.id] = (gameCounts[m.id] ?? 0) + 1;
+      hoursByGenre[m.id] = (hoursByGenre[m.id] ?? 0) + splitHours;
+      weightedByGenre[m.id] = (weightedByGenre[m.id] ?? 0) + splitHours * affinity;
+    }
+  }
+  const personalAvg = totalHoursAll > 0 ? totalWeightedAll / totalHoursAll : 1;
+  return Object.entries(gameCounts)
+    .filter(([, count]) => count >= TASTE_MIN_GAMES)
+    .map(([id, count]) => ({
+      genreId: Number(id),
+      genre: nameById[Number(id)],
+      games: count,
+      // Recentered around this player's own average (see comment above), not an absolute 1.0 -
+      // still expressed on the same "1.0 = neutral" scale every consumer (recommendScore, the
+      // taste chart, the recommend chip) already expects, so nothing downstream needs to change.
+      affinity: weightedByGenre[Number(id)] / hoursByGenre[Number(id)] - personalAvg + 1,
+    }))
+    .sort((a, b) => b.affinity - a.affinity);
+}
+
+export function computeRecommendPercentile(
+  wlItems: Item[],
+  wlGames: Record<number, Game>,
+  genreTasteMap: Record<number, { affinity: number; games: number }>,
+): Record<number, number> {
+  if (Object.keys(genreTasteMap).length === 0) return {};
+  const scored = wlItems
+    .map((item) => ({
+      appid: item.appid,
+      score: recommendScore(wlGames[item.appid]?.genreIds, genreTasteMap),
+    }))
+    .filter((x): x is { appid: number; score: number } => x.score != null)
+    .sort((a, b) => a.score - b.score);
+  const n = scored.length;
+  const map: Record<number, number> = {};
+  // Tied scores (same genre-match set) must share one percentile - rank by the last index of the
+  // tie group instead of each game's own sort position, which would otherwise rank identical games
+  // differently by arbitrary sort order.
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j + 1 < n && scored[j + 1].score === scored[i].score) j++;
+    const pct = n > 1 ? Math.round((j / (n - 1)) * 100) : 100;
+    for (let k = i; k <= j; k++) map[scored[k].appid] = pct;
+    i = j + 1;
+  }
+  return map;
 }

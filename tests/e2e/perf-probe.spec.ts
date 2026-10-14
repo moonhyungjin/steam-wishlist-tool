@@ -27,7 +27,9 @@ test("interaction latency on 900 games", async ({ page }) => {
         page.evaluate(
           () =>
             new Promise<number>((res) =>
-              requestAnimationFrame(() => requestAnimationFrame(() => res(performance.now() - (window as any).__t0))),
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => res(performance.now() - (window as any).__t0)),
+              ),
             ),
         ),
       )
@@ -37,6 +39,16 @@ test("interaction latency on 900 games", async ({ page }) => {
   await measure("type 1 char in search", () => search.press("g"));
   await measure("type 2nd char", () => search.press("a"));
   await measure("clear search", () => search.fill(""));
-  await measure("toggle 할인 중 filter", () => page.getByLabel(/할인 중/).first().check({ force: true }));
-  await measure("toggle it off", () => page.getByLabel(/할인 중/).first().uncheck({ force: true }));
+  await measure("toggle 할인 중 filter", () =>
+    page
+      .getByLabel(/할인 중/)
+      .first()
+      .check({ force: true }),
+  );
+  await measure("toggle it off", () =>
+    page
+      .getByLabel(/할인 중/)
+      .first()
+      .uncheck({ force: true }),
+  );
 });

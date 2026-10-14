@@ -67,7 +67,8 @@ test.describe("library filters (status / rating / stars from synced data)", () =
     await loadLibrary(page);
     await expect(page.getByText("Action One").first()).toBeVisible();
   }
-  const open = (page: Page, title: string) => page.locator(".fieldToggle", { hasText: title }).first().click();
+  const open = (page: Page, title: string) =>
+    page.locator(".fieldToggle", { hasText: title }).first().click();
 
   test("진행 상태 filter", async ({ page }) => {
     await setup(page);
@@ -91,7 +92,11 @@ test.describe("library filters (status / rating / stars from synced data)", () =
     await setup(page);
     await open(page, "별점");
     // options are SVG stars, no text - the list is ordered 5 stars first
-    await page.locator(".filterGroup", { hasText: "별점" }).locator(".sortCheck input").first().check({ force: true });
+    await page
+      .locator(".filterGroup", { hasText: "별점" })
+      .locator(".sortCheck input")
+      .first()
+      .check({ force: true });
     await expect(page.getByText("Action Two").first()).toBeVisible();
     await expect(page.getByText("Action One")).toHaveCount(0);
     await expect(page.getByText("Rpg One")).toHaveCount(0);

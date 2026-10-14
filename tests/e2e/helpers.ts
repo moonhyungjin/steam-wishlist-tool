@@ -24,7 +24,9 @@ function fullGame(g: MockGame) {
     releaseUnannounced: false,
     earlyAccess: false,
     isFree: false,
-    price: g.price ?? (g.priceValue == null ? "정보 없음" : `₩ ${(g.priceValue / 100).toLocaleString()}`),
+    price:
+      g.price ??
+      (g.priceValue == null ? "정보 없음" : `₩ ${(g.priceValue / 100).toLocaleString()}`),
     initialPrice: discountPercent ? "₩ 20,000" : null,
     priceValue: g.priceValue,
     discountPercent,
@@ -49,17 +51,25 @@ export async function mockApis(
   const current = () => (typeof gamesSource === "function" ? gamesSource() : gamesSource);
   await page.route("**/api/wishlist**", (r) =>
     r.fulfill({
-      json: { steamid: STEAM_ID, count: current().length, items: current().map((g) => ({ appid: g.appid })) },
+      json: {
+        steamid: STEAM_ID,
+        count: current().length,
+        items: current().map((g) => ({ appid: g.appid })),
+      },
     }),
   );
   await page.route("**/api/games**", (r) => {
-    const ids = (new URL(r.request().url()).searchParams.get("appids") ?? "").split(",").map(Number);
+    const ids = (new URL(r.request().url()).searchParams.get("appids") ?? "")
+      .split(",")
+      .map(Number);
     const out: Record<number, ReturnType<typeof fullGame>> = {};
     for (const g of current()) if (ids.includes(g.appid)) out[g.appid] = fullGame(g);
     return r.fulfill({ json: { games: out } });
   });
   await page.route("**/api/lowestprice**", (r) => {
-    const ids = (new URL(r.request().url()).searchParams.get("appids") ?? "").split(",").map(Number);
+    const ids = (new URL(r.request().url()).searchParams.get("appids") ?? "")
+      .split(",")
+      .map(Number);
     const prices: Record<number, unknown> = {};
     for (const id of ids)
       if (id in lows)
@@ -87,12 +97,17 @@ export async function mockLibrary(
 ) {
   await page.route("**/api/library**", (r) =>
     r.fulfill({
-      json: { count: appids.length, items: appids.map((appid) => ({ appid, playtimeMinutes: 600 })) },
+      json: {
+        count: appids.length,
+        items: appids.map((appid) => ({ appid, playtimeMinutes: 600 })),
+      },
     }),
   );
   await page.route("**/api/achievements**", (r) => r.fulfill({ json: { achievements: {} } }));
   await page.route("**/api/sync**", (r) =>
-    r.request().method() === "GET" ? r.fulfill({ json: { configured: true, ...sync } }) : r.fulfill({ json: {} }),
+    r.request().method() === "GET"
+      ? r.fulfill({ json: { configured: true, ...sync } })
+      : r.fulfill({ json: {} }),
   );
 }
 

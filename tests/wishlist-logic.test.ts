@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   blankGame,
   compareByKey,
+  computeGenreTaste,
+  computeGenreXp,
+  computeRecommendPercentile,
   formatMoney,
   gameAffinity,
   genreLevelInfo,
@@ -172,5 +175,93 @@ describe("mergeGamesInto", () => {
   it("returns a new object so React can see the update", () => {
     const prev = { 1: game(1) };
     expect(mergeGamesInto(prev, {})).not.toBe(prev);
+  });
+});
+
+describe("genre level / taste / recommendation (feature flag is still off in production)", () => {
+  const A = 19; // 액션
+  const R = 122; // RPG
+  const mk = (appid: number, ids: number[], names: string[]): Game => ({
+    ...game(appid),
+    genreIds: ids,
+    genres: names,
+  });
+  const libGames = (n: number, ids: number[], names: string[], from = 1) =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [from + i, mk(from + i, ids, names)]));
+  const items = (appids: number[], minutes: number) =>
+    appids.map((appid) => ({ appid, playtimeMinutes: minutes }));
+
+  it("splits a game's hours evenly across its matched genres and preserves the total", () => {
+    const games = { 1: mk(1, [A, R], ["액션", "RPG"]) };
+    const r = computeGenreXp(items([1], 600), games, {});
+    expect(r.xp[A]).toBeCloseTo(5);
+    expect(r.xp[R]).toBeCloseTo(5);
+    expect(r.totalHours).toBeCloseTo(10);
+    expect(r.gameCount).toBe(1);
+  });
+  it("ignores excluded games, unplayed games and non-allowlisted tags", () => {
+    const games = {
+      1: mk(1, [A], ["액션"]),
+      2: mk(2, [A], ["액션"]),
+      3: mk(3, [999999], ["귀여운"]),
+    };
+    const r = computeGenreXp(
+      [
+        { appid: 1, playtimeMinutes: 600 },
+        { appid: 2, playtimeMinutes: 0 },
+        { appid: 3, playtimeMinutes: 600 },
+      ],
+      games,
+      { 1: "excluded" },
+    );
+    expect(r.totalHours).toBe(0);
+    expect(r.gameCount).toBe(0);
+  });
+
+  it("taste needs 12+ fully-rated games per genre (dropped counts without a rating)", () => {
+    const ids = Array.from({ length: 12 }, (_, i) => i + 1);
+    const games = libGames(12, [A], ["액션"]);
+    const full = Object.fromEntries(ids.map((i) => [i, "completed" as const]));
+    const like = Object.fromEntries(ids.map((i) => [i, "like" as const]));
+    const star = Object.fromEntries(ids.map((i) => [i, 4 as const]));
+    expect(computeGenreTaste(items(ids, 600), games, full, like, star, {})).toHaveLength(1);
+    // one fewer game -> below TASTE_MIN_GAMES, no taste entry
+    expect(computeGenreTaste(items(ids.slice(1), 600), games, full, like, star, {})).toHaveLength(
+      0,
+    );
+    // status only (no rating/star) doesn't count...
+    expect(computeGenreTaste(items(ids, 600), games, full, {}, {}, {})).toHaveLength(0);
+    // ...but dropped does
+    const dropped = Object.fromEntries(ids.map((i) => [i, "dropped" as const]));
+    expect(computeGenreTaste(items(ids, 600), games, dropped, {}, {}, {})).toHaveLength(1);
+  });
+  it("recenters affinity on the player's own average (liked genre > 1, disliked genre < 1)", () => {
+    const a = libGames(12, [A], ["액션"], 1);
+    const r = libGames(12, [R], ["RPG"], 100);
+    const games = { ...a, ...r };
+    const all = [...Object.keys(a), ...Object.keys(r)].map(Number);
+    const status = Object.fromEntries(all.map((i) => [i, "completed" as const]));
+    const rating = Object.fromEntries(
+      all.map((i) => [i, i < 100 ? ("like" as const) : ("dislike" as const)]),
+    );
+    const star = Object.fromEntries(all.map((i) => [i, i < 100 ? (5 as const) : (1 as const)]));
+    const t = computeGenreTaste(items(all, 600), games, status, rating, star, {});
+    const byId = Object.fromEntries(t.map((x) => [x.genreId, x.affinity]));
+    expect(byId[A]).toBeGreaterThan(1);
+    expect(byId[R]).toBeLessThan(1);
+    expect(t[0].genreId).toBe(A); // sorted best first
+  });
+
+  it("recommend percentile: games with identical genre sets get the same percentile", () => {
+    const taste = { [A]: { affinity: 1.2, games: 20 }, [R]: { affinity: 0.8, games: 20 } };
+    const wl = {
+      1: mk(1, [A], ["액션"]),
+      2: mk(2, [A], ["액션"]),
+      3: mk(3, [R], ["RPG"]),
+    };
+    const p = computeRecommendPercentile([{ appid: 1 }, { appid: 2 }, { appid: 3 }], wl, taste);
+    expect(p[3]).toBe(0);
+    expect(p[1]).toBe(p[2]);
+    expect(p[1]).toBe(100);
   });
 });
