@@ -11,7 +11,7 @@ import {
   RATING_LABELS,
   MANUAL_PLATFORM_LABELS,
 } from "../constants";
-import { GENRE_LEVELING_ENABLED } from "../genres";
+import { GENRE_TASTE_ENABLED } from "../genres";
 import { StarRow } from "./Glyphs";
 import { FilterGroup } from "./FilterGroup";
 export function FilterPanel({
@@ -134,7 +134,7 @@ export function FilterPanel({
           >
             {WISHLIST_SORT_OPTIONS.filter(
               (opt) =>
-                opt.value !== "recommend-desc" || (GENRE_LEVELING_ENABLED && genreTaste.length > 0),
+                opt.value !== "recommend-desc" || (GENRE_TASTE_ENABLED && genreTaste.length > 0),
             ).map((opt) => (
               <label key={opt.value} className="sortCheck">
                 <input
