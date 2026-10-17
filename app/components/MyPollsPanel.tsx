@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { type MyPoll } from "../types";
+import { CloseButton } from "./CloseButton";
 // Lists the polls this Steam ID has created (server-side, see /api/my-polls) so a poll link that
 // was never copied can still be found - along with a quick results summary, which is usually what
 // the creator came back for. Its own component for the same reason as ManualAddPanel: it holds its
@@ -52,9 +53,7 @@ export function MyPollsPanel({ steamId, onClose }: { steamId: string; onClose: (
     <div className="myPollsPanel">
       <div className="myPollsHead">
         <span className="myPollsTitle">내가 만든 투표</span>
-        <button type="button" className="pollBarBtnGhost" onClick={onClose}>
-          닫기
-        </button>
+        <CloseButton onClick={onClose} />
       </div>
       {!validId ? (
         <p className="myPollsEmpty">Steam ID64를 입력해야 내가 만든 투표를 볼 수 있어요.</p>
