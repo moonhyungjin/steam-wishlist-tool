@@ -1382,9 +1382,6 @@ button:disabled {
 .manualRemoveBtn:hover {
   color: #ef7a86;
 }
-.manualAddPanel {
-  padding: 16px;
-}
 .manualSearchingNote {
   margin: 8px 0 0;
   color: var(--muted);
@@ -1394,12 +1391,6 @@ button:disabled {
   margin: 8px 0 0;
   color: #6bd68a;
   font-size: 12px;
-}
-.manualAddPanel .field label {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 6px;
 }
 .manualAddRow {
   display: flex;
@@ -1430,14 +1421,6 @@ button:disabled {
   border-radius: 9px;
   padding: 0 30px 0 10px;
   font-size: 13px;
-}
-.manualAddHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  font-size: 15px;
-  font-weight: bold;
 }
 .manualResults {
   list-style: none;
@@ -2114,11 +2097,12 @@ a.moreActionsItem {
 }
 .pollBar {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
   padding: var(--space-sm) var(--space-md);
-  margin: var(--space-md) 0 var(--space-sm);
+  margin: var(--space-md) 0 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2187,9 +2171,14 @@ a.moreActionsItem {
 }
 
 /* --- 내가 만든 투표 (list of polls this Steam ID created, opened from the ⋯ menu) --- */
+/* The shell every toolbar-opened panel shares (게임 추가, 스토어 국가, 동기화 코드, 내가 만든 투표):
+   title + ✕ header with no rule under it. These and the poll bar sit in .mainArea's flex column,
+   where margins add up instead of collapsing - so spacing is top-only (16px between panels; the
+   list keeps its own 10px), and flex: none keeps several open panels from squeezing each other. */
 .myPollsPanel {
+  flex: none;
   padding: var(--space-md);
-  margin: var(--space-md) 0 var(--space-sm);
+  margin: var(--space-md) 0 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2224,6 +2213,9 @@ a.moreActionsItem {
   justify-content: space-between;
   gap: var(--space-md);
   padding: var(--space-sm) 0;
+}
+/* Rules between polls only - none above the first, so the header reads like the other panels. */
+.myPollsItem + .myPollsItem {
   border-top: 1px solid var(--line);
 }
 .myPollsInfo {

@@ -4,6 +4,7 @@ import { type Game, type ManualPlatform } from "../types";
 import { blankGame } from "../gameLogic";
 import { MANUAL_PLATFORM_LABELS } from "../constants";
 import { enrichGames } from "../enrich";
+import { CloseButton } from "./CloseButton";
 // Split out from Wishlist so typing in the search box only re-renders this small panel instead of
 // the entire app - manualQuery lived in Wishlist's own state before, and every keystroke was
 // re-rendering the whole sidebar (every FilterGroup) plus the virtualized list/grid's rowProps/
@@ -92,23 +93,10 @@ export function ManualAddPanel({
     confirmManualAdd(name);
   }
   return (
-    <section className="panel manualAddPanel">
-      <div className="manualAddHeader">
-        <span>게임 추가</span>
-        <button type="button" className="filterCloseBtn" onClick={onClose} aria-label="닫기">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          >
-            <line x1="4" y1="4" x2="20" y2="20" />
-            <line x1="20" y1="4" x2="4" y2="20" />
-          </svg>
-        </button>
+    <section className="myPollsPanel">
+      <div className="myPollsHead">
+        <span className="myPollsTitle">게임 추가</span>
+        <CloseButton onClick={onClose} />
       </div>
       <div className="row">
         <div className="field">
