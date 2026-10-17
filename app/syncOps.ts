@@ -61,23 +61,28 @@ function validValue(map: SyncMapName, v: unknown): boolean {
   }
 }
 
-// Returns the ops in canonical form, or null if any of them is malformed (the whole request is
-// then refused rather than applied in part).
-export function parseOps(raw: unknown): SyncOp[] | null {
+// One op in canonical form, or null if it's malformed.
+export function parseOp(o: unknown): SyncOp | null {
+  if (!o || typeof o !== "object") return null;
+  const { map, appid, op, value } = o as Record<string, unknown>;
+  if (!SYNC_MAPS.includes(map as SyncMapName)) return null;
+  // Manually-added non-Steam games use negative ids (see ManualAddPanel).
+  if (!Number.isSafeInteger(appid) || appid === 0) return null;
+  if (op === "del") return { map: map as SyncMapName, appid: appid as number, op };
+  if (op === "set" && validValue(map as SyncMapName, value))
+    return { map: map as SyncMapName, appid: appid as number, op, value };
+  return null;
+}
+
+// The well-formed ops of a request, plus how many were dropped. Malformed entries are skipped one
+// by one rather than refusing the request: a client answers a refusal by dropping the whole batch
+// (resending it would only be refused again), so one bad entry - say a status value an older
+// version allowed and this one doesn't - would otherwise take up to MAX_OPS_PER_REQUEST good
+// changes down with it. null only when the body isn't a usable op list at all.
+export function parseOps(raw: unknown): { ops: SyncOp[]; dropped: number } | null {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_OPS_PER_REQUEST) return null;
-  const out: SyncOp[] = [];
-  for (const o of raw) {
-    if (!o || typeof o !== "object") return null;
-    const { map, appid, op, value } = o as Record<string, unknown>;
-    if (!SYNC_MAPS.includes(map as SyncMapName)) return null;
-    // Manually-added non-Steam games use negative ids (see ManualAddPanel).
-    if (!Number.isSafeInteger(appid) || appid === 0) return null;
-    if (op === "del") out.push({ map: map as SyncMapName, appid: appid as number, op });
-    else if (op === "set" && validValue(map as SyncMapName, value))
-      out.push({ map: map as SyncMapName, appid: appid as number, op, value });
-    else return null;
-  }
-  return out;
+  const ops = raw.map(parseOp).filter((o): o is SyncOp => o != null);
+  return { ops, dropped: raw.length - ops.length };
 }
 
 export const emptyMaps = (): SyncMaps =>

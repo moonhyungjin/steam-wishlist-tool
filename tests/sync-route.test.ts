@@ -43,6 +43,14 @@ const commands = {
     const h = store.get(k) as Map<string, string> | undefined;
     return h?.size ? Object.fromEntries([...h].map(([f, v]) => [f, parse(v)])) : null;
   },
+  // Stands in for the route's one Lua script (SEED_SCRIPT): skip if the marker exists, else write
+  // the (key, field, value) triples and set the marker - all at once, as Redis would.
+  async eval(_script: string, keys: string[], args: string[]) {
+    if (store.has(keys[0])) return 0;
+    for (let i = 1; i < args.length; i += 3) hash(args[i]).set(args[i + 1], args[i + 2]);
+    store.set(keys[0], parse(args[0]));
+    return 1;
+  },
 };
 vi.mock("@upstash/redis", () => ({
   Redis: class {
@@ -198,26 +206,36 @@ describe("/api/sync per-entry ops", () => {
     expect(store.size).toBe(0);
   });
 
-  it("refuses malformed ops as a whole", async () => {
-    for (const ops of [
-      [],
-      [{ map: "nope", appid: 1, op: "set", value: "x" }],
-      [{ map: "statusMap", appid: 1.5, op: "set", value: "playing" }],
-      [{ map: "statusMap", appid: 1, op: "set", value: "winning" }],
-      [{ map: "starMap", appid: 1, op: "set", value: 4.2 }],
-      [
-        { map: "statusMap", appid: 1, op: "set", value: "playing" },
-        { map: "ratingMap", appid: 1, op: "set", value: null },
-      ],
-    ]) {
+  it("refuses a body that isn't an op list, and claims nothing", async () => {
+    for (const ops of [[], "x", null, Array(201).fill({ map: "starMap", appid: 1, op: "del" })]) {
       expect((await post(A, { ops })).status).toBe(400);
     }
     expect(store.size).toBe(0);
   });
 
+  it("skips malformed ops one by one and applies the rest", async () => {
+    const res = await post(A, {
+      ops: [
+        { map: "statusMap", appid: 1, op: "set", value: "playing" },
+        { map: "nope", appid: 1, op: "set", value: "x" },
+        { map: "statusMap", appid: 1.5, op: "set", value: "playing" },
+        { map: "statusMap", appid: 2, op: "set", value: "planned" }, // retired status
+        { map: "starMap", appid: 1, op: "set", value: 4.2 },
+        { map: "ratingMap", appid: 1, op: "set", value: null },
+        { map: "ratingMap", appid: 3, op: "set", value: "like" },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).dropped).toBe(5);
+    const d = await read();
+    expect(d.statusMap).toEqual({ 1: "playing" });
+    expect(d.starMap).toEqual({});
+    expect(d.ratingMap).toEqual({ 3: "like" });
+  });
+
   it("seeds from the legacy whole-record JSON once, dropping tombstoned manual games", async () => {
     store.set(`sync:${ID}`, {
-      statusMap: { 1: "completed", [-9]: "playing" },
+      statusMap: { 1: "completed", [-9]: "playing", 4: "planned", abc: "playing" },
       ratingMap: {},
       manualGames: { [-9]: { appid: -9, name: "Gone", genres: [] }, [-8]: { appid: -8, genres: [] } },
       manualPlatform: { [-9]: "epic", [-8]: "stove" },
