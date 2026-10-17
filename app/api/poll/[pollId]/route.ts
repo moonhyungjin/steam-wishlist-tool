@@ -33,26 +33,28 @@ export async function GET(
 // for its own UI, and sends that back as `previousAppid` when changing a vote so this endpoint can
 // move the count instead of just adding a second one.
 //
-// The read-check-count-write runs inside Redis as one script, so two votes landing at the same
-// moment can't both read the same old counts and have the later write drop the earlier vote. The
-// record keeps its plain-JSON shape (votes inside it), so GET, /api/my-polls and polls created
-// before this change need nothing different. Re-applying the TTL on every vote (instead of
+// Counting is compare-and-set: read the record, count in JS, then write only if the record is
+// still exactly what was read (checked and written inside Redis by one script), else re-read and
+// retry. Two votes landing together can no longer both start from the same counts and have the
+// later write drop the earlier vote. Not a Lua JSON merge: Upstash's cjson drops null fields
+// (a candidate's headerImage) when re-encoding. Re-applying the TTL on every vote (instead of
 // KEEPTTL) is deliberate - a poll that's still getting votes should keep living a bit longer.
-const VOTE_SCRIPT = `
-local raw = redis.call('GET', KEYS[1])
-if not raw then return 'missing' end
-local data = cjson.decode(raw)
-local appid, prev = ARGV[1], ARGV[2]
-if data.votes[appid] == nil then return 'bad' end
-if prev ~= '' and data.votes[prev] == nil then return 'badprev' end
-if prev ~= appid then
-  if prev ~= '' then data.votes[prev] = math.max(0, data.votes[prev] - 1) end
-  data.votes[appid] = data.votes[appid] + 1
-end
-local out = cjson.encode(data)
-redis.call('SET', KEYS[1], out, 'EX', tonumber(ARGV[3]))
-return out
+const CAS_SCRIPT = `
+if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call('SET', KEYS[1], ARGV[2], 'EX', tonumber(ARGV[3]))
+return 1
 `;
+const MAX_VOTE_ATTEMPTS = 25;
+
+// The compare needs the stored text byte for byte, so this client skips Upstash's JSON parsing.
+let rawRedis: Redis | null | undefined;
+function getRawRedis(): Redis | null {
+  if (rawRedis !== undefined) return rawRedis;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  rawRedis = url && token ? new Redis({ url, token, automaticDeserialization: false }) : null;
+  return rawRedis;
+}
 
 export async function POST(
   request: NextRequest,
@@ -62,30 +64,41 @@ export async function POST(
   const body = await request.json().catch(() => null);
   const appid = Number(body?.appid);
   const previousAppid = body?.previousAppid != null ? Number(body.previousAppid) : null;
-  const client = getRedis();
+  const client = getRawRedis();
   if (!client)
     return NextResponse.json({ error: "서버 DB가 설정되어 있지 않습니다." }, { status: 503 });
 
-  if (!Number.isInteger(appid))
-    return NextResponse.json({ error: "유효하지 않은 후보예요." }, { status: 400 });
-  if (previousAppid != null && !Number.isInteger(previousAppid))
-    return NextResponse.json({ error: "유효하지 않은 이전 후보예요." }, { status: 400 });
+  const key = `poll:${pollId}`;
+  for (let attempt = 0; attempt < MAX_VOTE_ATTEMPTS; attempt++) {
+    const raw = await client.get<string>(key);
+    if (!raw)
+      return NextResponse.json(
+        { error: "투표를 찾을 수 없어요. 링크가 만료(30일) 되었거나 잘못됐을 수 있어요." },
+        { status: 404 },
+      );
+    const data: PollData = JSON.parse(raw);
+    if (!Number.isInteger(appid) || !(appid in data.votes))
+      return NextResponse.json({ error: "유효하지 않은 후보예요." }, { status: 400 });
+    if (previousAppid != null && !(previousAppid in data.votes))
+      return NextResponse.json({ error: "유효하지 않은 이전 후보예요." }, { status: 400 });
+    if (previousAppid === appid) return NextResponse.json(data);
 
-  const result = await client.eval<string[], string | PollData>(
-    VOTE_SCRIPT,
-    [`poll:${pollId}`],
-    [String(appid), previousAppid != null ? String(previousAppid) : "", String(POLL_TTL_SECONDS)],
-  );
-  if (result === "missing")
-    return NextResponse.json(
-      { error: "투표를 찾을 수 없어요. 링크가 만료(30일) 되었거나 잘못됐을 수 있어요." },
-      { status: 404 },
+    if (previousAppid != null) {
+      data.votes[previousAppid] = Math.max(0, (data.votes[previousAppid] ?? 0) - 1);
+    }
+    data.votes[appid] = (data.votes[appid] ?? 0) + 1;
+    const written = await client.eval(
+      CAS_SCRIPT,
+      [key],
+      [raw, JSON.stringify(data), String(POLL_TTL_SECONDS)],
     );
-  if (result === "bad")
-    return NextResponse.json({ error: "유효하지 않은 후보예요." }, { status: 400 });
-  if (result === "badprev")
-    return NextResponse.json({ error: "유효하지 않은 이전 후보예요." }, { status: 400 });
-  // Upstash JSON-parses string replies by default; parse here only in case that's ever turned off.
-  const data: PollData = typeof result === "string" ? JSON.parse(result) : result;
-  return NextResponse.json(data);
+    if (Number(written) === 1) return NextResponse.json(data);
+    // Someone else's vote landed in between - back off (longer each time, randomized so racing
+    // voters spread out) and count again on top of it.
+    await new Promise((r) => setTimeout(r, (10 + Math.random() * 40) * (1 + attempt / 3)));
+  }
+  return NextResponse.json(
+    { error: "투표가 몰려서 저장하지 못했어요. 다시 눌러주세요." },
+    { status: 503 },
+  );
 }
