@@ -23,5 +23,5 @@ ever receives reviewed, built, content-identical cherry-picks.
 - Never push or merge to `main` without an explicit deploy request. Approval does not carry over to
   the next deploy.
 - Never print secrets from `.env.local`.
-- Confirm `GENRE_LEVELING_ENABLED = false` in `app/wishlist.tsx` before each deploy.
+- Confirm `GENRE_TASTE_ENABLED = false` in `app/genres.ts` before each deploy (genre levels are live; taste/recommend stay off until docs/genre-taste-eval.md says otherwise).
 - The reviewer in a review step is read-only: it reports findings, it does not fix them.
