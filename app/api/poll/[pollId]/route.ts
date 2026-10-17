@@ -32,6 +32,28 @@ export async function GET(
 // friends, not a public ballot. The client keeps a localStorage "already voted" flag per pollId
 // for its own UI, and sends that back as `previousAppid` when changing a vote so this endpoint can
 // move the count instead of just adding a second one.
+//
+// The read-check-count-write runs inside Redis as one script, so two votes landing at the same
+// moment can't both read the same old counts and have the later write drop the earlier vote. The
+// record keeps its plain-JSON shape (votes inside it), so GET, /api/my-polls and polls created
+// before this change need nothing different. Re-applying the TTL on every vote (instead of
+// KEEPTTL) is deliberate - a poll that's still getting votes should keep living a bit longer.
+const VOTE_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return 'missing' end
+local data = cjson.decode(raw)
+local appid, prev = ARGV[1], ARGV[2]
+if data.votes[appid] == nil then return 'bad' end
+if prev ~= '' and data.votes[prev] == nil then return 'badprev' end
+if prev ~= appid then
+  if prev ~= '' then data.votes[prev] = math.max(0, data.votes[prev] - 1) end
+  data.votes[appid] = data.votes[appid] + 1
+end
+local out = cjson.encode(data)
+redis.call('SET', KEYS[1], out, 'EX', tonumber(ARGV[3]))
+return out
+`;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ pollId: string }> },
@@ -44,26 +66,26 @@ export async function POST(
   if (!client)
     return NextResponse.json({ error: "서버 DB가 설정되어 있지 않습니다." }, { status: 503 });
 
-  const key = `poll:${pollId}`;
-  const data = await client.get<PollData>(key);
-  if (!data)
+  if (!Number.isInteger(appid))
+    return NextResponse.json({ error: "유효하지 않은 후보예요." }, { status: 400 });
+  if (previousAppid != null && !Number.isInteger(previousAppid))
+    return NextResponse.json({ error: "유효하지 않은 이전 후보예요." }, { status: 400 });
+
+  const result = await client.eval<string[], string | PollData>(
+    VOTE_SCRIPT,
+    [`poll:${pollId}`],
+    [String(appid), previousAppid != null ? String(previousAppid) : "", String(POLL_TTL_SECONDS)],
+  );
+  if (result === "missing")
     return NextResponse.json(
       { error: "투표를 찾을 수 없어요. 링크가 만료(30일) 되었거나 잘못됐을 수 있어요." },
       { status: 404 },
     );
-  if (!Number.isInteger(appid) || !(appid in data.votes))
+  if (result === "bad")
     return NextResponse.json({ error: "유효하지 않은 후보예요." }, { status: 400 });
-  if (previousAppid != null && !(previousAppid in data.votes))
+  if (result === "badprev")
     return NextResponse.json({ error: "유효하지 않은 이전 후보예요." }, { status: 400 });
-
-  if (previousAppid != null && previousAppid !== appid) {
-    data.votes[previousAppid] = Math.max(0, (data.votes[previousAppid] ?? 0) - 1);
-  }
-  if (previousAppid !== appid) {
-    data.votes[appid] = (data.votes[appid] ?? 0) + 1;
-  }
-  // Re-applying the TTL on every vote (instead of a keepttl write) is fine here - a poll that's
-  // still getting votes is exactly the one that should keep living a bit longer.
-  await client.set(key, data, { ex: POLL_TTL_SECONDS });
+  // Upstash JSON-parses string replies by default; parse here only in case that's ever turned off.
+  const data: PollData = typeof result === "string" ? JSON.parse(result) : result;
   return NextResponse.json(data);
 }
