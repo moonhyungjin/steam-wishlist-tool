@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { SyncLinkState } from "../useSyncedData";
 import { getSyncToken } from "../syncToken";
+import { CloseButton } from "./CloseButton";
 
 // Cross-device sync needs no account: the first browser to save claims the record with a secret
 // code, and another device joins by entering that code here. See app/api/sync/route.ts.
@@ -26,9 +27,7 @@ export function SyncPanel({
     <div className="myPollsPanel">
       <div className="myPollsHead">
         <span className="myPollsTitle">동기화 코드</span>
-        <button type="button" className="pollBarBtnGhost" onClick={onClose}>
-          닫기
-        </button>
+        <CloseButton onClick={onClose} />
       </div>
       {!ready ? (
         <p className="myPollsEmpty">먼저 Steam ID를 입력하고 목록을 불러와 주세요.</p>

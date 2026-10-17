@@ -1,5 +1,6 @@
 "use client";
 import { COUNTRIES } from "../countries";
+import { CloseButton } from "./CloseButton";
 // Picker for the Steam store region. Switching it changes the price currency and the ITAD all-time
 // low the app compares against - never the UI language, which stays Korean.
 export function CountryPanel({
@@ -15,9 +16,7 @@ export function CountryPanel({
     <div className="myPollsPanel">
       <div className="myPollsHead">
         <span className="myPollsTitle">스토어 국가</span>
-        <button type="button" className="pollBarBtnGhost" onClick={onClose}>
-          닫기
-        </button>
+        <CloseButton onClick={onClose} />
       </div>
       <p className="myPollsEmpty">
         선택한 국가의 스팀 스토어 기준으로 가격과 역대 최저가가 표시돼요. 언어는 한국어 그대로예요.
