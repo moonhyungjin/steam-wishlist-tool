@@ -32,3 +32,6 @@ next-env.d.ts
 # playwright
 /test-results/
 /playwright-report/
+
+# genre-taste evaluation output (holds an account's personal library/sync data)
+/tools/taste-eval/out/
