@@ -2,7 +2,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Grid, List } from "react-window";
 import { DEFAULT_COUNTRY, isSupportedCountry } from "./countries";
-import { type Item, type View, type Profile, type Game, type AchievementInfo } from "./types";
+import {
+  type Item,
+  type View,
+  type Profile,
+  type Game,
+  type AchievementInfo,
+  type ToolbarPanel,
+} from "./types";
 import {
   lowestPriceStatus,
   genreLevelInfo,
@@ -129,13 +136,16 @@ export default function Wishlist() {
   const [libFetchedOnce, setLibFetchedOnce] = useState(false);
 
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
-  const [myPollsOpen, setMyPollsOpen] = useState(false);
+  // One panel at a time: opening another replaces it, and picking the open one again from the menu
+  // closes it - several stacked panels left no room for the list on a phone.
+  const [openPanel, setOpenPanel] = useState<ToolbarPanel | null>(null);
+  function togglePanel(panel: ToolbarPanel) {
+    setOpenPanel((cur) => (cur === panel ? null : panel));
+  }
   // Steam store region. The ref mirrors the state so loaders that run right after a change (in the
   // same handler, before the next render) and async continuations still read the current value.
   const [country, setCountry] = useState<string>(DEFAULT_COUNTRY);
   const countryRef = useRef<string>(DEFAULT_COUNTRY);
-  const [countryOpen, setCountryOpen] = useState(false);
-  const [syncOpen, setSyncOpen] = useState(false);
   function changeCountry(code: string) {
     if (!isSupportedCountry(code) || code === countryRef.current) return;
     countryRef.current = code;
@@ -155,7 +165,7 @@ export default function Wishlist() {
       stripped[Number(id)] = { ...g, lowestPrice: undefined, lowestPriceCheckedForEnd: undefined };
     }
     setWlGames(stripped);
-    setCountryOpen(false);
+    setOpenPanel(null);
     if (wlItems.length > 0) loadWishlistWith(stripped);
   }
   const moreActionsWrapRef = useRef<HTMLDivElement>(null);
@@ -205,7 +215,6 @@ export default function Wishlist() {
     () => ({ ...libGames, ...(hasLibIdentity ? manualGames : {}) }),
     [libGames, manualGames, hasLibIdentity],
   );
-  const [manualFormOpen, setManualFormOpen] = useState(false);
 
   const items = view === "wishlist" ? wlItems : combinedLibItems;
   const games = view === "wishlist" ? wlGames : combinedLibGames;
@@ -232,6 +241,15 @@ export default function Wishlist() {
   function switchView(next: View) {
     setView(next);
     setSortKey(null);
+    // 게임 추가 and 동기화 코드 only exist on the library tab - close them rather than leave a hidden
+    // panel that pops back up later (게임 추가's form would be reset by then anyway).
+    if (next !== "library") setOpenPanel((p) => (p === "manual" || p === "sync" ? null : p));
+  }
+  // Starting a poll closes whatever panel is open - games are picked in the list, which needs the
+  // room. Opening a panel during a poll leaves the poll alone, since ending it drops the picks.
+  function togglePollFromMenu(kind: "buy" | "play") {
+    if (!pollActiveForView) setOpenPanel(null);
+    togglePollMode(kind);
   }
   const { markRefreshed, statusFor } = useRefreshStamp();
   const filters = useFilterState();
@@ -935,40 +953,38 @@ export default function Wishlist() {
           moreActionsOpen={moreActionsOpen}
           moreActionsWrapRef={moreActionsWrapRef}
           pollActiveForView={pollActiveForView}
-          setCountryOpen={setCountryOpen}
-          setSyncOpen={setSyncOpen}
+          openPanel={openPanel}
+          togglePanel={togglePanel}
           syncLocked={syncLink === "locked"}
           setLayoutMode={setLayoutMode}
-          setManualFormOpen={setManualFormOpen}
           setMoreActionsOpen={setMoreActionsOpen}
-          setMyPollsOpen={setMyPollsOpen}
-          togglePollMode={togglePollMode}
+          togglePollMode={togglePollFromMenu}
           view={view}
         />
-        {view === "library" && manualFormOpen && (
+        {view === "library" && openPanel === "manual" && (
           <ManualAddPanel
             country={countryRef.current}
             onAdd={addManualGame}
-            onClose={() => setManualFormOpen(false)}
+            onClose={() => setOpenPanel(null)}
           />
         )}
-        {countryOpen && (
+        {openPanel === "country" && (
           <CountryPanel
             current={country}
             onSelect={changeCountry}
-            onClose={() => setCountryOpen(false)}
+            onClose={() => setOpenPanel(null)}
           />
         )}
-        {syncOpen && (
+        {view === "library" && openPanel === "sync" && (
           <SyncPanel
             steamId={steamId.trim()}
             link={syncLink}
             onLink={linkSyncCode}
-            onClose={() => setSyncOpen(false)}
+            onClose={() => setOpenPanel(null)}
           />
         )}
-        {myPollsOpen && (
-          <MyPollsPanel steamId={steamId.trim()} onClose={() => setMyPollsOpen(false)} />
+        {openPanel === "myPolls" && (
+          <MyPollsPanel steamId={steamId.trim()} onClose={() => setOpenPanel(null)} />
         )}
         {pollActiveForView && (
           <PollBar
