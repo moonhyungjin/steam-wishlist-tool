@@ -889,7 +889,7 @@ button:disabled {
    a "dedicated screen" is a pure sizing change with no positioning logic to add. */
 .genreLevelPopover {
   width: min(720px, 94vw);
-  max-height: min(640px, 86vh);
+  max-height: min(760px, 86vh);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -2314,27 +2314,114 @@ a.pollBarBtn {
 .chartLabel .fieldChevron {
   margin-left: 6px;
 }
-.genreSubList {
-  list-style: none;
-  margin: 0 0 6px;
-  padding: 2px 4px 4px 26px;
+.genreSubPanel {
+  margin: var(--space-xs) 2px var(--space-md);
+  padding: 14px;
+  border: 1px solid rgba(102, 192, 244, 0.14);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(102, 192, 244, 0.06), transparent 65%), #13202e;
+}
+.genreSubHeader {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.genreSubHeader > :first-child {
+  color: var(--accent);
+  font-weight: 700;
+}
+.genreSubList {
+  display: grid;
+  gap: 14px;
+  list-style: none;
   font-size: 12px;
-  color: #aebbd0;
 }
 .genreSubList li {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
 }
-.genreSubList .genreSubHours {
+.genreSubRank {
+  flex: 0 0 24px;
+  align-self: flex-start;
+  padding-top: 1px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: #8fa1b8;
+  color: var(--muted);
+}
+.genreSubList li:first-child .genreSubRank,
+.genreSubList li:first-child .genreSubName {
+  color: var(--accent);
+}
+.genreSubContent {
+  flex: 1;
+  min-width: 0;
+}
+.genreSubMeta,
+.genreSubOther {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 38px;
+  align-items: baseline;
+  gap: 8px;
+}
+.genreSubName {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.genreSubHours,
+.genreSubPercent {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.genreSubHours {
+  color: var(--muted);
+  font-size: 11px;
+}
+.genreSubPercent {
+  text-align: right;
+  color: #c7e6f8;
+  font-size: 12px;
+}
+.genreSubTrack {
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(145, 160, 180, 0.14);
+}
+.genreSubTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3889b8, #86d1fa);
 }
 .genreSubOther {
-  opacity: 0.7;
+  margin-top: 14px;
+  padding-top: var(--space-sm);
+  padding-left: 34px;
+  border-top: 1px solid rgba(145, 160, 180, 0.15);
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 480px) {
+  .genreSubPanel {
+    padding: var(--space-sm);
+  }
+  .genreSubList li {
+    gap: var(--space-xs);
+  }
+  .genreSubRank {
+    flex-basis: 18px;
+  }
+  .genreSubOther {
+    padding-left: 24px;
+  }
 }
 
 .chip.recommendTag.mid {
