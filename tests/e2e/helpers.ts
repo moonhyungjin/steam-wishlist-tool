@@ -10,7 +10,7 @@ type MockGame = {
   price?: string;
 };
 
-function fullGame(g: MockGame) {
+export function fullGame(g: MockGame) {
   const discountPercent = g.discountPercent ?? 0;
   return {
     appid: g.appid,
