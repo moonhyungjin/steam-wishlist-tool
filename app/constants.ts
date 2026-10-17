@@ -89,13 +89,10 @@ export const MANUAL_GAMES_STORAGE_KEY = "library:manualGames";
 // Manual entries have no Steam-tracked playtime, so without this they silently contribute
 // nothing to genre levels/taste - letting the user type a rough estimate lets them opt in.
 export const MANUAL_PLAYTIME_STORAGE_KEY = "library:manualPlaytime";
-// syncFromServer's "prefer local over stale/empty server data" check only ever protects against
-// a fully-empty server response - if the server still has a manual entry you just deleted (its
-// pushSync hadn't landed, or silently failed), the server's manualGames/manualPlatform is still
-// non-empty and unconditionally overwrites local, resurrecting the deletion. Tracks appids
-// deleted on this device so any still-stale entry gets filtered back out of whatever the server
-// returns, rather than trusting a plain non-empty-wins merge. Cleared for an appid the moment
-// it's re-added locally, so re-adding the same game later isn't permanently blocked.
+// Legacy, read-only: appids of manual games deleted on this device under the old whole-map sync,
+// which needed this list to keep a stale server copy from bringing them back. Deletions are real
+// sync ops now; the list is only read to keep those games out of the one-time catch-up upload
+// (see useSyncedData's syncFromServer), then removed.
 export const MANUAL_REMOVED_STORAGE_KEY = "library:manualRemoved";
 // Steam store region (price currency + ITAD low) - a per-browser preference like the layout mode,
 // deliberately not part of the cross-device sync blob.
