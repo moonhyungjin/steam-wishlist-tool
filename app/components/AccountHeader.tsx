@@ -248,7 +248,19 @@ export function AccountHeader({
                           title={`${genre} · Lv.${level} · ${Math.round(hours)}시간`}
                           onClick={hasDetail ? () => toggleExpanded(genreId) : undefined}
                           role={hasDetail ? "button" : undefined}
+                          tabIndex={hasDetail ? 0 : undefined}
+                          onKeyDown={
+                            hasDetail
+                              ? (event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    toggleExpanded(genreId);
+                                  }
+                                }
+                              : undefined
+                          }
                           aria-expanded={hasDetail ? expanded : undefined}
+                          aria-controls={hasDetail ? `genre-detail-${genreId}` : undefined}
                         >
                           <span className="chartLabel">
                             <GenreGlyph genreId={genreId} className="genreGlyph" />
@@ -270,25 +282,55 @@ export function AccountHeader({
                           <span className="chartValue">Lv.{level}</span>
                         </div>
                         {hasDetail && expanded && (
-                          <ul className="genreSubList">
-                            {detail.children.slice(0, 8).map((c) => (
-                              <li key={c.id}>
-                                <span>{c.name}</span>
-                                <span className="genreSubHours">
-                                  {Math.round(c.hours)}시간 · {Math.round((c.hours / hours) * 100)}%
-                                </span>
-                              </li>
-                            ))}
+                          <div className="genreSubPanel" id={`genre-detail-${genreId}`}>
+                            <div className="genreSubHeader">
+                              <span>세부 장르</span>
+                              <span>{genre} 내 시간 비중</span>
+                            </div>
+                            <ul className="genreSubList" aria-label={`${genre} 세부 장르`}>
+                              {detail.children.map((c, index) => {
+                                const percent = hours > 0 ? (c.hours / hours) * 100 : 0;
+                                return (
+                                  <li key={c.id}>
+                                    <span className="genreSubRank" aria-hidden="true">
+                                      {String(index + 1).padStart(2, "0")}
+                                    </span>
+                                    <div className="genreSubContent">
+                                      <div className="genreSubMeta">
+                                        <span className="genreSubName">{c.name}</span>
+                                        <span className="genreSubHours">
+                                          {c.hours < 1
+                                            ? "1시간 미만"
+                                            : `${Math.round(c.hours).toLocaleString("ko-KR")}시간`}
+                                        </span>
+                                        <span className="genreSubPercent">
+                                          {percent > 0 && percent < 1 ? "<1" : Math.round(percent)}%
+                                        </span>
+                                      </div>
+                                      <div className="genreSubTrack" aria-hidden="true">
+                                        <span
+                                          style={{
+                                            width: `${Math.min(100, Math.max(0, percent))}%`,
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                            </ul>
                             {detail.other > 0.5 && (
-                              <li className="genreSubOther">
+                              <div className="genreSubOther">
                                 <span>그 외</span>
                                 <span className="genreSubHours">
-                                  {Math.round(detail.other)}시간 ·{" "}
-                                  {Math.round((detail.other / hours) * 100)}%
+                                  {Math.round(detail.other).toLocaleString("ko-KR")}시간
                                 </span>
-                              </li>
+                                <span className="genreSubPercent">
+                                  {hours > 0 ? Math.round((detail.other / hours) * 100) : 0}%
+                                </span>
+                              </div>
                             )}
-                          </ul>
+                          </div>
                         )}
                       </div>
                     );
