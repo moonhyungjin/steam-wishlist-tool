@@ -27,7 +27,6 @@ import {
   MANUAL_PLATFORM_STORAGE_KEY,
   MANUAL_GAMES_STORAGE_KEY,
   MANUAL_PLAYTIME_STORAGE_KEY,
-  MANUAL_REMOVED_STORAGE_KEY,
   COUNTRY_STORAGE_KEY,
   CACHE_VERSION,
   ROW_HEIGHT,
@@ -71,8 +70,6 @@ export default function Wishlist() {
     setManualGames,
     manualPlaytime,
     setManualPlaytime,
-    manualRemovedIds,
-    setManualRemovedIds,
     statusMap,
     setStatusMap,
     ratingMap,
@@ -81,14 +78,13 @@ export default function Wishlist() {
     setStarMap,
     achievementMap,
     setAchievementMap,
-    persistManualRemoved,
-    persistManual,
     setManualPlaytimeHours,
     setGameStatus,
     setGameRating,
     setGameStar,
+    addManualGame,
+    removeManualGame,
     resetPerAccountStateIfIdChanged,
-    pushSync,
     syncFromServer,
     updateAchievements,
     activeSyncIdRef,
@@ -333,7 +329,7 @@ export default function Wishlist() {
         for (const [id, info] of Object.entries(d.achievements)) {
           updates[Number(id)] = info as AchievementInfo | null;
         }
-        updateAchievements({ ...achievementMap, ...updates });
+        updateAchievements(updates);
       }
     } catch {
     } finally {
@@ -572,10 +568,6 @@ export default function Wishlist() {
       );
       if (manualPlaytimeSaved && typeof manualPlaytimeSaved === "object")
         setManualPlaytime(manualPlaytimeSaved);
-      const manualRemovedSaved = JSON.parse(
-        localStorage.getItem(MANUAL_REMOVED_STORAGE_KEY) ?? "null",
-      );
-      if (Array.isArray(manualRemovedSaved)) setManualRemovedIds(manualRemovedSaved);
       const status = JSON.parse(localStorage.getItem(STATUS_STORAGE_KEY) ?? "null");
       if (status && typeof status === "object") setStatusMap(status);
       const rating = JSON.parse(localStorage.getItem(RATING_STORAGE_KEY) ?? "null");
@@ -612,9 +604,9 @@ export default function Wishlist() {
       }
     } catch {}
     // Intentionally mount-only (see comment above the effect) - syncFromServer itself is
-    // recreated every render, but the maps it reads for the "prefer local over stale server
-    // data" check now come from refs (see their comment) rather than this closure, so it's safe
-    // for only the version captured here, at mount, to ever run.
+    // recreated every render, but the maps it merges into come from refs (see their comment)
+    // rather than this closure, so it's safe for only the version captured here, at mount, to
+    // ever run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -675,27 +667,6 @@ export default function Wishlist() {
     if (now - lastLibPersistAt.current < 1500) return;
     lastLibPersistAt.current = now;
     persistTo(LIBRARY_CACHE_KEY, steamId, itemsValue, gamesValue);
-  }
-  function removeManualGame(appid: number) {
-    const nextPlatform = { ...manualPlatform };
-    delete nextPlatform[appid];
-    const nextGames = { ...manualGames };
-    delete nextGames[appid];
-    setManualPlatform(nextPlatform);
-    setManualGames(nextGames);
-    persistManual(nextPlatform, nextGames);
-    setManualPlaytimeHours(appid, null);
-    setGameStatus(appid, null);
-    setGameRating(appid, null);
-    // Tombstone the deletion so a stale (still-non-empty) server pull can't resurrect it - see
-    // MANUAL_REMOVED_STORAGE_KEY's comment. Pushed to the server too, so other devices pick it up
-    // next time they load (see syncFromServer's union logic).
-    const nextRemoved = manualRemovedIds.includes(appid)
-      ? manualRemovedIds
-      : [...manualRemovedIds, appid];
-    setManualRemovedIds(nextRemoved);
-    persistManualRemoved(nextRemoved);
-    pushSync({ manualRemovedIds: nextRemoved });
   }
   // Zero-arg on purpose: this is passed straight to onClick handlers, which would otherwise hand
   // the click event in as `gamesOverride`. Region changes call loadWishlistWith directly instead.
@@ -973,23 +944,7 @@ export default function Wishlist() {
         {view === "library" && manualFormOpen && (
           <ManualAddPanel
             country={countryRef.current}
-            onAdd={(appid, platform, game) => {
-              const nextPlatform = { ...manualPlatform, [appid]: platform };
-              const nextGames = { ...manualGames, [appid]: game };
-              setManualPlatform(nextPlatform);
-              setManualGames(nextGames);
-              persistManual(nextPlatform, nextGames);
-              // Re-adding a previously-deleted appid should un-tombstone it, or a stale server
-              // sync could never bring a genuinely-re-added game back. A device that's still
-              // offline at this moment won't find out until it separately re-adds the same appid
-              // itself - the server union only ever grows, it doesn't propagate removals.
-              if (manualRemovedIds.includes(appid)) {
-                const nextRemoved = manualRemovedIds.filter((id) => id !== appid);
-                setManualRemovedIds(nextRemoved);
-                persistManualRemoved(nextRemoved);
-                pushSync({ manualRemovedIds: nextRemoved });
-              }
-            }}
+            onAdd={addManualGame}
             onClose={() => setManualFormOpen(false)}
           />
         )}

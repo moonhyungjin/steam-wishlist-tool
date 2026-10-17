@@ -150,7 +150,8 @@ export async function enrichAchievements(
   appids: number[],
   steamId: string,
   initial: Record<number, AchievementInfo | null>,
-  onUpdate: (map: Record<number, AchievementInfo | null>) => void,
+  // Called with just the entries each chunk checked.
+  onUpdate: (updates: Record<number, AchievementInfo | null>) => void,
   // Ids in this set get re-fetched even if already in `initial` - everything else only fills in
   // gaps. Achievement % can only change for games actually played since the last check, so
   // "새로고침" only forces the handful of most-recently-played games instead of the whole library -
@@ -158,8 +159,7 @@ export async function enrichAchievements(
   // (no batch endpoint for this one) for data that almost certainly didn't move.
   forceIds: Set<number> = new Set(),
 ) {
-  let current = initial;
-  const targets = appids.filter((id) => forceIds.has(id) || !(id in current));
+  const targets = appids.filter((id) => forceIds.has(id) || !(id in initial));
   for (let i = 0; i < targets.length; i += ACHIEVEMENT_CHUNK) {
     const chunk = targets.slice(i, i + ACHIEVEMENT_CHUNK);
     const r = await fetch(
@@ -171,8 +171,7 @@ export async function enrichAchievements(
     for (const [id, info] of Object.entries(d.achievements ?? {})) {
       updates[Number(id)] = info as AchievementInfo | null;
     }
-    current = { ...current, ...updates };
-    onUpdate(current);
+    onUpdate(updates);
     if (d.blocked) return;
   }
 }
