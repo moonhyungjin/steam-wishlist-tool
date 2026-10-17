@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { Redis } from "@upstash/redis";
-import { SYNC_MAPS, emptyMaps, parseOps, type SyncMapName, type SyncMaps } from "../../syncOps";
+import {
+  SYNC_MAPS,
+  emptyMaps,
+  parseOp,
+  parseOps,
+  type SyncMapName,
+  type SyncMaps,
+} from "../../syncOps";
 
 // Cross-device sync for the data that can't be re-fetched from Steam - play status, like/dislike,
 // stars, achievement % and manually-added games. Wishlist/library game lists stay localStorage-only
@@ -43,34 +50,39 @@ type SyncAuth = { hash: string; updatedAt: number };
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 const authKey = (steamId: string) => `syncauth:${steamId}`;
 
+// Seeds the hashes and sets the marker in one atomic step, or does nothing if the marker already
+// exists. Values arrive already JSON-encoded from JS and are written as-is - no cjson round-trip,
+// which drops null fields on Upstash. ARGV: marker value, then (hash key, field, value) triples.
+const SEED_SCRIPT = `
+if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end
+for i = 2, #ARGV, 3 do redis.call('HSET', ARGV[i], ARGV[i + 1], ARGV[i + 2]) end
+redis.call('SET', KEYS[1], ARGV[1])
+return 1
+`;
+
 // Returns whether the record exists, creating it (create=true) or seeding it from the legacy
-// record. The marker is claimed with NX before seeding, so of two first accesses racing only one
-// copies the legacy data in - the other can't write stale legacy values over an op that landed
-// in between. Its worst case is reading a half-seeded record once; the next pull corrects it.
+// record. Seeding and the marker go in one script, so no op from another request can land between
+// them (and be overwritten by a slower seeder), and a seed that fails leaves no marker behind -
+// the next access simply tries again.
 async function ensureRecord(client: Redis, steamId: string, create: boolean): Promise<boolean> {
   if (await client.exists(metaKey(steamId))) return true;
   const legacy = await client.get<LegacyData>(legacyKey(steamId));
   if (!legacy && !create) return false;
-  const claimed = await client.set(metaKey(steamId), { createdAt: Date.now() }, { nx: true });
-  if (!claimed || !legacy) return true;
-  // The legacy record's tombstones hid deleted manual games that a stale whole-map write had put
-  // back - drop those entries for good instead of carrying the tombstone list forward.
-  const removed = new Set((legacy.manualRemovedIds ?? []).map(String));
-  const tx = client.multi();
-  let writes = 0;
-  for (const map of SYNC_MAPS) {
-    const entries = Object.entries(legacy[map] ?? {}).filter(
-      ([id]) => !(map.startsWith("manual") && removed.has(id)),
-    );
-    if (!entries.length) continue;
-    tx.hset(
-      mapKey(steamId, map),
-      Object.fromEntries(entries.map(([id, v]) => [id, JSON.stringify(v)])),
-    );
-    writes++;
+  const args = [JSON.stringify({ createdAt: Date.now() })];
+  if (legacy) {
+    // The legacy record's tombstones hid deleted manual games that a stale whole-map write had put
+    // back - drop those entries for good instead of carrying the tombstone list forward. Entries
+    // the current format wouldn't accept (e.g. a status value since retired) are left behind too.
+    const removed = new Set((legacy.manualRemovedIds ?? []).map(String));
+    for (const map of SYNC_MAPS)
+      for (const [id, value] of Object.entries(legacy[map] ?? {})) {
+        if (map.startsWith("manual") && removed.has(id)) continue;
+        if (!parseOp({ map, appid: Number(id), op: "set", value })) continue;
+        args.push(mapKey(steamId, map), id, JSON.stringify(value));
+      }
   }
-  if (writes) await tx.exec();
-  await client.expire(legacyKey(steamId), LEGACY_TTL_SECONDS);
+  await client.eval(SEED_SCRIPT, [metaKey(steamId)], args);
+  if (legacy) await client.expire(legacyKey(steamId), LEGACY_TTL_SECONDS);
   return true;
 }
 
@@ -130,8 +142,9 @@ export async function POST(request: NextRequest) {
       { error: "페이지를 새로고침해 주세요.", outdated: true },
       { status: 409 },
     );
-  const ops = parseOps(body.ops);
-  if (!ops) return NextResponse.json({ error: "잘못된 동기화 요청이에요." }, { status: 400 });
+  const parsed = parseOps(body.ops);
+  if (!parsed) return NextResponse.json({ error: "잘못된 동기화 요청이에요." }, { status: 400 });
+  const { ops, dropped } = parsed;
   const hash = hashToken(token);
   const now = Date.now();
   let auth = await client.get<SyncAuth>(authKey(steamId));
@@ -156,5 +169,5 @@ export async function POST(request: NextRequest) {
   }
   tx.set(authKey(steamId), { hash, updatedAt: now });
   await tx.exec();
-  return NextResponse.json({ ok: true, linked: true });
+  return NextResponse.json({ ok: true, linked: true, dropped });
 }
