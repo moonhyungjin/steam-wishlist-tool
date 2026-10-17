@@ -36,7 +36,8 @@ import {
   CARD_ROW_HEIGHT,
 } from "./constants";
 import {
-  GENRE_LEVELING_ENABLED,
+  GENRE_LEVELS_ENABLED,
+  GENRE_TASTE_ENABLED,
   GENRE_LEVELS_MIN_GAMES,
   GENRE_LEVELS_MIN_HOURS,
   GENRE_FILTER_LIMIT,
@@ -386,7 +387,7 @@ export default function Wishlist() {
   // them on the wishlist tab too (both tabs share one identity now, so it's always the same
   // account's library).
   const showGenreLevels =
-    GENRE_LEVELING_ENABLED &&
+    GENRE_LEVELS_ENABLED &&
     genreLevels.length > 0 &&
     genreXp.gameCount >= GENRE_LEVELS_MIN_GAMES &&
     genreXp.totalHours >= GENRE_LEVELS_MIN_HOURS;
@@ -394,16 +395,19 @@ export default function Wishlist() {
   // like JRPG vs CRPG vs 액션 RPG matter here, unlike for the level badge where they'd just dilute
   // one bucket. A genre only surfaces once it's crossed TASTE_MIN_GAMES games, so a couple of
   // flukes (one dropped game, one over-generous 5-star) can't swing a tiny-sample average.
+  // Empty while GENRE_TASTE_ENABLED is off, which hides every taste surface downstream at once.
   const genreTaste = useMemo(
     () =>
-      computeGenreTaste(
-        combinedLibItems,
-        combinedLibGames,
-        statusMap,
-        ratingMap,
-        starMap,
-        achievementMap,
-      ),
+      GENRE_TASTE_ENABLED
+        ? computeGenreTaste(
+            combinedLibItems,
+            combinedLibGames,
+            statusMap,
+            ratingMap,
+            starMap,
+            achievementMap,
+          )
+        : [],
     [combinedLibItems, combinedLibGames, statusMap, ratingMap, starMap, achievementMap],
   );
   // Keyed by genreId for O(1) lookup from recommendScore, rather than re-scanning the array per
@@ -416,7 +420,7 @@ export default function Wishlist() {
   // Wishlist-wide (not just what's currently filtered/visible), so a game shows the same label
   // regardless of which filters happen to be active - see computeRecommendFit.
   const recommendFit = useMemo(
-    () => (GENRE_LEVELING_ENABLED ? computeRecommendFit(wlItems, wlGames, genreTasteMap) : {}),
+    () => (GENRE_TASTE_ENABLED ? computeRecommendFit(wlItems, wlGames, genreTasteMap) : {}),
     [wlItems, wlGames, genreTasteMap],
   );
   const [genreTab, setGenreTab] = useState<"level" | "taste">("level");

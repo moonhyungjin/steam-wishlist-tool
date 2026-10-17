@@ -182,7 +182,7 @@ export function AccountHeader({
                 tabIndex={0}
                 role="note"
                 aria-label="장르 프로필 도움말"
-                data-tooltip="라이브러리에 장르가 매칭되는 게임이 5개 이상, 누적 10시간 이상 쌓여야 이 프로필이 나타납니다. 레벨 = ⌊√(누적시간 ÷ 5)⌋ (Lv.1=5시간, Lv.2=20시간, Lv.3=45시간... 뒤로 갈수록 완만해지는 곡선). 21개 굵은 장르 카테고리로 집계되며, 게임 하나가 여러 장르에 걸치면 시간을 균등 분배합니다. 플레이타임 0시간이거나 '제외' 상태인 게임은 집계에서 빠집니다. 장르 선호도(%)는 절대 기준이 아니라 본인의 전체 평균 대비 상대값이며, 최소 12개 이상 보유한 장르만 표시됩니다."
+                data-tooltip="Steam 플레이타임을 16개 큰 장르로 나눠 쌓은 레벨이에요. 장르가 맞는 게임이 5개 이상, 합계 10시간 이상이면 나타나요. 레벨 = ⌊√(누적시간 ÷ 5)⌋ (Lv.1=5시간, Lv.2=20시간, Lv.3=45시간... 레벨이 오를수록 다음 레벨까지 더 오래 걸려요). 게임 하나가 여러 장르에 걸치면 시간을 똑같이 나눠요. 직접 추가한 게임은 입력한 플레이타임으로 들어가고, 플레이타임이 0이거나 '제외' 상태인 게임은 빠져요. 장르를 누르면 세부 장르별 시간을 볼 수 있어요."
               >
                 ?
               </span>
@@ -208,15 +208,16 @@ export function AccountHeader({
               </svg>
             </button>
           </div>
-          <div className="genreTabRow">
-            <button
-              type="button"
-              className={"genreTab " + (genreTab === "level" ? "active" : "")}
-              onClick={() => setGenreTab("level")}
-            >
-              장르 레벨
-            </button>
-            {genreTaste.length > 0 && (
+          {/* Only worth a tab row when there's a second tab to switch to. */}
+          {genreTaste.length > 0 && (
+            <div className="genreTabRow">
+              <button
+                type="button"
+                className={"genreTab " + (genreTab === "level" ? "active" : "")}
+                onClick={() => setGenreTab("level")}
+              >
+                장르 레벨
+              </button>
               <button
                 type="button"
                 className={"genreTab " + (genreTab === "taste" ? "active" : "")}
@@ -224,8 +225,8 @@ export function AccountHeader({
               >
                 장르 선호도
               </button>
-            )}
-          </div>
+            </div>
+          )}
           {genreTab === "level" && (
             <>
               <GenreRadar

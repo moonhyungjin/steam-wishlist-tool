@@ -28,7 +28,7 @@ import {
   MANUAL_PLATFORM_LABELS,
   ROW_GAP,
 } from "../constants";
-import { GENRE_LEVELING_ENABLED } from "../genres";
+import { GENRE_TASTE_ENABLED } from "../genres";
 import { StatusGlyph, CoverPlaceholder, StarGlyph, StarPicker } from "./Glyphs";
 const RECOMMEND_FIT_LABELS: Record<RecommendFit, string> = {
   good: "잘 맞음",
@@ -95,7 +95,7 @@ export function GameRow({
   const achievement = achievementMap[item.appid];
   const checkingAchievement = checkingAchievements.has(item.appid);
   const recommend =
-    GENRE_LEVELING_ENABLED && view === "wishlist" && sortKey === "recommend-desc"
+    GENRE_TASTE_ENABLED && view === "wishlist" && sortKey === "recommend-desc"
       ? (recommendFit[item.appid] ?? null)
       : null;
   // Negative appids are synthetic (no Steam match), so there's no real store/library page to link
@@ -296,7 +296,7 @@ export function GameRow({
                 type="button"
                 className="chip playtimeChip"
                 onClick={() => setEditingPlaytime(true)}
-                title="직접 입력한 플레이타임 - 장르 레벨/선호도 계산에 반영됩니다"
+                title="직접 입력한 플레이타임 - 장르 레벨 계산에 반영됩니다"
               >
                 {item.playtimeMinutes != null
                   ? `플레이타임 ${(item.playtimeMinutes / 60).toFixed(1)}시간 (수정)`

@@ -181,7 +181,7 @@ describe("mergeGamesInto", () => {
   });
 });
 
-describe("genre level / taste / recommendation (feature flag is still off in production)", () => {
+describe("genre level / taste / recommendation (taste + recommend still off in production)", () => {
   const A = 19; // 액션
   const R = 122; // RPG
   const mk = (appid: number, ids: number[], names: string[]): Game => ({

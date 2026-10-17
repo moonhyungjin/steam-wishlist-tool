@@ -1,8 +1,10 @@
-// Genre level/taste/recommendation still need more real-world tuning before going live - this
-// keeps every entry point (profile badge, popover, wishlist sort option, recommend chip) off in
-// production while the underlying code, data model, and DB sync all ship as-is. Flip to true when
-// ready to launch instead of re-threading these checks individually.
-export const GENRE_LEVELING_ENABLED = false;
+// Genre levels (profile badge + level popover): playtime per broad genre, shown as-is.
+export const GENRE_LEVELS_ENABLED = true;
+// Genre taste and everything built on it (the popover's 장르 선호도 tab, the badge's "선호 1위"
+// tooltip, the wishlist's 추천도 높은순 sort and its recommend chip). Held back: on the author's
+// account it did not beat the existing review sort - see docs/genre-taste-eval.md for the result
+// and how to re-run it before turning this on. Off means the taste profile isn't computed at all.
+export const GENRE_TASTE_ENABLED = false;
 // Deliberately much smaller than the genre *filter*'s GENRE_ALLOWLIST (100+ raw Steam tags) - that
 // list is great for filtering (fine-grained facets are useful there) but terrible for leveling,
 // since near-synonyms ("1인칭 슈팅"/"히어로 슈팅"/"익스트랙션 슈터") would each level up as their
