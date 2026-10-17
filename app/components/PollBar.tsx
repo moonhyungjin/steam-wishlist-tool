@@ -1,4 +1,5 @@
 "use client";
+import { CloseButton } from "./CloseButton";
 
 export function PollBar({
   closePollMode,
@@ -39,9 +40,7 @@ export function PollBar({
           >
             복사
           </button>
-          <button type="button" className="pollBarBtnGhost" onClick={closePollMode}>
-            닫기
-          </button>
+          <CloseButton className="pollBarClose" onClick={closePollMode} />
         </>
       ) : (
         <>
@@ -59,9 +58,6 @@ export function PollBar({
           >
             {pollCreating ? "만드는 중..." : "투표 링크 만들기"}
           </button>
-          <button type="button" className="pollBarBtnGhost" onClick={closePollMode}>
-            취소
-          </button>
           <label className="pollBarCheck">
             <input
               type="checkbox"
@@ -70,6 +66,7 @@ export function PollBar({
             />
             체크한 게임만 보기
           </label>
+          <CloseButton className="pollBarClose" label="투표 만들기 닫기" onClick={closePollMode} />
         </>
       )}
     </div>

@@ -2166,6 +2166,10 @@ a.moreActionsItem {
   border-color: var(--accent);
   color: var(--accent);
 }
+/* Pinned to the bar's right end, like the ✕ in a panel header. */
+.pollBarClose {
+  margin-left: auto;
+}
 .pollBarCheck {
   display: flex;
   align-items: center;
