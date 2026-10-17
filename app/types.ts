@@ -1,5 +1,7 @@
 export type Item = { appid: number; playtimeMinutes?: number; lastPlayedTimestamp?: number | null };
 export type View = "wishlist" | "library";
+// The panels the toolbar's ⋯ menu opens above the list - at most one at a time.
+export type ToolbarPanel = "manual" | "country" | "sync" | "myPolls";
 export type Profile = {
   personaName: string | null;
   avatarUrl: string | null;

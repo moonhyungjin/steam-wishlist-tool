@@ -1,6 +1,6 @@
 "use client";
 import type { FilterState } from "../useFilterState";
-import { type Item, type View } from "../types";
+import { type Item, type ToolbarPanel, type View } from "../types";
 import { countryLabel } from "../countries";
 export function Toolbar({
   filters,
@@ -15,14 +15,12 @@ export function Toolbar({
   loading,
   moreActionsOpen,
   moreActionsWrapRef,
+  openPanel,
   pollActiveForView,
-  setCountryOpen,
-  setSyncOpen,
   syncLocked,
   setLayoutMode,
-  setManualFormOpen,
   setMoreActionsOpen,
-  setMyPollsOpen,
+  togglePanel,
   togglePollMode,
   view,
 }: {
@@ -39,17 +37,17 @@ export function Toolbar({
   moreActionsOpen: boolean;
   moreActionsWrapRef: React.RefObject<HTMLDivElement | null>;
   pollActiveForView: boolean;
-  setCountryOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setSyncOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  openPanel: ToolbarPanel | null;
+  togglePanel: (panel: ToolbarPanel) => void;
   syncLocked: boolean;
   setLayoutMode: React.Dispatch<React.SetStateAction<"list" | "card">>;
-  setManualFormOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setMoreActionsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setMyPollsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   togglePollMode: (kind: "buy" | "play") => void;
   view: View;
 }) {
   const { nameQuery, setMobileFiltersOpen, setNameQuery } = filters;
+  // Marks the menu entry whose panel (or poll) is open - picking it again closes it.
+  const itemClass = (open: boolean) => "moreActionsItem" + (open ? " open" : "");
   // The "refresh daily" nudge only matters for the wishlist - library data (owned games, playtime)
   // isn't price-sensitive, so no dot or hint there.
   const showRefreshNudge = refreshDue && view === "wishlist";
@@ -157,7 +155,7 @@ export function Toolbar({
             <div className="moreActionsMenu">
               <button
                 type="button"
-                className="moreActionsItem"
+                className={itemClass(pollActiveForView)}
                 onClick={() => {
                   togglePollMode(view === "wishlist" ? "buy" : "play");
                   setMoreActionsOpen(false);
@@ -172,9 +170,9 @@ export function Toolbar({
               </button>
               <button
                 type="button"
-                className="moreActionsItem"
+                className={itemClass(openPanel === "myPolls")}
                 onClick={() => {
-                  setMyPollsOpen(true);
+                  togglePanel("myPolls");
                   setMoreActionsOpen(false);
                 }}
               >
@@ -199,10 +197,10 @@ export function Toolbar({
               {view === "library" && (
                 <button
                   type="button"
-                  className="moreActionsItem"
+                  className={itemClass(openPanel === "manual")}
                   title="Epic/STOVE 등 다른 곳에서 산 게임을 직접 추가"
                   onClick={() => {
-                    setManualFormOpen((v) => !v);
+                    togglePanel("manual");
                     setMoreActionsOpen(false);
                   }}
                 >
@@ -242,9 +240,9 @@ export function Toolbar({
               </a>
               <button
                 type="button"
-                className="moreActionsItem"
+                className={itemClass(openPanel === "country")}
                 onClick={() => {
-                  setCountryOpen(true);
+                  togglePanel("country");
                   setMoreActionsOpen(false);
                 }}
               >
@@ -267,9 +265,9 @@ export function Toolbar({
               {view === "library" && (
                 <button
                   type="button"
-                  className="moreActionsItem"
+                  className={itemClass(openPanel === "sync")}
                   onClick={() => {
-                    setSyncOpen(true);
+                    togglePanel("sync");
                     setMoreActionsOpen(false);
                   }}
                 >

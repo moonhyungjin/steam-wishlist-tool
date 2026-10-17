@@ -2049,6 +2049,10 @@ button:disabled {
 a.moreActionsItem {
   text-decoration: none;
 }
+.moreActionsItem.open {
+  background: rgba(102, 192, 244, 0.12);
+  color: var(--accent);
+}
 .moreActionsItem:disabled {
   opacity: 0.5;
   cursor: default;
@@ -2241,6 +2245,20 @@ a.pollBarBtn {
   text-decoration: none;
 }
 @media (max-width: 900px) {
+  /* .mainArea is a fixed 100vh column here, so a tall panel (동기화 코드, a long 내가 만든 투표)
+     would leave the list no height at all - cap it and scroll inside, keeping the title + ✕ pinned. */
+  .myPollsPanel {
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  .myPollsHead {
+    position: sticky;
+    top: calc(-1 * var(--space-md));
+    z-index: 1;
+    margin-top: calc(-1 * var(--space-md));
+    padding-top: var(--space-md);
+    background: var(--panel);
+  }
   .myPollsItem {
     flex-direction: column;
     align-items: stretch;
