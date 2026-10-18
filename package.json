@@ -23,9 +23,6 @@
     "react-window": "^2.3.0"
   },
   "devDependencies": {
-    "@capacitor/android": "^8.5.1",
-    "@capacitor/cli": "^8.5.1",
-    "@capacitor/core": "^8.5.1",
     "@playwright/test": "^1.64.0",
     "@types/node": "latest",
     "@types/react": "latest",
